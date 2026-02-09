@@ -1,0 +1,1 @@
+}Rf/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.ServiceDefaults/RiparianPoc.ServiceDefaults.csproj¢net10.0òCSharp14

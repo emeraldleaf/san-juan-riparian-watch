@@ -1,0 +1,12 @@
+{
+  // SonarQube for IDE — connected mode
+  // Token is stored in VS Code secure storage (macOS Keychain), not here.
+  "sonarlint.connectedMode.project": {
+    "connectionId": "riparian-vs-extension",
+    "projectKey": "riparian-poc"
+  },
+
+  "files.associations": {
+    "*.sql": "sql"
+  }
+}

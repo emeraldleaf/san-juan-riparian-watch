@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SonarProjectConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.sonarsource.com/msbuild/analyzer/2021/1">
+  <AnalysisConfigPath>/Volumes/Mac OS Extended 1/riparian-poc/.sonarqube/conf/SonarQubeAnalysisConfig.xml</AnalysisConfigPath>
+  <ProjectPath>/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.Api/RiparianPoc.Api.csproj</ProjectPath>
+  <FilesToAnalyzePath>/Volumes/Mac OS Extended 1/riparian-poc/.sonarqube/conf/1/FilesToAnalyze.txt</FilesToAnalyzePath>
+  <OutPath>/Volumes/Mac OS Extended 1/riparian-poc/.sonarqube/out/1</OutPath>
+  <ProjectType>Product</ProjectType>
+  <TargetFramework>net10.0</TargetFramework>
+</SonarProjectConfig>

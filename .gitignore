@@ -1,0 +1,16 @@
+
+# IDE & tooling
+.github/instructions/codacy.instructions.md
+
+# Dev script state
+.aspire.pid
+
+# Build outputs
+**/bin/
+**/obj/
+**/dist/
+**/node_modules/
+
+# Secrets & environment
+.env
+*.user

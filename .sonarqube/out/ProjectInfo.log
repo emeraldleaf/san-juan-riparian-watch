@@ -1,0 +1,26 @@
+Product projects
+---------------------------------------
+/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.ServiceDefaults/RiparianPoc.ServiceDefaults.csproj
+/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.Api/RiparianPoc.Api.csproj
+/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.AppHost/RiparianPoc.AppHost.csproj
+
+
+Test projects
+---------------------------------------
+
+
+Invalid projects
+---------------------------------------
+{none}
+
+
+Skipped projects
+---------------------------------------
+{none}
+
+
+Excluded projects
+---------------------------------------
+{none}
+
+

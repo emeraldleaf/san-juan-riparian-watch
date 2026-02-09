@@ -1,0 +1,1 @@
+eRN/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.Api/RiparianPoc.Api.csproj¢net10.0òCSharp14

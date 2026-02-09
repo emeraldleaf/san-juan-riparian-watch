@@ -1,0 +1,1 @@
+mRV/Volumes/Mac OS Extended 1/riparian-poc/RiparianPoc.AppHost/RiparianPoc.AppHost.csproj¢net10.0òCSharp14

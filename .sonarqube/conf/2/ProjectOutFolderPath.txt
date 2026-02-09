@@ -1,0 +1,1 @@
+/Volumes/Mac OS Extended 1/riparian-poc/.sonarqube/out/2
