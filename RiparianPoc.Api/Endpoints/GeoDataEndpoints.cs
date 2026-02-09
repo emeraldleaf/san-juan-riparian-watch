@@ -103,19 +103,23 @@ public sealed record VegetationReading(
 
 /// <summary>
 /// Watershed-level compliance summary from the gold schema.
+/// Uses a class (not record) so Dapper uses property-based mapping,
+/// which correctly handles nullable DB columns.
 /// </summary>
-public sealed record ComplianceSummary(
-    int Id,
-    int WatershedId,
-    string Huc8,
-    decimal? TotalStreamLengthM,
-    decimal? TotalBufferAreaSqM,
-    int TotalParcels,
-    int CompliantParcels,
-    int FocusAreaParcels,
-    decimal? CompliancePct,
-    decimal? AvgNdvi,
-    decimal? HealthyBufferPct,
-    decimal? DegradedBufferPct,
-    decimal? BareBufferPct,
-    DateTimeOffset CreatedAt);
+public sealed class ComplianceSummary
+{
+    public int Id { get; init; }
+    public int WatershedId { get; init; }
+    public string Huc8 { get; init; } = "";
+    public decimal? TotalStreamLengthM { get; init; }
+    public decimal? TotalBufferAreaSqM { get; init; }
+    public int TotalParcels { get; init; }
+    public int CompliantParcels { get; init; }
+    public int FocusAreaParcels { get; init; }
+    public decimal? CompliancePct { get; init; }
+    public decimal? AvgNdvi { get; init; }
+    public decimal? HealthyBufferPct { get; init; }
+    public decimal? DegradedBufferPct { get; init; }
+    public decimal? BareBufferPct { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}

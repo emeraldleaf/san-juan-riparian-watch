@@ -534,6 +534,7 @@ class EtlPipeline:
         source_fields = ",".join(PARCEL_FIELD_MAP.keys())
         offset = 0
         total = 0
+        seen_ids: set[str] = set()
 
         while True:
             gdf = self._client.query(
@@ -552,8 +553,12 @@ class EtlPipeline:
             gdf = gdf.dropna(subset=["parcel_id"])
             if len(gdf) < before:
                 logger.info("Dropped %d parcels with null parcel_id", before - len(gdf))
+            # Deduplicate within batch and across batches
+            gdf = gdf.drop_duplicates(subset=["parcel_id"], keep="first")
+            gdf = gdf[~gdf["parcel_id"].isin(seen_ids)]
             if gdf.empty:
                 continue
+            seen_ids.update(gdf["parcel_id"].tolist())
             self._writer.write(gdf, "parcels", "bronze")
 
             batch_count = len(gdf)
