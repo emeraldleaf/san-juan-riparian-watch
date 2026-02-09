@@ -24,6 +24,7 @@ waterway buffer zones, and how healthy is the vegetation in those zones?"*
 - [Code Quality (SonarQube)](#code-quality-sonarqube)
 - [Azure Deployment](#azure-deployment)
 - [Troubleshooting](#troubleshooting)
+- [Observability](#observability)
 
 ---
 
@@ -73,9 +74,9 @@ This application:
     │  Pipeline      │  │  API       │  │  (Leaflet Map)       │
     │                │  │            │  │                      │
     │  - ArcGIS APIs │  │  - GeoJSON │  │  - Stream lines      │
-    │  - PostGIS     │  │  - 6 endpts│  │  - Buffer polygons   │
-    │  - Sentinel-2  │  │  - NTS     │  │  - Parcel colors     │
-    │  - NDVI calc   │  │            │  │  - NDVI heatmap      │
+    │  - PostGIS     │  │  - Dapper  │  │  - Buffer polygons   │
+    │  - Sentinel-2  │  │  - 6 endpts│  │  - Parcel colors     │
+    │  - NDVI calc   │  │  - OTEL   │  │  - NDVI heatmap      │
     └────────┬───────┘  └─────┬──────┘  └───────────┬──────────┘
              │                │                      │
              │         ┌──────▼──────┐               │
@@ -93,11 +94,11 @@ This application:
 
 | Service | Role | Port |
 |---------|------|------|
-| **Aspire AppHost** | Orchestrates containers, injects connection strings, manages lifecycle | Dashboard: ~15195 |
+| **Aspire AppHost** | Orchestrates containers, injects connection strings, manages lifecycle | Dashboard: 18888 |
 | **PostgreSQL + PostGIS** | Shared spatial database (persistent container) | 5432 |
-| **C# REST API** | Reads from all schemas, returns GeoJSON | Dynamic (see dashboard) |
+| **C# REST API** | Reads from all schemas, returns GeoJSON via service layer + Dapper | 8000 |
 | **Python ETL** | Writes to bronze/silver/gold schemas | No port (batch job) |
-| **React Frontend** | Vite dev server, calls C# API | 3000 |
+| **React Frontend** | Vite dev server, calls C# API with session tracking | 3000 |
 
 Aspire automatically:
 - Starts PostGIS with a persistent container (data survives restarts)
@@ -401,10 +402,10 @@ ETL_UPDATE_TYPE=all                   # Incremental + NDVI
 | **.NET** | 10.0 | Runtime for API and Aspire |
 | **ASP.NET Core** | 10.0 | REST API framework (minimal APIs) |
 | **.NET Aspire** | 13.1.0 | Service orchestration, health checks, OpenTelemetry |
-| **Npgsql** | via Aspire | Foundational .NET data provider for PostgreSQL |
-| **Entity Framework Core** | 10.0 | ORM for database interaction |
-| **Npgsql.EntityFrameworkCore.PostgreSQL** | via Aspire | EF Core provider with spatial data type mapping |
-| **NetTopologySuite (NTS)** | 4.0.0 | Spatial data types (Points, Lines, Polygons) in .NET + GeoJSON serialization |
+| **Npgsql** | via Aspire | .NET data provider for PostgreSQL (NpgsqlDataSource) |
+| **Dapper** | 2.1 | Micro-ORM for typed and dynamic SQL queries |
+| **NetTopologySuite (NTS)** | 4.0.0 | Spatial data types + GeoJSON serialization |
+| **OpenTelemetry** | via Aspire | Distributed tracing, metrics, and structured logging |
 
 ### Database
 | Technology | Version | Purpose |
@@ -446,8 +447,19 @@ riparian-poc/
 │
 ├── RiparianPoc.Api/                   # C# REST API
 │   ├── Endpoints/
-│   │   └── GeoDataEndpoints.cs        #   6 API endpoints (streams, buffers, parcels, etc.)
-│   ├── Program.cs                     #   Minimal hosting, CORS, Npgsql setup
+│   │   └── GeoDataEndpoints.cs        #   Thin route handlers + DTO records
+│   ├── Services/
+│   │   ├── IGeoDataServices.cs        #   ISpatialQueryService + IComplianceDataService
+│   │   └── GeoDataServices.cs         #   SQL queries + business logic
+│   ├── Repositories/
+│   │   ├── IPostGisRepository.cs      #   Data access abstraction
+│   │   └── PostGisRepository.cs       #   Dapper queries + GeoJSON deserialization
+│   ├── Middleware/
+│   │   ├── CorrelationMiddleware.cs    #   X-Correlation-Id + X-Session-Id tracking
+│   │   └── ExceptionHandlingMiddleware.cs  # Global error → structured JSON
+│   ├── Models/
+│   │   └── ApiErrorResponse.cs        #   Structured error response record
+│   ├── Program.cs                     #   DI registration, middleware pipeline, OTEL setup
 │   └── RiparianPoc.Api.csproj
 │
 ├── RiparianPoc.ServiceDefaults/       # Shared Aspire config
@@ -534,8 +546,8 @@ cd "/Volumes/Mac OS Extended 1/riparian-poc"
 | Service | URL |
 |---------|-----|
 | **Frontend (map)** | http://localhost:3000 |
-| **Aspire Dashboard** | See terminal output (typically http://localhost:15195) |
-| **API** | Dynamic port — check the Aspire dashboard |
+| **Aspire Dashboard** | http://localhost:18888 |
+| **API** | http://localhost:8000 |
 
 ---
 
@@ -587,7 +599,8 @@ SELECT * FROM meta.etl_runs ORDER BY started_at DESC;
 ## API Endpoints
 
 All endpoints return **GeoJSON FeatureCollections** (except vegetation and summary which
-return typed JSON arrays).
+return typed JSON arrays). On error, all endpoints return a structured
+`ApiErrorResponse` JSON body (see [Observability](#observability)).
 
 ### GET /api/streams
 Returns all stream centerlines from the bronze layer.
@@ -808,3 +821,90 @@ batch. The upsert method handles this by deduplicating the staging table before 
 ### PostGIS container keeps restarting
 Check Docker Desktop's disk space. PostGIS data is stored in Docker volumes on the
 external drive at `/Volumes/Mac OS Extended 1/DockerData/`.
+
+---
+
+## Observability
+
+The API includes built-in distributed tracing, structured logging, and error handling
+powered by **OpenTelemetry** and **.NET Aspire**.
+
+### Correlation & Session Tracking
+
+Every API request is tagged with two identifiers:
+
+- **Correlation ID** (`X-Correlation-Id` header) — ties a single HTTP request to all
+  its downstream database queries and log entries. Derived from the W3C TraceId.
+- **Session ID** (`X-Session-Id` header) — ties multiple API calls together for a
+  single user session. Generated by the frontend on page load.
+
+The frontend sends `X-Session-Id` with every request. The middleware extracts both IDs,
+attaches them to the OpenTelemetry trace as tags, and wraps all downstream logging in a
+scope so every log entry includes `CorrelationId`, `SessionId`, and `ClientIp`.
+
+### Distributed Tracing
+
+Three custom `ActivitySource` instances create nested trace spans:
+
+```
+HTTP GET /api/streams (ASP.NET Core auto-span)
+  └── SpatialQuery.GetStreams (service span)
+       └── PostGis.QueryGeoJson (repository span)
+            └── Npgsql query (auto-instrumented)
+```
+
+In the Aspire Dashboard (http://localhost:18888):
+- **Traces** tab — view the full span hierarchy for each request
+- Filter by `session.id` tag to see all API calls for one user session
+- Filter by `correlation.id` to drill into a single request
+
+### Error Handling
+
+Errors are handled in layers (defense in depth):
+
+| Layer | Responsibility |
+|-------|---------------|
+| **Repository** | Catches `NpgsqlException`, enriches trace with timing, wraps with context |
+| **Service** | Validates input (e.g., `bufferId <= 0` → `ArgumentException`) |
+| **ExceptionHandlingMiddleware** | Maps exception types to HTTP status codes, returns structured JSON |
+
+Error responses use a consistent JSON format:
+
+```json
+{
+  "error": "Buffer ID must be positive, got -1",
+  "correlationId": "a1b2c3d4e5f6...",
+  "statusCode": 400,
+  "detail": "System.ArgumentException: ..."
+}
+```
+
+The `detail` field is only populated in the Development environment. Exception type
+mapping:
+
+| Exception | HTTP Status | Message Policy |
+|-----------|-------------|----------------|
+| `NpgsqlException` | 503 | Generic ("Database temporarily unavailable") |
+| `ArgumentException` | 400 | Exception message exposed (user-facing) |
+| `KeyNotFoundException` | 404 | Exception message exposed |
+| `OperationCanceledException` | 504 | Generic ("Request timed out") |
+| Other | 500 | Generic ("An unexpected error occurred") |
+
+### API Architecture
+
+The API follows a layered architecture with interface segregation:
+
+```
+Endpoints (thin handlers)
+    ↓ inject
+Services (ISpatialQueryService, IComplianceDataService)
+    ↓ inject
+Repository (IPostGisRepository)
+    ↓ uses
+NpgsqlDataSource + Dapper
+```
+
+- **Endpoints** — route handlers only, no SQL or business logic
+- **Services** — own SQL queries, input validation, ActivitySource tracing
+- **Repository** — generic data access (GeoJSON and typed queries via Dapper)
+- All registered as scoped services in DI
