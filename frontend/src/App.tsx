@@ -119,7 +119,7 @@ function onEachParcel(feature: Feature, layer: Layer) {
   if (p.is_focus_area === true) status = 'Focus Area';
   else if (p.is_focus_area === false) status = 'Compliant';
   const extra = [
-    p.overlap_pct == null ? '' : `Overlap: ${p.overlap_pct}%`,
+    p.overlap_pct == null ? '' : `Buffer Overlap: ${p.overlap_pct}%`,
     p.focus_area_reason ? `Reason: ${p.focus_area_reason}` : '',
   ].filter(Boolean).join('<br/>');
 

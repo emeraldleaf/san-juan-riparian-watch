@@ -856,24 +856,32 @@ _GENERATE_BUFFERS_SQL = text("""
 
 # Bounding-box pre-filter (&&) before expensive ST_Intersects per convention
 _ANALYZE_COMPLIANCE_SQL = text("""
+    WITH intersections AS (
+        SELECT
+            p.id AS parcel_id,
+            b.id AS buffer_id,
+            b.area_sq_m AS buffer_area_sq_m,
+            ST_Intersection(p.geom, b.geom) AS overlap_geom
+        FROM bronze.parcels p
+        JOIN silver.riparian_buffers b
+            ON p.geom && b.geom
+            AND ST_Intersects(p.geom, b.geom)
+    )
     INSERT INTO silver.parcel_compliance (
         parcel_id, buffer_id, overlap_area_sq_m, overlap_pct,
         is_focus_area, focus_area_reason, geom
     )
     SELECT
-        p.id,
-        b.id,
-        ST_Area(ST_Intersection(p.geom, b.geom)::geography),
-        ST_Area(ST_Intersection(p.geom, b.geom)::geography)
-            / NULLIF(ST_Area(p.geom::geography), 0) * 100,
+        i.parcel_id,
+        i.buffer_id,
+        ST_Area(i.overlap_geom::geography),
+        ST_Area(i.overlap_geom::geography)
+            / NULLIF(i.buffer_area_sq_m, 0) * 100,
         TRUE,
         'Parcel overlaps riparian buffer zone',
-        ST_Intersection(p.geom, b.geom)
-    FROM bronze.parcels p
-    JOIN silver.riparian_buffers b
-        ON p.geom && b.geom
-        AND ST_Intersects(p.geom, b.geom)
-    WHERE ST_Area(ST_Intersection(p.geom, b.geom)::geography) > 1
+        i.overlap_geom
+    FROM intersections i
+    WHERE ST_Area(i.overlap_geom::geography) > 1
 """)
 
 _CALCULATE_SUMMARY_SQL = text("""

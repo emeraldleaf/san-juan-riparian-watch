@@ -42,8 +42,9 @@ This application:
 2. **Generates buffer zones** — 100-foot protective corridors around each stream.
 3. **Pulls parcel data** from the Colorado Public Parcels database to know property
    boundaries and ownership.
-4. **Identifies focus areas** — any parcel that physically overlaps a buffer zone is flagged,
-   with the exact overlap area and percentage calculated.
+4. **Identifies focus areas** — any parcel that physically overlaps a buffer zone is flagged.
+   The parcel is clipped to the buffer boundary, and the overlap area and percentage of
+   buffer encroachment are calculated.
 5. **Scores vegetation health** using Sentinel-2 satellite imagery (NDVI) to determine
    whether the vegetation in each buffer zone is healthy, degraded, or bare.
 6. **Displays everything on a map** — an interactive web application where you can see
@@ -186,12 +187,14 @@ intersect.
 computes whether the actual polygon shapes touch or overlap. This is slower but precise.
 
 **Computing the overlap:** For every parcel-buffer pair that intersects, the pipeline
-calculates:
+clips the parcel to the buffer boundary and calculates metrics on that clipped portion only:
 
 - **Overlap geometry:** `ST_Intersection(parcel, buffer)` — the exact shape of the
-  encroachment
-- **Overlap area:** `ST_Area(overlap::geography)` — area in square meters
-- **Overlap percentage:** overlap area / parcel area * 100
+  parcel within the buffer (not the full parcel)
+- **Overlap area:** `ST_Area(overlap::geography)` — area of the clipped portion in
+  square meters
+- **Overlap percentage:** overlap area / **buffer** area * 100 — what percentage of the
+  buffer zone this parcel encroaches on
 
 Any parcel with more than 1 square meter of overlap is identified as a **focus area**.
 
