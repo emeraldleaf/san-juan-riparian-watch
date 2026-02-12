@@ -100,6 +100,13 @@ function parcelStyle(feature?: Feature): PathOptions {
   return { color: '#6b7280', weight: 1, fillOpacity: 0.2 };
 }
 
+const WETLAND_STYLE: PathOptions = {
+  color: '#0891b2',
+  weight: 1,
+  fillColor: '#22d3ee',
+  fillOpacity: 0.35,
+};
+
 // ---------------------------------------------------------------------------
 // Popups
 // ---------------------------------------------------------------------------
@@ -153,6 +160,17 @@ function onEachParcel(feature: Feature, layer: Layer) {
   );
 }
 
+function onEachWetland(feature: Feature, layer: Layer) {
+  const p = feature.properties;
+  if (!p) return;
+  layer.bindPopup(
+    `<strong>NWI Wetland</strong><br/>` +
+    `Type: ${p.wetland_type ?? 'N/A'}<br/>` +
+    `Cowardin Code: ${p.cowardin_code ?? 'N/A'}<br/>` +
+    `Acres: ${p.acres ? Number(p.acres).toFixed(2) : 'N/A'}`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // NDVI heat points from buffer centroids
 // ---------------------------------------------------------------------------
@@ -192,8 +210,10 @@ export default function App() {
   const [streams, setStreams] = useState<FeatureCollection | null>(null);
   const [buffers, setBuffers] = useState<FeatureCollection | null>(null);
   const [parcels, setParcels] = useState<FeatureCollection | null>(null);
+  const [wetlands, setWetlands] = useState<FeatureCollection | null>(null);
+  const [showWetlands, setShowWetlands] = useState(true);
   const [summary, setSummary] = useState<ComplianceSummary[]>([]);
-  const [basemap, setBasemap] = useState<'street' | 'satellite'>('street');
+  const [basemap, setBasemap] = useState<'street' | 'satellite' | 'naip'>('street');
 
   // Timelapse state
   const [ndviDates, setNdviDates] = useState<string[]>([]);
@@ -209,12 +229,14 @@ export default function App() {
       fetchJson<FeatureCollection>(`${API_URL}/api/parcels`),
       fetchJson<ComplianceSummary[]>(`${API_URL}/api/summary`),
       fetchJson<string[]>(`${API_URL}/api/ndvi/dates`),
-    ]).then(([s, b, p, sum, dates]) => {
+      fetchJson<FeatureCollection>(`${API_URL}/api/wetlands`),
+    ]).then(([s, b, p, sum, dates, w]) => {
       if (s.status === 'fulfilled') setStreams(s.value);
       if (b.status === 'fulfilled') setBuffers(b.value);
       if (p.status === 'fulfilled') setParcels(p.value);
       if (sum.status === 'fulfilled') setSummary(sum.value);
       if (dates.status === 'fulfilled') setNdviDates(dates.value);
+      if (w.status === 'fulfilled') setWetlands(w.value);
     });
   }, []);
 
@@ -283,17 +305,26 @@ export default function App() {
           zoom={DEFAULT_ZOOM}
           className="h-full w-full"
         >
-          {basemap === 'street' ? (
+          {basemap === 'street' && (
             <TileLayer
               key="street"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
-          ) : (
+          )}
+          {basemap === 'satellite' && (
             <TileLayer
               key="satellite"
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               attribution="Tiles &copy; Esri"
+              maxZoom={19}
+            />
+          )}
+          {basemap === 'naip' && (
+            <TileLayer
+              key="naip"
+              url="https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}"
+              attribution="USDA NAIP Imagery"
               maxZoom={19}
             />
           )}
@@ -320,16 +351,39 @@ export default function App() {
               onEachFeature={onEachParcel}
             />
           )}
+          {showWetlands && wetlands && (
+            <GeoJSON
+              data={wetlands}
+              style={() => WETLAND_STYLE}
+              onEachFeature={onEachWetland}
+            />
+          )}
 
           <NDVILayer points={ndviPoints} />
         </MapContainer>
 
+        {/* Layer toggles */}
+        <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs space-y-1">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showWetlands}
+              onChange={(e) => setShowWetlands(e.target.checked)}
+              className="accent-cyan-600"
+            />
+            NWI Wetlands
+          </label>
+        </div>
+
         {/* Basemap toggle */}
         <button
-          onClick={() => setBasemap((b) => (b === 'street' ? 'satellite' : 'street'))}
+          onClick={() => setBasemap((b) => {
+            const cycle = { street: 'satellite', satellite: 'naip', naip: 'street' } as const;
+            return cycle[b];
+          })}
           className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs font-medium hover:bg-gray-100 transition-colors"
         >
-          {basemap === 'street' ? 'Satellite' : 'Street Map'}
+          {{ street: 'Satellite', satellite: 'NAIP Aerial', naip: 'Street Map' }[basemap]}
         </button>
 
         {/* Timelapse slider */}
@@ -354,6 +408,8 @@ export default function App() {
             <LegendItem color="bg-green-600/60" shape="box" label="Compliant" />
             <LegendItem color="bg-red-600/60" shape="box" label="Focus Area" />
             <LegendItem color="bg-gray-500/40" shape="box" label="Unknown Status" />
+            <span className="block text-[10px] text-gray-500 pt-1">Overlays</span>
+            <LegendItem color="bg-cyan-400/60" shape="box" label="NWI Wetlands" />
           </div>
         </div>
       </div>

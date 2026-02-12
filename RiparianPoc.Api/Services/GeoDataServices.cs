@@ -178,6 +178,27 @@ public sealed class SpatialQueryService : ISpatialQueryService
 
         return fc;
     }
+
+    /// <inheritdoc />
+    public async Task<FeatureCollection> GetWetlandsAsync(CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("SpatialQuery.GetWetlands");
+
+        _logger.LogInformation("Fetching NWI wetland polygons from bronze schema");
+
+        const string sql = """
+            SELECT id, wetland_type, cowardin_code, acres,
+                   ST_AsGeoJSON(geom) AS geojson
+            FROM bronze.nwi_wetlands
+            """;
+
+        var fc = await _repository.QueryGeoJsonAsync(sql, null, ct);
+
+        activity?.SetTag(FeatureCountTag, fc.Count);
+        _logger.LogInformation("NWI wetlands fetched: {FeatureCount} features", fc.Count);
+
+        return fc;
+    }
 }
 
 /// <summary>
@@ -251,6 +272,39 @@ public sealed class ComplianceDataService : IComplianceDataService
         _logger.LogInformation("NDVI dates fetched: {Count} dates", dates.Count);
 
         return dates;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<BufferWetland>> GetBufferWetlandsAsync(
+        int bufferId, CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("ComplianceData.GetBufferWetlands");
+        activity?.SetTag("buffer.id", bufferId);
+
+        if (bufferId <= 0)
+        {
+            throw new ArgumentException(
+                $"Buffer ID must be positive, got {bufferId}", nameof(bufferId));
+        }
+
+        _logger.LogInformation("Fetching wetland overlaps for buffer {BufferId}", bufferId);
+
+        const string sql = """
+            SELECT bw.id, bw.buffer_id, bw.wetland_id,
+                   bw.overlap_area_sq_m, bw.wetland_pct_of_buffer,
+                   bw.wetland_type, bw.cowardin_code, bw.processed_at
+            FROM silver.buffer_wetlands bw
+            WHERE bw.buffer_id = @bufferId
+            ORDER BY bw.overlap_area_sq_m DESC
+            """;
+
+        var results = await _repository.QueryAsync<BufferWetland>(sql, new { bufferId }, ct);
+
+        _logger.LogInformation(
+            "Wetland overlaps fetched for buffer {BufferId}: {Count} overlaps",
+            bufferId, results.Count);
+
+        return results;
     }
 
     /// <inheritdoc />

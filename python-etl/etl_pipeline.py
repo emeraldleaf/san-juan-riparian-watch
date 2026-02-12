@@ -41,6 +41,10 @@ PARCELS_URL = (
     "https://gis.colorado.gov/public/rest/services"
     "/Address_and_Parcel/Colorado_Public_Parcels/FeatureServer/0"
 )
+NWI_URL = (
+    "https://fwspublicservices.wim.usgs.gov/wetlandsmapservice"
+    "/rest/services/Wetlands/MapServer/0"
+)
 
 # Study area
 HUC8_CODE = "14080101"
@@ -63,6 +67,13 @@ PARCEL_FIELD_MAP: dict[str, str] = {
     "zoningDesc": "zoning_desc",
     "owner": "owner_name",
     "landAcres": "land_acres",
+}
+
+# NWI field renaming (source API field -> database column)
+NWI_FIELD_MAP: dict[str, str] = {
+    "WETLAND_TYPE": "wetland_type",
+    "ATTRIBUTE": "cowardin_code",
+    "ACRES": "acres",
 }
 
 
@@ -663,6 +674,23 @@ class EtlPipeline:
         )
         logger.info("Generated %d riparian buffers", count)
 
+    def load_nwi_wetlands(self) -> None:
+        """Load NWI wetland polygons from FWS ArcGIS REST service.
+
+        Uses the watershed bounding box as a spatial filter to limit
+        results to the study area.
+        """
+        logger.info("Loading NWI wetland polygons")
+        envelope = self._writer.get_watershed_envelope(HUC8_CODE)
+
+        self._load_layer(
+            name="nwi_wetlands", schema="bronze",
+            url=NWI_URL,
+            envelope=envelope, explode=False,
+            col_map=NWI_FIELD_MAP,
+        )
+        logger.info("Finished loading NWI wetlands")
+
     def analyze_compliance(self) -> None:
         """Flag parcels that encroach on riparian buffer zones.
 
@@ -674,6 +702,18 @@ class EtlPipeline:
         self._writer.truncate("silver", "parcel_compliance")
         count = self._writer.execute(_ANALYZE_COMPLIANCE_SQL)
         logger.info("Found %d compliance focus areas", count)
+
+    def analyze_buffer_wetlands(self) -> None:
+        """Compute spatial intersection of riparian buffers with NWI wetlands.
+
+        Uses bounding-box pre-filter (&&) before the expensive spatial
+        intersection. Only records overlaps greater than 1 sq meter to
+        exclude rounding artifacts.
+        """
+        logger.info("Analyzing buffer-wetland intersections")
+        self._writer.truncate("silver", "buffer_wetlands")
+        count = self._writer.execute(_ANALYZE_BUFFER_WETLANDS_SQL)
+        logger.info("Found %d buffer-wetland overlaps", count)
 
     # -- Gold layer ---------------------------------------------------------
 
@@ -710,10 +750,12 @@ class EtlPipeline:
         self.load_watershed()
         self.load_nhdplus_layers()
         self.load_parcels()
+        self.load_nwi_wetlands()
 
         # Silver -- spatial processing
         self.generate_buffers()
         self.analyze_compliance()
+        self.analyze_buffer_wetlands()
 
         # Gold -- aggregated analytics
         self.calculate_summary()
@@ -909,6 +951,9 @@ class EtlPipeline:
         parcels_changed = parcels_result.has_changes
         buffers_changed = False
 
+        # Bronze -- NWI wetlands (always full refresh, like watershed)
+        self.load_nwi_wetlands()
+
         # Silver -- recompute only if upstream changed
         if streams_changed:
             self.generate_buffers()
@@ -916,6 +961,10 @@ class EtlPipeline:
 
         if parcels_changed or buffers_changed:
             self.analyze_compliance()
+
+        # Silver -- buffer-wetland intersection (recompute if buffers changed)
+        if buffers_changed:
+            self.analyze_buffer_wetlands()
 
         # Gold -- recompute after any silver changes
         if streams_changed or parcels_changed or buffers_changed:
@@ -975,6 +1024,37 @@ _ANALYZE_COMPLIANCE_SQL = text("""
         TRUE,
         'Parcel overlaps riparian buffer zone',
         i.overlap_geom
+    FROM intersections i
+    WHERE ST_Area(i.overlap_geom::geography) > 1
+""")
+
+# Buffer-wetland intersection using && pre-filter per convention
+_ANALYZE_BUFFER_WETLANDS_SQL = text("""
+    WITH intersections AS (
+        SELECT
+            b.id AS buffer_id,
+            w.id AS wetland_id,
+            b.area_sq_m AS buffer_area_sq_m,
+            w.wetland_type,
+            w.cowardin_code,
+            ST_Intersection(b.geom, w.geom) AS overlap_geom
+        FROM silver.riparian_buffers b
+        JOIN bronze.nwi_wetlands w
+            ON b.geom && w.geom
+            AND ST_Intersects(b.geom, w.geom)
+    )
+    INSERT INTO silver.buffer_wetlands (
+        buffer_id, wetland_id, overlap_area_sq_m,
+        wetland_pct_of_buffer, wetland_type, cowardin_code
+    )
+    SELECT
+        i.buffer_id,
+        i.wetland_id,
+        ST_Area(i.overlap_geom::geography),
+        ST_Area(i.overlap_geom::geography)
+            / NULLIF(i.buffer_area_sq_m, 0) * 100,
+        i.wetland_type,
+        i.cowardin_code
     FROM intersections i
     WHERE ST_Area(i.overlap_geom::geography) > 1
 """)

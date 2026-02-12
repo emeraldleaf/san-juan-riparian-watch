@@ -217,7 +217,11 @@ riparian-poc/
 
 ├── sql/
 
-│   └── create_schemas.sql          # Database migration (source of truth for schema)
+│   ├── create_schemas.sql          # Database migration (source of truth for schema)
+
+│   └── nwi_migration.sql           # NWI wetlands + SMP dataset tables (additive)
+
+├── smp_plan.md                     # SMP Dataset Integration plan
 
 ├── azure.yaml                      # Azure Developer CLI config
 
@@ -242,14 +246,19 @@ Data flows one direction: bronze → silver → gold. Never write back upstream.
 - **Python ETL** writes to bronze, silver, and gold schemas sequentially
 - **React frontend** calls the C# API, renders on Leaflet map
 - **Microsoft Planetary Computer** is accessed by the Python ETL for Sentinel-2 imagery (free, no API key)
+- **FWS NWI MapServer** is accessed by the Python ETL for wetland polygon data (free, no API key)
 
 ### API Endpoints
 - `GET /api/streams` — stream centerlines from bronze (GeoJSON)
 - `GET /api/buffers` — riparian buffer polygons from silver (GeoJSON)
 - `GET /api/buffers/health` — buffers with latest NDVI health (GeoJSON, LEFT JOIN LATERAL to vegetation_health)
+- `GET /api/buffers/health/{date}` — buffers with NDVI health for a specific date (GeoJSON)
 - `GET /api/parcels` — parcels with compliance status (GeoJSON)
 - `GET /api/focus-areas` — only focus area parcels (GeoJSON)
 - `GET /api/vegetation/buffers/{bufferId}` — NDVI time series for a buffer
+- `GET /api/ndvi/dates` — distinct NDVI acquisition dates
+- `GET /api/wetlands` — NWI wetland polygons from bronze (GeoJSON)
+- `GET /api/buffers/{bufferId}/wetlands` — NWI wetland overlaps for a buffer
 - `GET /api/summary` — gold layer compliance summary
 
 ## Conventions
@@ -429,5 +438,6 @@ Follow the standards from the prompt library
 - Colorado Parcels: https://gis.colorado.gov/public/rest/services/Address_and_Parcel/Colorado_Public_Parcels/FeatureServer/0
 - USDA Watersheds: https://apps.fs.usda.gov/ArcX/rest/services/EDW/EDW_Watersheds_01/MapServer
 - Sentinel-2 via Planetary Computer: https://planetarycomputer.microsoft.com/api/stac/v1
+- NWI Wetlands: https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/0
 - Study area: San Juan Basin, HUC8 code 14080101
 ```

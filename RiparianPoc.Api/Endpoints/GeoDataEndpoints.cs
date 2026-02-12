@@ -25,6 +25,9 @@ public static class GeoDataEndpoints
         api.MapGet("/ndvi/dates", GetNdviDates).WithName("GetNdviDates");
         api.MapGet("/buffers/health/{date}", GetBuffersWithHealthByDate)
             .WithName("GetBuffersWithHealthByDate");
+        api.MapGet("/wetlands", GetWetlands).WithName("GetWetlands");
+        api.MapGet("/buffers/{bufferId:int}/wetlands", GetBufferWetlands)
+            .WithName("GetBufferWetlands");
 
         return app;
     }
@@ -118,6 +121,26 @@ public static class GeoDataEndpoints
         var fc = await spatialService.GetBuffersWithHealthByDateAsync(date, ct);
         return TypedResults.Ok(fc);
     }
+
+    /// <summary>
+    /// GET /api/wetlands — NWI wetland polygons from bronze schema (GeoJSON FeatureCollection).
+    /// </summary>
+    private static async Task<IResult> GetWetlands(
+        ISpatialQueryService spatialService, CancellationToken ct)
+    {
+        var fc = await spatialService.GetWetlandsAsync(ct);
+        return TypedResults.Ok(fc);
+    }
+
+    /// <summary>
+    /// GET /api/buffers/{bufferId}/wetlands — NWI wetland overlaps for a specific buffer.
+    /// </summary>
+    private static async Task<IResult> GetBufferWetlands(
+        int bufferId, IComplianceDataService complianceService, CancellationToken ct)
+    {
+        var wetlands = await complianceService.GetBufferWetlandsAsync(bufferId, ct);
+        return TypedResults.Ok(wetlands);
+    }
 }
 
 /// <summary>
@@ -168,4 +191,21 @@ public sealed class ComplianceSummary
     public decimal? DegradedBufferPct { get; init; }
     public decimal? BareBufferPct { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>
+/// NWI wetland overlap for a riparian buffer from the silver schema.
+/// Uses a class (not record) so Dapper uses property-based mapping,
+/// which correctly handles snake_case columns with MatchNamesWithUnderscores.
+/// </summary>
+public sealed class BufferWetland
+{
+    public int Id { get; init; }
+    public int BufferId { get; init; }
+    public int WetlandId { get; init; }
+    public decimal? OverlapAreaSqM { get; init; }
+    public decimal? WetlandPctOfBuffer { get; init; }
+    public string? WetlandType { get; init; }
+    public string? CowardinCode { get; init; }
+    public DateTime ProcessedAt { get; init; }
 }

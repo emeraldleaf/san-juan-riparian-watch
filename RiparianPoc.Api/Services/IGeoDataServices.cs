@@ -25,6 +25,9 @@ public interface ISpatialQueryService
 
     /// <summary>Returns buffer polygons with NDVI health data for a specific acquisition date.</summary>
     Task<FeatureCollection> GetBuffersWithHealthByDateAsync(DateOnly date, CancellationToken ct);
+
+    /// <summary>Returns NWI wetland polygons from the bronze schema.</summary>
+    Task<FeatureCollection> GetWetlandsAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -41,4 +44,8 @@ public interface IComplianceDataService
 
     /// <summary>Returns distinct NDVI acquisition dates ordered chronologically.</summary>
     Task<IReadOnlyList<DateOnly>> GetNdviDatesAsync(CancellationToken ct);
+
+    /// <summary>Returns NWI wetland overlaps for a specific buffer.</summary>
+    Task<IReadOnlyList<BufferWetland>> GetBufferWetlandsAsync(
+        int bufferId, CancellationToken ct);
 }
