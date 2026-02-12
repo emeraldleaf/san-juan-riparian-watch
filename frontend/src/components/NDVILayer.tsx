@@ -13,7 +13,7 @@ interface NDVILayerProps {
  *
  * Uses leaflet.heat to display buffer-centroid heat points with a
  * red-to-green gradient matching NDVI health thresholds:
- *   bare (<0.3) → degraded (0.3–0.6) → healthy (>0.6)
+ *   bare (<0.15) → degraded (0.15–0.3) → healthy (>0.3)
  */
 export default function NDVILayer({ points }: NDVILayerProps) {
   const map = useMap();
@@ -28,8 +28,8 @@ export default function NDVILayer({ points }: NDVILayerProps) {
       max: 1,
       gradient: {
         0: '#d73027', // bare / unhealthy
-        0.3: '#fc8d59', // degraded
-        0.6: '#91cf60', // moderate
+        0.15: '#fc8d59', // degraded
+        0.3: '#91cf60', // moderate
         1: '#1a9850', // healthy
       },
     });

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import type { FeatureCollection, Feature } from 'geojson';
 import type { Layer, PathOptions } from 'leaflet';
 import NDVILayer from './components/NDVILayer';
+import TimeSlider from './components/TimeSlider';
 import 'leaflet/dist/leaflet.css';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
@@ -78,6 +79,20 @@ const BUFFER_STYLE: PathOptions = {
   fillOpacity: 0.25,
 };
 
+function bufferHealthStyle(feature?: Feature): PathOptions {
+  const category = feature?.properties?.health_category as string | null;
+  switch (category) {
+    case 'healthy':
+      return { color: '#15803d', weight: 1.5, fillColor: '#16a34a', fillOpacity: 0.4 };
+    case 'degraded':
+      return { color: '#b45309', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.4 };
+    case 'bare':
+      return { color: '#b91c1c', weight: 1.5, fillColor: '#dc2626', fillOpacity: 0.4 };
+    default:
+      return BUFFER_STYLE; // no NDVI data — use default green
+  }
+}
+
 function parcelStyle(feature?: Feature): PathOptions {
   const focusArea = feature?.properties?.is_focus_area as boolean | null;
   if (focusArea === true) return { color: '#dc2626', weight: 2, fillOpacity: 0.4 };
@@ -104,11 +119,16 @@ function onEachBuffer(feature: Feature, layer: Layer) {
   const p = feature.properties;
   if (!p) return;
   const acres = p.area_sq_m ? (p.area_sq_m / 4046.86).toFixed(2) : 'N/A';
+  const ndviLine = p.mean_ndvi != null
+    ? `NDVI: ${Number(p.mean_ndvi).toFixed(3)} (${p.health_category})<br/>`
+    : '';
+  const dateLine = p.acquisition_date ? `Acquired: ${p.acquisition_date}<br/>` : '';
   layer.bindPopup(
     `<strong>Riparian Buffer</strong><br/>` +
     `Stream: ${p.stream_name ?? 'Unknown'}<br/>` +
     `Distance: ${p.buffer_distance_m} m<br/>` +
-    `Area: ${acres} acres`,
+    `Area: ${acres} acres<br/>` +
+    ndviLine + dateLine,
   );
 }
 
@@ -144,11 +164,13 @@ function computeHeatPoints(
 
   return buffers.features
     .map((f) => {
+      const ndvi = f.properties?.mean_ndvi as number | null;
+      if (ndvi == null) return null; // skip buffers without NDVI data
       const coords = extractCoords(f.geometry);
       if (coords.length === 0) return null;
       const lat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
       const lng = coords.reduce((s, c) => s + c[0], 0) / coords.length;
-      return [lat, lng, 0.5] as [number, number, number];
+      return [lat, lng, Math.max(0, Math.min(1, ndvi))] as [number, number, number];
     })
     .filter((p): p is [number, number, number] => p !== null);
 }
@@ -171,23 +193,62 @@ export default function App() {
   const [buffers, setBuffers] = useState<FeatureCollection | null>(null);
   const [parcels, setParcels] = useState<FeatureCollection | null>(null);
   const [summary, setSummary] = useState<ComplianceSummary[]>([]);
+  const [basemap, setBasemap] = useState<'street' | 'satellite'>('street');
 
+  // Timelapse state
+  const [ndviDates, setNdviDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [bufferLoading, setBufferLoading] = useState(false);
+  const bufferVersion = useRef(0);
+
+  // Initial load — streams, latest buffers, parcels, summary, and available NDVI dates
   useEffect(() => {
     Promise.allSettled([
       fetchJson<FeatureCollection>(`${API_URL}/api/streams`),
-      fetchJson<FeatureCollection>(`${API_URL}/api/buffers`),
+      fetchJson<FeatureCollection>(`${API_URL}/api/buffers/health`),
       fetchJson<FeatureCollection>(`${API_URL}/api/parcels`),
       fetchJson<ComplianceSummary[]>(`${API_URL}/api/summary`),
-    ]).then(([s, b, p, sum]) => {
+      fetchJson<string[]>(`${API_URL}/api/ndvi/dates`),
+    ]).then(([s, b, p, sum, dates]) => {
       if (s.status === 'fulfilled') setStreams(s.value);
       if (b.status === 'fulfilled') setBuffers(b.value);
       if (p.status === 'fulfilled') setParcels(p.value);
       if (sum.status === 'fulfilled') setSummary(sum.value);
+      if (dates.status === 'fulfilled') setNdviDates(dates.value);
     });
+  }, []);
+
+  // Fetch buffers for a specific date (or latest when null)
+  const handleDateChange = useCallback((date: string | null) => {
+    setSelectedDate(date);
+    setBufferLoading(true);
+    bufferVersion.current += 1;
+    const version = bufferVersion.current;
+
+    const url = date
+      ? `${API_URL}/api/buffers/health/${date}`
+      : `${API_URL}/api/buffers/health`;
+
+    fetchJson<FeatureCollection>(url)
+      .then((fc) => {
+        // Only apply if this is still the latest request
+        if (version === bufferVersion.current) {
+          setBuffers(fc);
+          setBufferLoading(false);
+        }
+      })
+      .catch(() => {
+        if (version === bufferVersion.current) setBufferLoading(false);
+      });
   }, []);
 
   const ndviPoints = useMemo(() => computeHeatPoints(buffers), [buffers]);
   const stats = summary[0] ?? null;
+  // Unique key to force GeoJSON remount when buffer data changes
+  const bufferKey = useMemo(
+    () => `buffers-${selectedDate ?? 'latest'}-${buffers?.features?.length ?? 0}`,
+    [selectedDate, buffers],
+  );
 
   return (
     <div className="flex flex-col h-screen">
@@ -222,15 +283,26 @@ export default function App() {
           zoom={DEFAULT_ZOOM}
           className="h-full w-full"
         >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          />
+          {basemap === 'street' ? (
+            <TileLayer
+              key="street"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            />
+          ) : (
+            <TileLayer
+              key="satellite"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution="Tiles &copy; Esri"
+              maxZoom={19}
+            />
+          )}
 
           {buffers && (
             <GeoJSON
+              key={bufferKey}
               data={buffers}
-              style={() => BUFFER_STYLE}
+              style={bufferHealthStyle}
               onEachFeature={onEachBuffer}
             />
           )}
@@ -252,14 +324,35 @@ export default function App() {
           <NDVILayer points={ndviPoints} />
         </MapContainer>
 
+        {/* Basemap toggle */}
+        <button
+          onClick={() => setBasemap((b) => (b === 'street' ? 'satellite' : 'street'))}
+          className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs font-medium hover:bg-gray-100 transition-colors"
+        >
+          {basemap === 'street' ? 'Satellite' : 'Street Map'}
+        </button>
+
+        {/* Timelapse slider */}
+        <TimeSlider
+          dates={ndviDates}
+          selectedDate={selectedDate}
+          onDateChange={handleDateChange}
+          loading={bufferLoading}
+        />
+
         {/* Legend */}
         <div className="absolute bottom-6 right-6 bg-white rounded-lg shadow-lg p-4 z-[1000]">
           <h3 className="font-semibold mb-2 text-sm">Legend</h3>
           <div className="space-y-1.5 text-xs">
             <LegendItem color="bg-blue-600" shape="line" label="Streams" />
-            <LegendItem color="bg-emerald-400/50" shape="box" label="Riparian Buffers" />
-            <LegendItem color="bg-green-600/60" shape="box" label="Compliant Parcels" />
-            <LegendItem color="bg-red-600/60" shape="box" label="Focus Area Parcels" />
+            <span className="block text-[10px] text-gray-500 pt-1">Buffer NDVI Health</span>
+            <LegendItem color="bg-green-600/70" shape="box" label="Healthy (>0.3)" />
+            <LegendItem color="bg-amber-400/70" shape="box" label="Degraded (0.15-0.3)" />
+            <LegendItem color="bg-red-600/70" shape="box" label="Bare (<0.15)" />
+            <LegendItem color="bg-emerald-400/50" shape="box" label="No NDVI Data" />
+            <span className="block text-[10px] text-gray-500 pt-1">Parcels</span>
+            <LegendItem color="bg-green-600/60" shape="box" label="Compliant" />
+            <LegendItem color="bg-red-600/60" shape="box" label="Focus Area" />
             <LegendItem color="bg-gray-500/40" shape="box" label="Unknown Status" />
           </div>
         </div>

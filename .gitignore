@@ -14,3 +14,9 @@
 # Secrets & environment
 .env
 *.user
+
+# PostgreSQL data (bind-mounted, survives Docker restarts)
+pgdata/
+
+# Database backups
+backups/

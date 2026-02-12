@@ -117,6 +117,67 @@ public sealed class SpatialQueryService : ISpatialQueryService
 
         return fc;
     }
+    /// <inheritdoc />
+    public async Task<FeatureCollection> GetBuffersWithHealthAsync(CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("SpatialQuery.GetBuffersWithHealth");
+
+        _logger.LogInformation("Fetching riparian buffers with NDVI health data");
+
+        const string sql = """
+            SELECT rb.id, rb.stream_id, rb.buffer_distance_m, rb.area_sq_m,
+                   s.gnis_name AS stream_name,
+                   vh.mean_ndvi, vh.health_category, vh.acquisition_date,
+                   ST_AsGeoJSON(rb.geom) AS geojson
+            FROM silver.riparian_buffers rb
+            JOIN bronze.streams s ON s.id = rb.stream_id
+            LEFT JOIN LATERAL (
+                SELECT mean_ndvi, health_category, acquisition_date
+                FROM silver.vegetation_health
+                WHERE buffer_id = rb.id AND season_context = 'peak_growing'
+                ORDER BY acquisition_date DESC
+                LIMIT 1
+            ) vh ON TRUE
+            """;
+
+        var fc = await _repository.QueryGeoJsonAsync(sql, null, ct);
+
+        activity?.SetTag(FeatureCountTag, fc.Count);
+        _logger.LogInformation("Buffers with health fetched: {FeatureCount} features", fc.Count);
+
+        return fc;
+    }
+
+    /// <inheritdoc />
+    public async Task<FeatureCollection> GetBuffersWithHealthByDateAsync(
+        DateOnly date, CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("SpatialQuery.GetBuffersWithHealthByDate");
+        activity?.SetTag("filter.date", date.ToString("yyyy-MM-dd"));
+
+        _logger.LogInformation("Fetching buffers with NDVI health for date {Date}", date);
+
+        const string sql = """
+            SELECT rb.id, rb.stream_id, rb.buffer_distance_m, rb.area_sq_m,
+                   s.gnis_name AS stream_name,
+                   vh.mean_ndvi, vh.health_category, vh.acquisition_date,
+                   ST_AsGeoJSON(rb.geom) AS geojson
+            FROM silver.riparian_buffers rb
+            JOIN bronze.streams s ON s.id = rb.stream_id
+            LEFT JOIN silver.vegetation_health vh
+                ON vh.buffer_id = rb.id
+                AND vh.season_context = 'peak_growing'
+                AND vh.acquisition_date = @date
+            """;
+
+        var fc = await _repository.QueryGeoJsonAsync(sql, new { date }, ct);
+
+        activity?.SetTag(FeatureCountTag, fc.Count);
+        _logger.LogInformation(
+            "Buffers with health for {Date}: {FeatureCount} features", date, fc.Count);
+
+        return fc;
+    }
 }
 
 /// <summary>
@@ -167,6 +228,29 @@ public sealed class ComplianceDataService : IComplianceDataService
             bufferId, readings.Count);
 
         return readings;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DateOnly>> GetNdviDatesAsync(CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("ComplianceData.GetNdviDates");
+
+        _logger.LogInformation("Fetching distinct NDVI acquisition dates");
+
+        const string sql = """
+            SELECT DISTINCT acquisition_date
+            FROM silver.vegetation_health
+            WHERE season_context = 'peak_growing'
+            ORDER BY acquisition_date
+            """;
+
+        var rows = await _repository.QueryAsync<NdviDateRow>(sql, null, ct);
+        var dates = rows.Select(r => r.AcquisitionDate).ToList();
+
+        activity?.SetTag("result.date_count", dates.Count);
+        _logger.LogInformation("NDVI dates fetched: {Count} dates", dates.Count);
+
+        return dates;
     }
 
     /// <inheritdoc />

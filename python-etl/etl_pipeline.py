@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 import geopandas as gpd
+import pandas as pd
 import requests
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -111,8 +112,12 @@ class FeatureClient(Protocol):
 class SpatialWriter(Protocol):
     """Interface for writing geospatial data to a database."""
 
-    def truncate(self, schema: str, table: str) -> None:
-        """Truncate a table, cascading to dependents."""
+    def count_rows(self, schema: str, table: str) -> int:
+        """Return row count for a table."""
+        ...
+
+    def truncate(self, schema: str, table: str, cascade: bool = False) -> None:
+        """Truncate a table, optionally cascading to dependents."""
         ...
 
     def write(
@@ -224,10 +229,27 @@ class PostGISWriter:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
-    def truncate(self, schema: str, table: str) -> None:
-        """Truncate a table, cascading to dependents."""
+    def count_rows(self, schema: str, table: str) -> int:
+        """Return row count for a table."""
         with self._engine.connect() as conn:
-            conn.execute(text(f"TRUNCATE TABLE {schema}.{table} CASCADE"))  # noqa: S608
+            row = conn.execute(
+                text(f"SELECT count(*) FROM {schema}.{table}"),  # noqa: S608
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def truncate(self, schema: str, table: str, cascade: bool = False) -> None:
+        """Truncate a table.
+
+        Args:
+            schema: Target schema name.
+            table: Target table name.
+            cascade: If True, cascade to dependent tables. Default False
+                to prevent accidentally wiping expensive derived data
+                (e.g. vegetation_health via riparian_buffers FK).
+        """
+        suffix = " CASCADE" if cascade else ""
+        with self._engine.connect() as conn:
+            conn.execute(text(f"TRUNCATE TABLE {schema}.{table}{suffix}"))  # noqa: S608
             conn.commit()
 
     def write(
@@ -366,7 +388,7 @@ def _coerce_int_columns(
 
     ArcGIS GeoJSON returns all numbers as floats (e.g. 1.0 instead of 1).
     """
-    import pandas as pd
+
     for col in cols:
         if col in gdf.columns:
             gdf[col] = pd.to_numeric(gdf[col], errors="coerce").astype("Int64")
@@ -417,6 +439,10 @@ class EtlPipeline:
         self._client = client
         self._writer = writer
 
+    def _count_rows(self, schema: str, table: str) -> int:
+        """Return the row count of a table (for pre-flight checks)."""
+        return self._writer.count_rows(schema, table)
+
     # -- Bronze layer -------------------------------------------------------
 
     def load_watershed(self) -> None:
@@ -435,7 +461,11 @@ class EtlPipeline:
             "HUC8": "huc8", "NAME": "name",
             "AREASQKM": "area_sq_km", "STATES": "states",
         })
-        self._writer.truncate("bronze", "watersheds")
+        # gold.riparian_summary references bronze.watersheds via FK —
+        # PostgreSQL TRUNCATE checks FK constraints even on empty tables,
+        # so CASCADE is required here. This is safe: riparian_summary is
+        # the only dependent and gets recalculated at the end of the pipeline.
+        self._writer.truncate("bronze", "watersheds", cascade=True)
         self._writer.write(gdf, "watersheds", "bronze")
         logger.info("Finished loading watershed boundary")
 
@@ -498,15 +528,35 @@ class EtlPipeline:
         explode: bool = False,
         int_cols: list[str] | None = None,
     ) -> None:
-        """Fetch, transform, and write a single feature layer."""
+        """Fetch, transform, and write a single feature layer.
+
+        Paginates through the ArcGIS REST API to load all features
+        (the API caps responses at maxRecordCount, typically 2000).
+        """
         logger.info("Loading %s", name)
 
-        gdf = self._client.query(
-            url=url, where=where, geometry_filter=envelope,
-        )
-        if gdf.empty:
+        batches: list[gpd.GeoDataFrame] = []
+        offset = 0
+        while True:
+            batch = self._client.query(
+                url=url, where=where, geometry_filter=envelope,
+                result_offset=offset,
+                result_record_count=ARCGIS_BATCH_SIZE,
+            )
+            if batch.empty:
+                break
+            batches.append(batch)
+            logger.info("Fetched %s batch: %d features (offset %d)", name, len(batch), offset)
+            offset += ARCGIS_BATCH_SIZE
+            if len(batch) < ARCGIS_BATCH_SIZE:
+                break
+
+        if not batches:
             logger.warning("No %s found in study area", name)
             return
+
+    
+        gdf = gpd.GeoDataFrame(pd.concat(batches, ignore_index=True), crs=batches[0].crs)
 
         gdf = rename_and_prepare(gdf, col_map)
         if int_cols:
@@ -514,7 +564,9 @@ class EtlPipeline:
         if explode:
             gdf = gdf.explode(index_parts=False).reset_index(drop=True)
 
-        self._writer.truncate(schema, name)
+        # Full load truncates and replaces — CASCADE is safe here because
+        # all dependent silver/gold tables are regenerated by the pipeline.
+        self._writer.truncate(schema, name, cascade=True)
         self._writer.write(gdf, name, schema)
         logger.info("Finished loading %d %s", len(gdf), name)
 
@@ -529,7 +581,8 @@ class EtlPipeline:
         """
         logger.info("Loading parcels with pagination")
         envelope = self._writer.get_watershed_envelope(HUC8_CODE)
-        self._writer.truncate("bronze", "parcels")
+        # CASCADE safe: parcel_compliance is regenerated by analyze_compliance()
+        self._writer.truncate("bronze", "parcels", cascade=True)
 
         source_fields = ",".join(PARCEL_FIELD_MAP.keys())
         offset = 0
@@ -591,7 +644,19 @@ class EtlPipeline:
             buffer_distance_m,
             buffer_distance_m * 3.28084,
         )
-        self._writer.truncate("silver", "riparian_buffers")
+        # Full regeneration: warn about NDVI loss, then CASCADE to clear
+        # all dependent tables (parcel_compliance, vegetation_health).
+        # PostgreSQL TRUNCATE checks FK constraints even on empty tables,
+        # so CASCADE is required regardless of truncation order.
+        ndvi_count = self._count_rows("silver", "vegetation_health")
+        if ndvi_count > 0:
+            logger.warning(
+                "Full buffer regeneration will delete %d NDVI readings. "
+                "Use './dev.sh --backup' beforehand or run incremental mode "
+                "to preserve them.",
+                ndvi_count,
+            )
+        self._writer.truncate("silver", "riparian_buffers", cascade=True)
         count = self._writer.execute(
             _GENERATE_BUFFERS_SQL,
             {"buffer_distance": buffer_distance_m},
@@ -617,12 +682,23 @@ class EtlPipeline:
 
         Aggregates stream lengths, buffer areas, and parcel compliance
         rates using CTEs. NDVI vegetation health fields are populated
-        separately by the vegetation scoring pipeline.
+        separately by update_summary_ndvi().
         """
         logger.info("Calculating compliance summary")
         self._writer.truncate("gold", "riparian_summary")
         count = self._writer.execute(_CALCULATE_SUMMARY_SQL)
         logger.info("Generated %d summary records", count)
+
+    def update_summary_ndvi(self) -> None:
+        """Update gold summary with aggregated NDVI health statistics.
+
+        Uses the latest peak-growing reading per buffer to compute
+        avg NDVI and health category percentages, then patches the
+        existing gold.riparian_summary row.
+        """
+        logger.info("Updating gold summary with NDVI statistics")
+        count = self._writer.execute(_UPDATE_SUMMARY_NDVI_SQL)
+        logger.info("Updated %d summary records with NDVI stats", count)
 
     # -- Orchestration ------------------------------------------------------
 
@@ -661,6 +737,9 @@ class EtlPipeline:
     ) -> LayerChangeResult:
         """Fetch, transform, and upsert a single feature layer.
 
+        Paginates through the ArcGIS REST API to load all features
+        (the API caps responses at maxRecordCount, typically 2000).
+
         Args:
             name: Layer/table name for logging.
             schema: Target database schema.
@@ -678,12 +757,28 @@ class EtlPipeline:
         """
         logger.info("Incremental load: %s", name)
 
-        gdf = self._client.query(
-            url=url, where=where, geometry_filter=envelope,
-        )
-        if gdf.empty:
+        batches: list[gpd.GeoDataFrame] = []
+        offset = 0
+        while True:
+            batch = self._client.query(
+                url=url, where=where, geometry_filter=envelope,
+                result_offset=offset,
+                result_record_count=ARCGIS_BATCH_SIZE,
+            )
+            if batch.empty:
+                break
+            batches.append(batch)
+            logger.info("Fetched %s batch: %d features (offset %d)", name, len(batch), offset)
+            offset += ARCGIS_BATCH_SIZE
+            if len(batch) < ARCGIS_BATCH_SIZE:
+                break
+
+        if not batches:
             logger.warning("No %s found in study area", name)
             return LayerChangeResult(name, 0, 0, 0)
+
+    
+        gdf = gpd.GeoDataFrame(pd.concat(batches, ignore_index=True), crs=batches[0].crs)
 
         gdf = rename_and_prepare(gdf, col_map)
         if int_cols:
@@ -941,6 +1036,32 @@ _CALCULATE_SUMMARY_SQL = text("""
     FROM stream_stats ss
     JOIN buffer_stats bs ON bs.watershed_id = ss.watershed_id
     JOIN parcel_stats ps ON ps.watershed_id = ss.watershed_id
+""")
+
+_UPDATE_SUMMARY_NDVI_SQL = text("""
+    UPDATE gold.riparian_summary rs SET
+        avg_ndvi = agg.avg_ndvi,
+        healthy_buffer_pct = agg.healthy_pct,
+        degraded_buffer_pct = agg.degraded_pct,
+        bare_buffer_pct = agg.bare_pct
+    FROM (
+        SELECT
+            AVG(vh.mean_ndvi) AS avg_ndvi,
+            COUNT(*) FILTER (WHERE vh.health_category = 'healthy') * 100.0
+                / NULLIF(COUNT(*), 0) AS healthy_pct,
+            COUNT(*) FILTER (WHERE vh.health_category = 'degraded') * 100.0
+                / NULLIF(COUNT(*), 0) AS degraded_pct,
+            COUNT(*) FILTER (WHERE vh.health_category = 'bare') * 100.0
+                / NULLIF(COUNT(*), 0) AS bare_pct
+        FROM silver.vegetation_health vh
+        WHERE vh.id IN (
+            SELECT DISTINCT ON (buffer_id) id
+            FROM silver.vegetation_health
+            WHERE season_context = 'peak_growing'
+            ORDER BY buffer_id, acquisition_date DESC
+        )
+    ) agg
+    WHERE rs.id = (SELECT MAX(id) FROM gold.riparian_summary)
 """)
 
 

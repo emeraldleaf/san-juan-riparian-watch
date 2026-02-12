@@ -19,6 +19,12 @@ public interface ISpatialQueryService
 
     /// <summary>Returns only focus-area parcels.</summary>
     Task<FeatureCollection> GetFocusAreasAsync(CancellationToken ct);
+
+    /// <summary>Returns buffer polygons with latest peak-growing NDVI health data.</summary>
+    Task<FeatureCollection> GetBuffersWithHealthAsync(CancellationToken ct);
+
+    /// <summary>Returns buffer polygons with NDVI health data for a specific acquisition date.</summary>
+    Task<FeatureCollection> GetBuffersWithHealthByDateAsync(DateOnly date, CancellationToken ct);
 }
 
 /// <summary>
@@ -32,4 +38,7 @@ public interface IComplianceDataService
 
     /// <summary>Returns watershed-level compliance summaries from the gold schema.</summary>
     Task<IReadOnlyList<ComplianceSummary>> GetSummaryAsync(CancellationToken ct);
+
+    /// <summary>Returns distinct NDVI acquisition dates ordered chronologically.</summary>
+    Task<IReadOnlyList<DateOnly>> GetNdviDatesAsync(CancellationToken ct);
 }

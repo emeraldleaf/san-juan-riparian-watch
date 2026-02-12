@@ -16,11 +16,15 @@ public static class GeoDataEndpoints
 
         api.MapGet("/streams", GetStreams).WithName("GetStreams");
         api.MapGet("/buffers", GetBuffers).WithName("GetBuffers");
+        api.MapGet("/buffers/health", GetBuffersWithHealth).WithName("GetBuffersWithHealth");
         api.MapGet("/parcels", GetParcels).WithName("GetParcels");
         api.MapGet("/focus-areas", GetFocusAreas).WithName("GetFocusAreas");
         api.MapGet("/vegetation/buffers/{bufferId:int}", GetVegetationByBuffer)
             .WithName("GetVegetationByBuffer");
         api.MapGet("/summary", GetSummary).WithName("GetSummary");
+        api.MapGet("/ndvi/dates", GetNdviDates).WithName("GetNdviDates");
+        api.MapGet("/buffers/health/{date}", GetBuffersWithHealthByDate)
+            .WithName("GetBuffersWithHealthByDate");
 
         return app;
     }
@@ -42,6 +46,16 @@ public static class GeoDataEndpoints
         ISpatialQueryService spatialService, CancellationToken ct)
     {
         var fc = await spatialService.GetBuffersAsync(ct);
+        return TypedResults.Ok(fc);
+    }
+
+    /// <summary>
+    /// GET /api/buffers/health — buffer polygons with latest NDVI health (GeoJSON FeatureCollection).
+    /// </summary>
+    private static async Task<IResult> GetBuffersWithHealth(
+        ISpatialQueryService spatialService, CancellationToken ct)
+    {
+        var fc = await spatialService.GetBuffersWithHealthAsync(ct);
         return TypedResults.Ok(fc);
     }
 
@@ -84,22 +98,54 @@ public static class GeoDataEndpoints
         var summaries = await complianceService.GetSummaryAsync(ct);
         return TypedResults.Ok(summaries);
     }
+
+    /// <summary>
+    /// GET /api/ndvi/dates — distinct NDVI acquisition dates.
+    /// </summary>
+    private static async Task<IResult> GetNdviDates(
+        IComplianceDataService complianceService, CancellationToken ct)
+    {
+        var dates = await complianceService.GetNdviDatesAsync(ct);
+        return TypedResults.Ok(dates);
+    }
+
+    /// <summary>
+    /// GET /api/buffers/health/{date} — buffer health for a specific acquisition date.
+    /// </summary>
+    private static async Task<IResult> GetBuffersWithHealthByDate(
+        DateOnly date, ISpatialQueryService spatialService, CancellationToken ct)
+    {
+        var fc = await spatialService.GetBuffersWithHealthByDateAsync(date, ct);
+        return TypedResults.Ok(fc);
+    }
 }
 
 /// <summary>
 /// NDVI vegetation health reading for a single date.
+/// Uses a class (not positional record) so Dapper uses property-based mapping,
+/// which correctly handles snake_case columns with MatchNamesWithUnderscores.
 /// </summary>
-public sealed record VegetationReading(
-    int Id,
-    int BufferId,
-    DateOnly AcquisitionDate,
-    decimal? MeanNdvi,
-    decimal? MinNdvi,
-    decimal? MaxNdvi,
-    string HealthCategory,
-    string SeasonContext,
-    string? Satellite,
-    DateTimeOffset ProcessedAt);
+public sealed class VegetationReading
+{
+    public int Id { get; init; }
+    public int BufferId { get; init; }
+    public DateOnly AcquisitionDate { get; init; }
+    public decimal? MeanNdvi { get; init; }
+    public decimal? MinNdvi { get; init; }
+    public decimal? MaxNdvi { get; init; }
+    public string HealthCategory { get; init; } = "";
+    public string SeasonContext { get; init; } = "";
+    public string? Satellite { get; init; }
+    public DateTime ProcessedAt { get; init; }
+}
+
+/// <summary>
+/// Internal DTO for Dapper mapping of distinct acquisition dates.
+/// </summary>
+public sealed class NdviDateRow
+{
+    public DateOnly AcquisitionDate { get; init; }
+}
 
 /// <summary>
 /// Watershed-level compliance summary from the gold schema.

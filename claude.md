@@ -64,17 +64,25 @@ If either fails, the external drive is not mounted. Mount it before proceeding.
 
 ### Quick Start (Recommended)
 ```
-
-./[dev.sh](http://dev.sh)              # Start everything (checks drive, starts PostGIS + Aspire)
-
-./[dev.sh](http://dev.sh) --status     # Check service health
-
-./[dev.sh](http://dev.sh) --restart    # Restart all services
-
-./[dev.sh](http://dev.sh) --stop       # Stop everything
-
+./dev.sh              # Start everything (checks drive I/O, starts PostGIS + Aspire)
+./dev.sh --status     # Check service health + drive I/O + data counts (incl. NDVI)
+./dev.sh --restart    # Restart all services
+./dev.sh --stop       # Stop everything gracefully
+./dev.sh --reconnect  # Recover after external drive disconnect/reconnect
+./dev.sh --backup     # Snapshot database to backups/ (timestamped pg_dump)
+./dev.sh --restore    # Restore from latest backup (prompts for confirmation)
 ```
 Always use `./dev.sh` instead of running services manually.
+
+**WARNING**: Never kill Aspire processes directly (`kill`, `pkill`, Activity Monitor). This can
+restart the PostgreSQL container and corrupt data. Always use `./dev.sh --stop`.
+
+### Drive Disconnect Recovery
+If the external drive was disconnected (accidentally or for transport):
+1. Reconnect the drive and wait for it to mount
+2. Run `./dev.sh --reconnect` — checks drive I/O, stops zombie containers, shows data status
+3. Run `./dev.sh` to start services
+4. If data was lost: `./dev.sh --restore` (auto-backups are taken before full ETL runs)
 
 ### Build & Run
 - Start everything: `./dev.sh`
@@ -102,21 +110,31 @@ Always use `./dev.sh` instead of running services manually.
 - `dev.sh` auto-sources `.env` on startup
 
 ### Database
-- Run migrations: `psql -h localhost -U postgres -d riparian_poc -f sql/create_schemas.sql`
-- PostGIS is required: `CREATE EXTENSION postgis;`
-- Connect: `psql -h localhost -U postgres -d riparian_poc`
-- Reset database:
+
+#### Data Persistence
+PostgreSQL data is bind-mounted to `./pgdata/` (via `.WithDataBindMount("../pgdata")` in AppHost).
+This survives Docker restarts, which happen frequently on the external drive. The `pgdata/` directory
+is gitignored.
+
+#### Backup & Restore
+```
+./dev.sh --backup     # Creates backups/ripariandb_YYYYMMDD_HHMMSS.dump (keeps latest 5)
+./dev.sh --restore    # Restores from most recent backup (drops + recreates DB)
+```
+Always take a backup after a successful full ETL run. Backups use `pg_dump -Fc` (custom format).
+
+#### Manual Database Access
+Aspire auto-generates the PostgreSQL password. To connect manually:
+```
+# Get password from running container
+PGPASSWORD=$(docker exec <postgres-container> printenv POSTGRES_PASSWORD)
+psql -h localhost -p <mapped-port> -U postgres -d ripariandb
 ```
 
-psql -h [localhost](http://localhost) -U postgres -c "DROP DATABASE IF EXISTS riparian_poc;"
-
-psql -h [localhost](http://localhost) -U postgres -c "CREATE DATABASE riparian_poc;"
-
-psql -h [localhost](http://localhost) -U postgres -d riparian_poc -c "CREATE EXTENSION postgis;"
-
-psql -h [localhost](http://localhost) -U postgres -d riparian_poc -f sql/create_schemas.sql
-
-```
+#### Schema Reset (if needed)
+Apply schema files in order:
+1. `sql/create_schemas.sql` — base schema (bronze/silver/gold tables, indexes)
+2. `sql/incremental_migration.sql` — meta schema (etl_runs, constraints)
 
 ### Azure Deployment
 - First time: `azd init` then `azd up`
@@ -124,16 +142,17 @@ psql -h [localhost](http://localhost) -U postgres -d riparian_poc -f sql/create_
 - Single service: `azd deploy --service api`
 - Tear down: `azd down`
 
-### Environment Variables (Local Dev Outside Docker)
+### ETL Operations
 ```
-
-export DATABASE_URL="postgresql://postgres:[postgres@localhost:5432](mailto:postgres@localhost:5432)/riparian_poc"
-
-export REDIS_URL="redis://[localhost:6379/0](http://localhost:6379/0)"   # if applicable
-
-export OPENSEARCH_HOST="[localhost](http://localhost)"             # if applicable
-
+./dev.sh --update              # Incremental ETL (default, preserves NDVI data)
+./dev.sh --update full         # Full reload (auto-backs up NDVI first, warns before deleting)
+./dev.sh --update ndvi         # NDVI processing only
 ```
+- **Default ETL mode is `incremental`** (not `full`) — Aspire restarts won't wipe NDVI data
+- `./dev.sh --update full` auto-backs up before truncating if NDVI readings exist
+- Full ETL truncates buffers which deletes vegetation_health (FK dependency, no CASCADE)
+- NDVI `process_buffers_incremental()` defaults to current year's growing season (June–August)
+- In winter months, use `process_buffers('YYYY-06-01/YYYY-08-31')` with an explicit past date range
 
 ## Architecture
 
@@ -227,6 +246,7 @@ Data flows one direction: bronze → silver → gold. Never write back upstream.
 ### API Endpoints
 - `GET /api/streams` — stream centerlines from bronze (GeoJSON)
 - `GET /api/buffers` — riparian buffer polygons from silver (GeoJSON)
+- `GET /api/buffers/health` — buffers with latest NDVI health (GeoJSON, LEFT JOIN LATERAL to vegetation_health)
 - `GET /api/parcels` — parcels with compliance status (GeoJSON)
 - `GET /api/focus-areas` — only focus area parcels (GeoJSON)
 - `GET /api/vegetation/buffers/{bufferId}` — NDVI time series for a buffer
@@ -256,7 +276,7 @@ This renaming happens in `etl_pipeline.py` during the `load_parcels()` step.
 
 ### NDVI & Phenology
 - NDVI = (NIR - Red) / (NIR + Red), range -1 to +1
-- Health thresholds: healthy (>0.6), degraded (0.3–0.6), bare (<0.3)
+- Health thresholds calibrated for semi-arid San Juan Basin: healthy (>0.3), degraded (0.15–0.3), bare (<0.15)
 - Only use imagery from peak growing season (June–August) for the San Juan Basin
 - Tag every vegetation_health record with `season_context` column
 - Dormant season readings should score as 'dormant', not 'bare'
@@ -292,7 +312,7 @@ Follow SOLID principles and the standards from the prompt library
 
 #### Service Layer Architecture
 - **Endpoints** (`GeoDataEndpoints.cs`): Thin route handlers only — no SQL, no business logic. Inject service interfaces, call one method, return result.
-- **Services** (`GeoDataServices.cs`): Own all SQL queries and business logic. Two ISP interfaces: `ISpatialQueryService` (4 spatial/GeoJSON methods) and `IComplianceDataService` (2 typed-result methods). Input validation here (e.g., `ArgumentException` for bad IDs).
+- **Services** (`GeoDataServices.cs`): Own all SQL queries and business logic. Two ISP interfaces: `ISpatialQueryService` (5 spatial/GeoJSON methods) and `IComplianceDataService` (2 typed-result methods). Input validation here (e.g., `ArgumentException` for bad IDs).
 - **Repository** (`PostGisRepository.cs`): Generic data access. `IPostGisRepository` with `QueryGeoJsonAsync` and `QueryAsync<T>`. Manages connection lifetime, GeoJSON deserialization, error handling for `NpgsqlException`.
 - DI registration: all scoped (`AddScoped<TInterface, TImpl>`) in Program.cs
 
@@ -361,7 +381,9 @@ Follow the standards from the prompt library
 - Vite for build tooling
 - Tailwind CSS for styling
 - API base URL from `VITE_API_URL` environment variable
-- NDVI heatmap uses leaflet.heat plugin
+- NDVI heatmap uses leaflet.heat plugin with real `mean_ndvi` values from `/api/buffers/health`
+- Satellite basemap toggle: ESRI World Imagery as alternative TileLayer (use React `key` prop to force remount on switch)
+- Buffer zones colored by NDVI health category: healthy (green), degraded (yellow), bare (red), no data (default)
 - Session tracking: `crypto.randomUUID()` generated per page load, sent as `X-Session-Id` header on every fetch
 - `fetchJson<T>` helper: sends session header, logs `X-Correlation-Id` from response, parses `ApiErrorResponse` on failure
 

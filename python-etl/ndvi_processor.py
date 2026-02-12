@@ -5,6 +5,10 @@ clips to buffer geometries with rasterio, computes NDVI statistics,
 classifies health with season awareness, and writes results to
 silver.vegetation_health.
 
+Scene-first processing: one STAC search for the whole watershed,
+then iterate scenes and extract per-buffer stats in memory via
+``rasterio.features.geometry_mask()``.
+
 Study area: San Juan Basin, HUC8 14080101.
 Peak growing season: June–August.
 """
@@ -21,9 +25,12 @@ import numpy as np
 import planetary_computer
 import pystac_client
 import rasterio
+import rasterio.windows
 from pyproj import Transformer
+from rasterio.features import geometry_mask
 from rasterio.mask import mask as rasterio_mask
-from shapely.geometry import mapping
+from rasterio.windows import from_bounds as window_from_bounds
+from shapely.geometry import box, mapping
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shapely_transform
 from sqlalchemy import text
@@ -187,7 +194,13 @@ def determine_season(acquisition_date: date) -> str:
 def classify_health(mean_ndvi: float, season: str) -> str:
     """Classify vegetation health from NDVI and season context.
 
-    Thresholds: healthy (>0.6), degraded (0.3–0.6), bare (<0.3).
+    Thresholds calibrated for the semi-arid San Juan Basin (HUC8 14080101)
+    where peak-growing median NDVI is ~0.17:
+
+    - **healthy** (>0.3): Actual riparian vegetation with measurable canopy.
+    - **degraded** (0.15–0.3): Sparse cover, grasses, or stressed vegetation.
+    - **bare** (<0.15): Exposed soil, rock, or water with minimal vegetation.
+
     Dormant-season readings are always classified as ``'dormant'``,
     never ``'bare'``.
 
@@ -201,9 +214,9 @@ def classify_health(mean_ndvi: float, season: str) -> str:
     """
     if season == "dormant":
         return "dormant"
-    if mean_ndvi > 0.6:
+    if mean_ndvi > 0.3:
         return "healthy"
-    if mean_ndvi >= 0.3:
+    if mean_ndvi >= 0.15:
         return "degraded"
     return "bare"
 
@@ -267,6 +280,11 @@ def clip_band_to_geometry(href: str, geom: BaseGeometry) -> np.ndarray:
     Reprojects the geometry from EPSG:4269 to the raster's CRS before
     clipping with ``rasterio.mask.mask()``.
 
+    Note:
+        Retained for ad-hoc single-buffer use. The main pipeline uses
+        ``read_band_window()`` + ``geometry_mask()`` for scene-first
+        batch processing.
+
     Args:
         href: URL or file path to the raster band (COG).
         geom: Shapely geometry in EPSG:4269.
@@ -280,6 +298,61 @@ def clip_band_to_geometry(href: str, geom: BaseGeometry) -> np.ndarray:
             geom = reproject_geometry(geom, STORAGE_CRS, raster_crs)
         clipped, _ = rasterio_mask(src, [mapping(geom)], crop=True, nodata=0)
     return clipped[0]
+
+
+# ---------------------------------------------------------------------------
+# Scene-first raster I/O
+# ---------------------------------------------------------------------------
+
+
+def read_band_window(
+    href: str,
+    watershed_bbox: tuple[float, float, float, float],
+    watershed_crs: str = STORAGE_CRS,
+    overview_level: int | None = 1,
+) -> tuple[np.ndarray, rasterio.Affine, str]:
+    """Read a raster band windowed to the watershed bounding box.
+
+    Opens the COG once and reads only the pixels covering the watershed,
+    avoiding full-scene downloads. Uses overview levels to reduce data
+    transfer (level 1 = 20m for Sentinel-2, level 2 = 40m).
+
+    Args:
+        href: URL or file path to the raster band (COG).
+        watershed_bbox: ``(minx, miny, maxx, maxy)`` in *watershed_crs*.
+        watershed_crs: CRS of the watershed bbox (default EPSG:4269).
+        overview_level: COG overview level (0=full, 1=2x, 2=4x). Default
+            1 (20m for Sentinel-2 10m bands). None for full resolution.
+
+    Returns:
+        Tuple of ``(data_2d, window_transform, cog_crs_string)``.
+
+    Raises:
+        rasterio.RasterioIOError: If the COG cannot be opened or read.
+    """
+    open_kwargs: dict[str, Any] = {}
+    if overview_level is not None:
+        open_kwargs["overview_level"] = overview_level
+
+    with rasterio.open(href, **open_kwargs) as src:
+        cog_crs = str(src.crs)
+        if cog_crs.upper() != watershed_crs.upper():
+            bbox_geom = box(*watershed_bbox)
+            bbox_reprojected = reproject_geometry(
+                bbox_geom, watershed_crs, cog_crs,
+            )
+            bounds = bbox_reprojected.bounds
+        else:
+            bounds = watershed_bbox
+
+        window = window_from_bounds(*bounds, transform=src.transform)
+        # Clamp to raster extent — scene may not cover full watershed
+        window = window.intersection(
+            rasterio.windows.Window(0, 0, src.width, src.height),
+        )
+        data = src.read(1, window=window)
+        transform = src.window_transform(window)
+    return (data, transform, cog_crs)
 
 
 # ---------------------------------------------------------------------------
@@ -310,17 +383,17 @@ def _parse_stac_item(item: Any) -> tuple[str, str, date] | None:
 
 
 # ---------------------------------------------------------------------------
-# Processor (orchestrator)
+# Processor (orchestrator) — scene-first approach
 # ---------------------------------------------------------------------------
 
 
 class NdviProcessor:
     """Orchestrates NDVI computation for all riparian buffers.
 
-    Fetches Sentinel-2 imagery from Planetary Computer, clips to buffer
-    geometries, computes NDVI statistics, classifies health with season
-    awareness (peak growing June–Aug, dormant otherwise), and writes
-    results to ``silver.vegetation_health``.
+    Uses a **scene-first** approach: one STAC search for the whole
+    watershed, then for each scene reads two bands into memory and
+    extracts per-buffer stats via ``rasterio.features.geometry_mask()``.
+    This reduces HTTP requests from ~256K to ~128 for 2000 buffers.
 
     Uses constructor injection for all I/O dependencies so each step
     can be tested with fake searchers and writers.
@@ -341,12 +414,47 @@ class NdviProcessor:
         self._writer = writer
         self._engine = engine
 
+    # -- Data loading -------------------------------------------------------
+
+    def _load_buffers(self) -> gpd.GeoDataFrame:
+        """Load riparian buffer geometries from the silver schema."""
+        gdf = gpd.read_postgis(
+            "SELECT id, geom FROM silver.riparian_buffers",
+            self._engine, geom_col="geom",
+        )
+        gdf = gdf.rename_geometry("geometry")
+        return gdf
+
+    def _load_watershed_bbox(self) -> tuple[float, float, float, float]:
+        """Load the bounding box of the watershed from bronze.watersheds.
+
+        Returns:
+            ``(minx, miny, maxx, maxy)`` in EPSG:4269.
+
+        Raises:
+            RuntimeError: If no watershed exists in the database.
+        """
+        sql = text(
+            "SELECT ST_XMin(geom), ST_YMin(geom), "
+            "ST_XMax(geom), ST_YMax(geom) "
+            "FROM bronze.watersheds LIMIT 1"
+        )
+        with self._engine.connect() as conn:
+            row = conn.execute(sql).fetchone()
+        if row is None:
+            raise RuntimeError("No watershed found in bronze.watersheds")
+        return (float(row[0]), float(row[1]), float(row[2]), float(row[3]))
+
+    # -- Scene-first full processing ----------------------------------------
+
     def process_buffers(
         self,
         date_range: str,
         max_cloud_cover: int = MAX_CLOUD_COVER,
     ) -> int:
         """Process all riparian buffers for NDVI vegetation health.
+
+        Delegates to scene-first processing for efficiency.
 
         Args:
             date_range: STAC datetime range (e.g., ``'2024-06-01/2024-08-31'``).
@@ -355,73 +463,266 @@ class NdviProcessor:
         Returns:
             Number of NDVI readings written.
         """
+        return self.process_buffers_by_scene(date_range, max_cloud_cover)
+
+    def process_buffers_by_scene(
+        self,
+        date_range: str,
+        max_cloud_cover: int = MAX_CLOUD_COVER,
+    ) -> int:
+        """Process all buffers using scene-first NDVI computation.
+
+        One STAC search for the watershed bbox, then iterate scenes and
+        extract per-buffer stats in memory.
+
+        Args:
+            date_range: STAC datetime range (e.g., ``'2025-06-01/2025-08-31'``).
+            max_cloud_cover: Maximum cloud cover percentage.
+
+        Returns:
+            Number of NDVI readings written.
+        """
         buffers = self._load_buffers()
-        logger.info("Processing NDVI for %d buffers", len(buffers))
+        watershed_bbox = self._load_watershed_bbox()
+        logger.info(
+            "Scene-first NDVI: %d buffers, watershed bbox %s",
+            len(buffers), watershed_bbox,
+        )
+
+        items = self._searcher.search_items(
+            watershed_bbox, date_range, max_cloud_cover,
+        )
+        if not items:
+            logger.warning(
+                "No Sentinel-2 imagery found for date range %s", date_range,
+            )
+            return 0
+        logger.info("Found %d Sentinel-2 scenes to process", len(items))
 
         all_readings: list[NdviReading] = []
-        for _, row in buffers.iterrows():
-            readings = self._process_single_buffer(
-                row, date_range, max_cloud_cover,
+        for scene_idx, item in enumerate(items, start=1):
+            parsed = _parse_stac_item(item)
+            if parsed is None:
+                continue
+            nir_href, red_href, acq_date = parsed
+
+            logger.info(
+                "Processing scene %d/%d: %s (acquired %s)",
+                scene_idx, len(items), item.id, acq_date,
             )
-            all_readings.extend(readings)
+
+            try:
+                readings = self._process_scene(
+                    nir_href, red_href, acq_date, item,
+                    buffers, watershed_bbox,
+                )
+                all_readings.extend(readings)
+            except (rasterio.RasterioIOError, ValueError) as exc:
+                logger.warning(
+                    "Failed to process scene %s: %s", item.id, exc,
+                )
+                continue
+
+            logger.info(
+                "  Scene %s: %d readings", item.id, len(readings),
+            )
 
         count = self._writer.write_readings(all_readings)
         logger.info("Wrote %d NDVI readings to vegetation_health", count)
         return count
 
-    def _load_buffers(self) -> gpd.GeoDataFrame:
-        """Load riparian buffer geometries from the silver schema."""
-        return gpd.read_postgis(
-            "SELECT id, geom FROM silver.riparian_buffers",
-            self._engine, geom_col="geom",
-        )
+    # -- Per-scene processing -----------------------------------------------
 
-    def _process_single_buffer(
+    def _process_scene(
         self,
-        buffer_row: Any,
-        date_range: str,
-        max_cloud_cover: int,
+        nir_href: str,
+        red_href: str,
+        acq_date: date,
+        item: Any,
+        buffers: gpd.GeoDataFrame,
+        watershed_bbox: tuple[float, float, float, float],
     ) -> list[NdviReading]:
-        """Process NDVI for one buffer across all available imagery."""
-        buffer_id = int(buffer_row["id"])
-        geom: BaseGeometry = buffer_row.geometry
-        bbox = geom.bounds
+        """Process a single Sentinel-2 scene against all buffers.
 
-        items = self._searcher.search_items(bbox, date_range, max_cloud_cover)
-        if not items:
-            logger.debug("No imagery found for buffer %d", buffer_id)
-            return []
+        Opens B08 and B04 once each (2 HTTP requests), computes
+        full-scene NDVI, then extracts per-buffer stats in memory.
 
-        readings: list[NdviReading] = []
-        for item in items:
-            reading = self._compute_reading(buffer_id, geom, item)
-            if reading is not None:
-                readings.append(reading)
-        return readings
+        Args:
+            nir_href: URL to the NIR (B08) COG.
+            red_href: URL to the Red (B04) COG.
+            acq_date: Image acquisition date.
+            item: STAC item (for bbox filtering).
+            buffers: All buffer geometries in STORAGE_CRS.
+            watershed_bbox: Watershed bounding box in STORAGE_CRS.
 
-    def _compute_reading(
-        self, buffer_id: int, geom: BaseGeometry, item: Any,
-    ) -> NdviReading | None:
-        """Compute a single NDVI reading from a STAC item clipped to a buffer."""
-        parsed = _parse_stac_item(item)
-        if parsed is None:
-            return None
-        nir_href, red_href, acq_date = parsed
+        Returns:
+            List of NdviReading for all buffers covered by this scene.
+        """
+        nir_data, transform, cog_crs = read_band_window(
+            nir_href, watershed_bbox,
+        )
+        red_data, _, _ = read_band_window(red_href, watershed_bbox)
 
-        try:
-            nir = clip_band_to_geometry(nir_href, geom)
-            red = clip_band_to_geometry(red_href, geom)
-        except (rasterio.RasterioIOError, ValueError):
-            logger.warning(
-                "Failed to clip imagery for buffer %d from %s",
-                buffer_id, item.id,
-            )
-            return None
-
-        ndvi = calculate_ndvi(nir, red)
-        mean_val, min_val, max_val = compute_ndvi_stats(ndvi)
+        ndvi_array = calculate_ndvi(nir_data, red_data)
         season = determine_season(acq_date)
 
+        # Pre-filter buffers to those intersecting this scene's footprint
+        scene_bbox = tuple(item.bbox) if item.bbox else watershed_bbox
+        relevant = self._buffers_intersecting_scene(buffers, scene_bbox)
+        logger.debug(
+            "Scene covers %d of %d buffers", len(relevant), len(buffers),
+        )
+
+        # Create transformer once per scene (not per buffer)
+        need_reproject = cog_crs.upper() != STORAGE_CRS.upper()
+        transformer: Transformer | None = None
+        if need_reproject:
+            transformer = Transformer.from_crs(
+                STORAGE_CRS, cog_crs, always_xy=True,
+            )
+
+        readings: list[NdviReading] = []
+        for _, row in relevant.iterrows():
+            reading = self._extract_buffer_reading(
+                int(row["id"]), row.geometry, ndvi_array, transform,
+                acq_date, season, transformer,
+            )
+            if reading is not None:
+                readings.append(reading)
+
+        return readings
+
+    def _process_scene_incremental(
+        self,
+        nir_href: str,
+        red_href: str,
+        acq_date: date,
+        item: Any,
+        buffers: gpd.GeoDataFrame,
+        watershed_bbox: tuple[float, float, float, float],
+        processed: set[tuple[int, str, str]],
+    ) -> list[NdviReading]:
+        """Process a scene incrementally, skipping already-processed buffers.
+
+        Same as ``_process_scene`` but checks the *processed* set before
+        computing stats for each buffer. If all buffers are already
+        processed for this acquisition date, skips the expensive band
+        reads entirely.
+
+        Args:
+            nir_href: URL to the NIR (B08) COG.
+            red_href: URL to the Red (B04) COG.
+            acq_date: Image acquisition date.
+            item: STAC item.
+            buffers: All buffer geometries in STORAGE_CRS.
+            watershed_bbox: Watershed bounding box in STORAGE_CRS.
+            processed: Set of ``(buffer_id, date_str, satellite)`` already in DB.
+
+        Returns:
+            List of new NdviReading objects (skips already-processed).
+        """
+        acq_date_str = str(acq_date)
+
+        # Quick check: skip the scene entirely if all buffers are done
+        buffer_ids = set(buffers["id"].astype(int))
+        unprocessed = {
+            bid for bid in buffer_ids
+            if (bid, acq_date_str, "Sentinel-2") not in processed
+        }
+        if not unprocessed:
+            logger.debug(
+                "All buffers already processed for %s — skipping scene",
+                acq_date,
+            )
+            return []
+
+        nir_data, transform, cog_crs = read_band_window(
+            nir_href, watershed_bbox,
+        )
+        red_data, _, _ = read_band_window(red_href, watershed_bbox)
+
+        ndvi_array = calculate_ndvi(nir_data, red_data)
+        season = determine_season(acq_date)
+
+        scene_bbox = tuple(item.bbox) if item.bbox else watershed_bbox
+        relevant = self._buffers_intersecting_scene(buffers, scene_bbox)
+
+        need_reproject = cog_crs.upper() != STORAGE_CRS.upper()
+        transformer: Transformer | None = None
+        if need_reproject:
+            transformer = Transformer.from_crs(
+                STORAGE_CRS, cog_crs, always_xy=True,
+            )
+
+        readings: list[NdviReading] = []
+        skipped = 0
+        for _, row in relevant.iterrows():
+            buffer_id = int(row["id"])
+            key = (buffer_id, acq_date_str, "Sentinel-2")
+            if key in processed:
+                skipped += 1
+                continue
+
+            reading = self._extract_buffer_reading(
+                buffer_id, row.geometry, ndvi_array, transform,
+                acq_date, season, transformer,
+            )
+            if reading is not None:
+                readings.append(reading)
+
+        if skipped > 0:
+            logger.debug(
+                "Skipped %d already-processed buffers for %s", skipped, acq_date,
+            )
+        return readings
+
+    # -- Per-buffer extraction (in-memory, no I/O) --------------------------
+
+    @staticmethod
+    def _extract_buffer_reading(
+        buffer_id: int,
+        geom: BaseGeometry,
+        ndvi_array: np.ndarray,
+        transform: rasterio.Affine,
+        acq_date: date,
+        season: str,
+        transformer: Transformer | None,
+    ) -> NdviReading | None:
+        """Extract NDVI stats for one buffer from a full-scene NDVI array.
+
+        Uses ``rasterio.features.geometry_mask()`` for in-memory masking
+        — no HTTP I/O.
+
+        Args:
+            buffer_id: Buffer primary key.
+            geom: Buffer geometry in STORAGE_CRS.
+            ndvi_array: Full-scene NDVI array.
+            transform: Affine transform of the NDVI array.
+            acq_date: Image acquisition date.
+            season: Season context string.
+            transformer: Optional CRS transformer (STORAGE_CRS → COG CRS).
+
+        Returns:
+            NdviReading or None if no valid pixels in the buffer.
+        """
+        if transformer is not None:
+            geom = shapely_transform(transformer.transform, geom)
+
+        try:
+            mask = geometry_mask(
+                [mapping(geom)],
+                out_shape=ndvi_array.shape,
+                transform=transform,
+                invert=True,
+            )
+        except (ValueError, IndexError):
+            return None
+
+        buffer_pixels = ndvi_array[mask]
+        if buffer_pixels.size == 0:
+            return None
+
+        mean_val, min_val, max_val = compute_ndvi_stats(buffer_pixels)
         return NdviReading(
             buffer_id=buffer_id,
             acquisition_date=acq_date,
@@ -432,7 +733,27 @@ class NdviProcessor:
             season_context=season,
         )
 
-    # -- Incremental processing ---------------------------------------------
+    @staticmethod
+    def _buffers_intersecting_scene(
+        buffers: gpd.GeoDataFrame,
+        scene_bbox: tuple[float, ...],
+    ) -> gpd.GeoDataFrame:
+        """Filter buffers to those whose geometry intersects the scene bbox.
+
+        Uses GeoPandas spatial predicates for fast filtering.
+
+        Args:
+            buffers: GeoDataFrame with geometry column in STORAGE_CRS.
+            scene_bbox: ``(minx, miny, maxx, maxy)`` of the scene footprint.
+
+        Returns:
+            Filtered GeoDataFrame (subset of rows).
+        """
+        scene_box = box(*scene_bbox[:4])
+        intersects_mask = buffers.geometry.intersects(scene_box)
+        return buffers[intersects_mask]
+
+    # -- Incremental processing (scene-first) --------------------------------
 
     def get_last_ndvi_date(self) -> date | None:
         """Get the most recent acquisition_date from vegetation_health.
@@ -465,11 +786,11 @@ class NdviProcessor:
         self,
         max_cloud_cover: int = MAX_CLOUD_COVER,
     ) -> int:
-        """Process NDVI incrementally, skipping already-processed dates.
+        """Process NDVI incrementally using scene-first approach.
 
-        Auto-detects the date range: from the day after the last
-        processed acquisition date through today. Falls back to the
-        current year's growing season if no prior data exists.
+        Auto-detects the date range from the last processed acquisition
+        date. Skips already-processed (buffer_id, date, satellite)
+        combinations.
 
         Args:
             max_cloud_cover: Maximum cloud cover percentage.
@@ -483,61 +804,64 @@ class NdviProcessor:
         if last_date:
             start = last_date + timedelta(days=1)
         else:
-            # Default: start of current year's growing season
             start = date(datetime.now().year, 6, 1)
 
         end = date.today()
         if start > end:
-            logger.info("NDVI is up-to-date through %s — nothing to process", last_date)
+            logger.info(
+                "NDVI is up-to-date through %s — nothing to process",
+                last_date,
+            )
             return 0
 
         date_range = f"{start.isoformat()}/{end.isoformat()}"
-        logger.info("Incremental NDVI processing: %s", date_range)
+        logger.info("Incremental NDVI processing (scene-first): %s", date_range)
 
         processed = self.get_processed_keys()
         buffers = self._load_buffers()
+        watershed_bbox = self._load_watershed_bbox()
+
         logger.info(
             "Processing NDVI for %d buffers (%d existing readings to skip)",
             len(buffers), len(processed),
         )
 
+        items = self._searcher.search_items(
+            watershed_bbox, date_range, max_cloud_cover,
+        )
+        if not items:
+            logger.info("No new Sentinel-2 imagery found")
+            return 0
+        logger.info("Found %d scenes for incremental processing", len(items))
+
         all_readings: list[NdviReading] = []
-        for _, row in buffers.iterrows():
-            readings = self._process_single_buffer_incremental(
-                row, date_range, max_cloud_cover, processed,
+        for scene_idx, item in enumerate(items, start=1):
+            parsed = _parse_stac_item(item)
+            if parsed is None:
+                continue
+            nir_href, red_href, acq_date = parsed
+
+            logger.info(
+                "Processing scene %d/%d: %s (acquired %s)",
+                scene_idx, len(items), item.id, acq_date,
             )
-            all_readings.extend(readings)
+
+            try:
+                readings = self._process_scene_incremental(
+                    nir_href, red_href, acq_date, item,
+                    buffers, watershed_bbox, processed,
+                )
+                all_readings.extend(readings)
+            except (rasterio.RasterioIOError, ValueError) as exc:
+                logger.warning(
+                    "Failed to process scene %s: %s", item.id, exc,
+                )
+                continue
+
+            logger.info(
+                "  Scene %s: %d new readings", item.id, len(readings),
+            )
 
         count = self._writer.write_readings(all_readings)
         logger.info("Wrote %d new NDVI readings", count)
         return count
-
-    def _process_single_buffer_incremental(
-        self,
-        buffer_row: Any,
-        date_range: str,
-        max_cloud_cover: int,
-        processed: set[tuple[int, str, str]],
-    ) -> list[NdviReading]:
-        """Process NDVI for one buffer, skipping already-processed items."""
-        buffer_id = int(buffer_row["id"])
-        geom: BaseGeometry = buffer_row.geometry
-        bbox = geom.bounds
-
-        items = self._searcher.search_items(bbox, date_range, max_cloud_cover)
-        if not items:
-            return []
-
-        readings: list[NdviReading] = []
-        for item in items:
-            parsed = _parse_stac_item(item)
-            if parsed is None:
-                continue
-            _, _, acq_date = parsed
-            key = (buffer_id, str(acq_date), "Sentinel-2")
-            if key in processed:
-                continue
-            reading = self._compute_reading(buffer_id, geom, item)
-            if reading is not None:
-                readings.append(reading)
-        return readings
