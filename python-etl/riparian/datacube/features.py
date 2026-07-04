@@ -31,7 +31,7 @@ import numpy as np
 import xarray as xr
 from scipy import ndimage
 
-from stac_datacube import spatial_dims
+from riparian.datacube.stac import spatial_dims
 
 logger = logging.getLogger(__name__)
 

@@ -24,11 +24,11 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from delineation_baseline import DelineationModel, predict_proba, train
-from delineation_validate import CvReport, assign_spatial_folds, spatial_cv
-from feature_builder import FeatureStack, build_feature_stack
-from hand_processor import build_hand_envelope
-from stac_datacube import (
+from riparian.delineation.baseline import DelineationModel, predict_proba, train
+from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
+from riparian.datacube.features import FeatureStack, build_feature_stack
+from riparian.delineation.hand import build_hand_envelope
+from riparian.datacube.stac import (
     CubeRequest,
     PlanetaryComputerSearcher,
     StacSearcher,
@@ -36,7 +36,7 @@ from stac_datacube import (
     build_sentinel2_cube,
     spatial_dims,
 )
-from weak_label_sampler import (
+from riparian.delineation.weak_labels import (
     LABEL_POSITIVE,
     LabelGrid,
     PostGISWeakLabelWriter,
