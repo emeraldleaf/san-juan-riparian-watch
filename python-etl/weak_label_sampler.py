@@ -35,6 +35,7 @@ import xarray as xr
 from scipy import ndimage
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from stac_datacube import spatial_dims
 
@@ -271,7 +272,7 @@ def load_nwi_mask(
     try:
         with engine.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
-    except Exception as exc:
+    except (SQLAlchemyError, OSError) as exc:
         logger.warning("Could not load NWI wetlands: %s", exc)
         return None
     geoms = [wkb.loads(bytes(r[0])) for r in rows if r[0] is not None]

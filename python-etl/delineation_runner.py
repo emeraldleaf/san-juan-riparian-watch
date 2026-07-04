@@ -16,11 +16,13 @@ from dataclasses import dataclass
 
 import numpy as np
 from rasterio.features import shapes as raster_shapes
-from sklearn.ensemble import RandomForestClassifier
-from rasterio.transform import from_bounds
+from rasterio.transform import Affine, from_bounds
+from scipy import ndimage
 from shapely.geometry import shape as shapely_shape
+from sklearn.ensemble import RandomForestClassifier
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from delineation_baseline import DelineationModel, predict_proba, train
 from delineation_validate import CvReport, assign_spatial_folds, spatial_cv
@@ -36,6 +38,7 @@ from stac_datacube import (
 )
 from weak_label_sampler import (
     LABEL_POSITIVE,
+    LabelGrid,
     PostGISWeakLabelWriter,
     build_weak_label_grid,
     grid_to_samples,
@@ -199,13 +202,13 @@ def _cv_estimator() -> RandomForestClassifier:
     )
 
 
-def _persist_samples(engine: Engine, grid, huc12: str | None) -> None:
+def _persist_samples(engine: Engine, grid: LabelGrid, huc12: str | None) -> None:
     """Write weak-labeled samples to bronze (best-effort; logs on failure)."""
     try:
         writer = PostGISWeakLabelWriter(engine)
         n = writer.write_samples(grid_to_samples(grid), huc12=huc12)
         logger.info("Persisted %d weak-labeled samples to bronze", n)
-    except Exception as exc:  # persistence is non-critical to the run
+    except (SQLAlchemyError, OSError) as exc:  # persistence is non-critical
         logger.warning("Could not persist training samples: %s", exc)
 
 
@@ -239,13 +242,27 @@ def _predict_and_write(
     return _write_extent(engine, rows, model, huc12)
 
 
-def _vectorize(riparian, prob_grid, transform, model, resolution_m, huc12) -> list[dict]:
-    """Vectorize connected riparian regions into polygon rows with mean probability."""
-    mean_prob = round(float(prob_grid[riparian].mean()), 4) if riparian.any() else 0.0
+def _vectorize(
+    riparian: np.ndarray,
+    prob_grid: np.ndarray,
+    transform: Affine,
+    model: DelineationModel,
+    resolution_m: float,
+    huc12: str | None,
+) -> list[dict]:
+    """Vectorize connected riparian regions into polygon rows.
+
+    Each polygon carries the mean predicted probability over *its own* pixels
+    (per-region, so the value is meaningful for downstream filtering/diffing),
+    computed from the labeled connected components.
+    """
+    labeled, _ = ndimage.label(riparian)
     rows: list[dict] = []
-    for geom, _ in raster_shapes(
-        riparian.astype(np.uint8), mask=riparian, transform=transform,
+    for geom, region_id in raster_shapes(
+        labeled.astype(np.int32), mask=riparian, transform=transform,
     ):
+        region_mask = labeled == int(region_id)
+        mean_prob = round(float(prob_grid[region_mask].mean()), 4)
         poly = shapely_shape(geom)
         rows.append({
             "method": model.method,
