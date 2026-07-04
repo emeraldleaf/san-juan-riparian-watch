@@ -30,7 +30,7 @@ from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (
     MaskedOlmoEarthSample,
 )
 
-from stac_datacube import spatial_dims
+from riparian.datacube.stac import spatial_dims
 
 logger = logging.getLogger(__name__)
 

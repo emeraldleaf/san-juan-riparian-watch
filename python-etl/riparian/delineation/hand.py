@@ -28,7 +28,7 @@ import rasterio
 import xarray as xr
 from odc.stac import stac_load
 
-from stac_datacube import STORAGE_CRS, StacSearcher, spatial_dims
+from riparian.datacube.stac import STORAGE_CRS, StacSearcher, spatial_dims
 
 logger = logging.getLogger(__name__)
 

@@ -128,11 +128,15 @@ riparian-poc/
 │   └── Models/ApiErrorResponse.cs
 ├── RiparianPoc.ServiceDefaults/  # Shared Aspire service configuration
 ├── python-etl/                   # Python geospatial ETL pipeline
-│   ├── etl_pipeline.py           # Main orchestrated pipeline
-│   ├── ndvi_processor.py         # Sentinel-2 NDVI + health scoring (scene-first)
-│   ├── stac_datacube.py          # STAC → xarray datacube (Stage-1 delineation)
-│   ├── nlcd_processor.py, landfire_processor.py, ssurgo_processor.py, lidar_processor.py
-│   ├── raster_processor.py       # Shared ImageServer/WCS raster source classes
+│   ├── riparian/                 # riparian AI package (domain-organized)
+│   │   ├── datacube/             #   stac.py, features.py — STAC access + feature engineering
+│   │   ├── delineation/          #   hand, weak_labels, baseline, validate, olmoearth, runner (Stage 1)
+│   │   ├── health/               #   invasive.py (+ condition scoring, Stage 2)
+│   │   ├── reaches/              #   processor.py — per-reach network product
+│   │   └── validation/           #   reference.py — NMRipMap/CO-RIP validation
+│   ├── etl_pipeline.py           # Legacy orchestrated pipeline (scene-first ingest)
+│   ├── ndvi_processor.py, nlcd_processor.py, landfire_processor.py, ssurgo_processor.py,
+│   │   lidar_processor.py, raster_processor.py  # legacy source ingest (flat, still wired to entrypoint)
 │   ├── health_scorer.py          # SMP 80/10/10 composite health scoring model
 │   ├── run_tracker.py, entrypoint.py, scheduler.py, requirements.txt, Dockerfile
 ├── frontend/                     # React 18 + Leaflet + Tailwind (src/App.tsx, components/)
@@ -298,7 +302,10 @@ config), `.coderabbit.yaml` (Tier-2 AI-review path rules), `.vscode/settings.jso
 - `RiparianPoc.AppHost/Program.cs` — Aspire orchestration
 - Coordinate reference systems (EPSG:4269 for storage)
 - **Do not add NuGet / npm / pip packages without asking**
-- Do not reorganize project structure or move files between directories
+- Do not reorganize the **.NET Aspire solution** (AppHost references projects by path; `azure.yaml`
+  + Dockerfiles are coupled to it) or the established repo layout without asking. Riparian AI
+  Python code has a sanctioned home — the `python-etl/riparian/` package (domain subpackages);
+  put new delineation/health/reach/validation modules there, not as new flat files.
 - Do not change field mappings in `etl_pipeline.py` without updating the schema
 
 ## Common Patterns

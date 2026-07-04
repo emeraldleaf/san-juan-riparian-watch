@@ -11,13 +11,17 @@ See CLAUDE.md "Python" + "Medallion Architecture" + "Common Patterns".
 
 `$ARGUMENTS` describes the step + its data source. If empty, ask.
 
-## Decide first: function in `etl_pipeline.py`, or a new `*_processor.py`?
+## Decide first: which home does the step belong in?
 
-- **A step in the existing pipeline** (uses data already ingested, simple transform) → add a
-  function in `etl_pipeline.py` and call it from `main()` in the correct order.
-- **A distinct source or model** (new external API, a new index family, an ML model) → add a
-  new `python-etl/<name>_processor.py` module and wire it into `entrypoint.py` as a `--mode`
-  (mirror `ndvi_processor.py` + how `entrypoint.py` dispatches modes).
+- **Riparian AI work** (delineation, health/condition, invasives, reaches, validation, STAC
+  datacube/features) → add a module in the domain-organized **`riparian/` package**:
+  `riparian/{datacube,delineation,health,reaches,validation}/`. Import intra-package via
+  `riparian.<domain>.<module>`. Mirror the existing modules (e.g. `riparian/delineation/runner.py`).
+- **A legacy source ingest** (new external raster/vector API following the old pattern) → add a
+  flat `python-etl/<name>_processor.py` and wire it into `entrypoint.py` as a `--mode`
+  (mirror `ndvi_processor.py`).
+- **A step in the existing legacy pipeline** (simple transform on ingested data) → a function
+  in `etl_pipeline.py`, called from `main()` in order.
 
 ## Conventions (non-negotiable)
 
@@ -29,8 +33,8 @@ See CLAUDE.md "Python" + "Medallion Architecture" + "Common Patterns".
   `calculate_ndvi`, `compute_ndvi_stats`) so they unit-test without network or DB.
 - **SQL is SQLAlchemy `text()` parameterized** — never f-string SQL. GeoPandas for PostGIS
   reads (`gpd.read_postgis(...)` then `gdf.rename_geometry("geometry")` — DB column is `geom`).
-- **STAC**: `planetary_computer.sign_inplace`; for datacubes reuse `stac_datacube.py` and its
-  `spatial_dims()` helper (geographic cubes name dims `latitude`/`longitude`, not `x`/`y`).
+- **STAC**: `planetary_computer.sign_inplace`; for datacubes reuse `riparian.datacube.stac`
+  and its `spatial_dims()` helper (geographic cubes name dims `latitude`/`longitude`, not `x`/`y`).
 - **Medallion direction**: write to the correct schema — bronze (raw/weak-labels), silver
   (derived spatial), gold (aggregates). Never write upstream.
 - **Log at start and end** of the step. Functions < 25 lines; no bare `except Exception`.
