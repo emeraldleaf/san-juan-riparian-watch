@@ -5,7 +5,7 @@ scores each reach with ``%riparian_cover`` from ``silver.riparian_extent`` withi
 a corridor buffer. Produces the manager-facing product: "which reaches are
 riparian" (later "which are degrading"), interpretable along the river network.
 
-All metric math (length, buffer, area) is done in EPSG:5070 (CONUS Albers,
+All metric math (length, buffer, area) uses PostGIS geography (``::geography``,
 metres); geometries are stored in EPSG:4269. NHD flowlines come from The
 National Map (ArcGIS Large-Scale layer). See
 docs/specs/2026-07-03-stage1-riparian-delineation.md.
@@ -28,7 +28,6 @@ NHD_FLOWLINE_QUERY = (
 )
 REACH_LEN_M = 250.0
 CORRIDOR_M = 50.0
-METRIC_SRID = 5070  # CONUS Albers Equal Area (metres)
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +117,7 @@ def write_flowlines(engine: Engine, flowlines: list[dict], huc12: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Split into reaches + score riparian cover (PostGIS, all metric math in 5070)
+# Split into reaches + score riparian cover (PostGIS, metric math via ::geography)
 # ---------------------------------------------------------------------------
 
 
@@ -198,7 +197,7 @@ def build_reaches(
     """
     with engine.connect() as conn:
         conn.execute(_BUILD_REACHES, {
-            "huc12": huc12, "method": method, "srid": METRIC_SRID,
+            "huc12": huc12, "method": method,
             "reach_len": reach_len_m, "corridor": corridor_m,
         })
         conn.commit()

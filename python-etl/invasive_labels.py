@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import numpy as np
 import requests
 from rasterio.features import rasterize
-from rasterio.transform import from_bounds
+from rasterio.transform import Affine, from_bounds
 from shapely.geometry import shape as shapely_shape
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ def grid_shape(bbox: tuple[float, float, float, float], resolution_m: float) -> 
 def build_invasive_labels(
     bbox: tuple[float, float, float, float],
     shape: tuple[int, int],
-    transform=None,
+    transform: Affine | None = None,
 ) -> InvasiveLabelGrid:
     """Fetch NMRipMap and rasterize an invasive/native label grid.
 

@@ -57,7 +57,9 @@ class EmbeddingGrid:
     x_coords: np.ndarray
 
 
-def load_olmoearth(model_id: ModelID = ModelID.OLMOEARTH_V1_NANO, *, weights: bool = True):
+def load_olmoearth(
+    model_id: ModelID = ModelID.OLMOEARTH_V1_NANO, *, weights: bool = True,
+) -> torch.nn.Module:
     """Load an OlmoEarth encoder in eval mode (CPU-friendly for Nano)."""
     model = load_model_from_id(model_id, load_weights=weights)
     model.eval()
@@ -127,7 +129,7 @@ def build_sample(cube: xr.Dataset, bbox: tuple[float, float, float, float]) -> M
     )
 
 
-def _ymd(t) -> list[int]:
+def _ymd(t: np.datetime64) -> list[int]:
     """Extract [day, month-1, year] from a numpy datetime64 (integers)."""
     dt = np.datetime64(t, "D").astype("datetime64[D]").item()
     return [int(dt.day), int(dt.month - 1), int(dt.year)]
@@ -135,7 +137,8 @@ def _ymd(t) -> list[int]:
 
 @torch.no_grad()
 def extract_embeddings(
-    model, cube: xr.Dataset, bbox: tuple[float, float, float, float],
+    model: torch.nn.Module, cube: xr.Dataset,
+    bbox: tuple[float, float, float, float],
     *, patch_size: int = DEFAULT_PATCH_SIZE,
 ) -> EmbeddingGrid:
     """Run the OlmoEarth encoder and return per-patch embeddings.
