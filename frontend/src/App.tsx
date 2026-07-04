@@ -1,19 +1,71 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
-import type { FeatureCollection, Feature } from 'geojson';
-import type { Layer, PathOptions } from 'leaflet';
+import {
+  Map,
+  Source,
+  Layer,
+  Popup,
+  NavigationControl,
+} from 'react-map-gl/maplibre';
+import type { MapRef } from 'react-map-gl/maplibre';
+import type { MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
 import NDVILayer from './components/NDVILayer';
 import TimeSlider from './components/TimeSlider';
-import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 // Unique session ID for this browser tab — sent with every API call for telemetry correlation.
 const SESSION_ID = crypto.randomUUID();
 
 // San Juan Basin center (HUC8 14080101)
-const MAP_CENTER: [number, number] = [37.3, -107.8];
+const MAP_CENTER = { longitude: -107.8, latitude: 37.3 };
 const DEFAULT_ZOOM = 10;
+
+// ---------------------------------------------------------------------------
+// Basemap styles
+// ---------------------------------------------------------------------------
+
+const CARTO_POSITRON =
+  'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      attribution: 'Tiles &copy; Esri',
+    },
+  },
+  layers: [
+    { id: 'satellite-basemap', type: 'raster', source: 'esri-satellite' },
+  ],
+};
+
+const NAIP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    naip: {
+      type: 'raster',
+      tiles: [
+        'https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      attribution: 'USDA NAIP Imagery',
+    },
+  },
+  layers: [{ id: 'naip-basemap', type: 'raster', source: 'naip' }],
+};
+
+const BASEMAP_STYLES: Record<string, string | StyleSpecification> = {
+  street: CARTO_POSITRON,
+  satellite: SATELLITE_STYLE,
+  naip: NAIP_STYLE,
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,7 +83,85 @@ interface ComplianceSummary {
   healthyBufferPct: number | null;
   degradedBufferPct: number | null;
   bareBufferPct: number | null;
+  avgCompositeScore: number | null;
+  gradeAPct: number | null;
+  gradeBPct: number | null;
+  gradeCPct: number | null;
+  gradeDPct: number | null;
+  gradeFPct: number | null;
 }
+
+interface PopupInfo {
+  longitude: number;
+  latitude: number;
+  layerType: 'buffer' | 'stream' | 'parcel' | 'wetland' | 'soil';
+  properties: Record<string, unknown>;
+}
+
+interface BufferDetail {
+  landCover: Array<{
+    nlcdDescription: string;
+    areaPct: number;
+    isNatural: boolean;
+  }>;
+  vegStructure: Array<{
+    evtName: string | null;
+    evhClass: string | null;
+    meanHeightM: number | null;
+    dominantLifeform: string | null;
+    areaPct: number;
+  }>;
+  soils: Array<{
+    muname: string | null;
+    soilPctOfBuffer: number;
+    hydricRating: string | null;
+  }>;
+  canopy: Array<{
+    meanHeightM: number | null;
+    maxHeightM: number | null;
+    p95HeightM: number | null;
+    canopyCoverPct: number | null;
+  }>;
+  score: ScoreDetail | null;
+}
+
+interface ScoreDetail {
+  ndviScore: number | null;
+  verticalComplexityScore: number | null;
+  speciesCompositionScore: number | null;
+  shrubLayerScore: number | null;
+  patchinessScore: number | null;
+  nativeRegenerationScore: number | null;
+  nativeCoverScore: number | null;
+  vegetationStructureScore: number | null;
+  connectivityScore: number | null;
+  contributingAreaScore: number | null;
+  compositeScore: number | null;
+  scoreGrade: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const GRADE_COLORS: Record<string, string> = {
+  A: '#16a34a',
+  B: '#84cc16',
+  C: '#eab308',
+  D: '#f97316',
+  F: '#dc2626',
+};
+
+/** All layer IDs that support click interaction. */
+const INTERACTIVE_LAYER_IDS = [
+  'buffer-smp-fill',
+  'buffer-ndvi-fill',
+  'buffer-vegetation-fill',
+  'stream-line',
+  'parcel-fill',
+  'wetland-fill',
+  'soil-fill',
+];
 
 // ---------------------------------------------------------------------------
 // Fetch helper
@@ -64,213 +194,170 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Layer styles
-// ---------------------------------------------------------------------------
-
-function streamStyle(feature?: Feature): PathOptions {
-  const order = (feature?.properties?.stream_order as number) ?? 1;
-  return { color: '#2563eb', weight: Math.max(1, order), opacity: 0.8 };
-}
-
-const BUFFER_STYLE: PathOptions = {
-  color: '#059669',
-  weight: 1,
-  fillColor: '#34d399',
-  fillOpacity: 0.25,
-};
-
-function bufferHealthStyle(feature?: Feature): PathOptions {
-  const category = feature?.properties?.health_category as string | null;
-  switch (category) {
-    case 'healthy':
-      return { color: '#15803d', weight: 1.5, fillColor: '#16a34a', fillOpacity: 0.4 };
-    case 'degraded':
-      return { color: '#b45309', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.4 };
-    case 'bare':
-      return { color: '#b91c1c', weight: 1.5, fillColor: '#dc2626', fillOpacity: 0.4 };
-    default:
-      return BUFFER_STYLE; // no NDVI data — use default green
-  }
-}
-
-function parcelStyle(feature?: Feature): PathOptions {
-  const focusArea = feature?.properties?.is_focus_area as boolean | null;
-  if (focusArea === true) return { color: '#dc2626', weight: 2, fillOpacity: 0.4 };
-  if (focusArea === false) return { color: '#16a34a', weight: 2, fillOpacity: 0.3 };
-  return { color: '#6b7280', weight: 1, fillOpacity: 0.2 };
-}
-
-const WETLAND_STYLE: PathOptions = {
-  color: '#0891b2',
-  weight: 1,
-  fillColor: '#22d3ee',
-  fillOpacity: 0.35,
-};
-
-// ---------------------------------------------------------------------------
-// Popups
-// ---------------------------------------------------------------------------
-
-function onEachStream(feature: Feature, layer: Layer) {
-  const p = feature.properties;
-  if (!p) return;
-  layer.bindPopup(
-    `<strong>${p.gnis_name ?? 'Unnamed Stream'}</strong><br/>` +
-    `COMID: ${p.comid}<br/>` +
-    `Order: ${p.stream_order ?? 'N/A'}<br/>` +
-    `Length: ${p.length_km ? p.length_km + ' km' : 'N/A'}`,
-  );
-}
-
-function onEachBuffer(feature: Feature, layer: Layer) {
-  const p = feature.properties;
-  if (!p) return;
-  const acres = p.area_sq_m ? (p.area_sq_m / 4046.86).toFixed(2) : 'N/A';
-  const ndviLine = p.mean_ndvi != null
-    ? `NDVI: ${Number(p.mean_ndvi).toFixed(3)} (${p.health_category})<br/>`
-    : '';
-  const dateLine = p.acquisition_date ? `Acquired: ${p.acquisition_date}<br/>` : '';
-  layer.bindPopup(
-    `<strong>Riparian Buffer</strong><br/>` +
-    `Stream: ${p.stream_name ?? 'Unknown'}<br/>` +
-    `Distance: ${p.buffer_distance_m} m<br/>` +
-    `Area: ${acres} acres<br/>` +
-    ndviLine + dateLine,
-  );
-}
-
-function onEachParcel(feature: Feature, layer: Layer) {
-  const p = feature.properties;
-  if (!p) return;
-  let status = 'No data';
-  if (p.is_focus_area === true) status = 'Focus Area';
-  else if (p.is_focus_area === false) status = 'Compliant';
-  const extra = [
-    p.overlap_pct == null ? '' : `Buffer Overlap: ${p.overlap_pct}%`,
-    p.focus_area_reason ? `Reason: ${p.focus_area_reason}` : '',
-  ].filter(Boolean).join('<br/>');
-
-  layer.bindPopup(
-    `<strong>Parcel ${p.parcel_id}</strong><br/>` +
-    `Owner: ${p.owner_name ?? 'Unknown'}<br/>` +
-    `Land Use: ${p.land_use_desc ?? 'N/A'}<br/>` +
-    `Acres: ${p.land_acres ?? 'N/A'}<br/>` +
-    `Status: ${status}` +
-    (extra ? `<br/>${extra}` : ''),
-  );
-}
-
-function onEachWetland(feature: Feature, layer: Layer) {
-  const p = feature.properties;
-  if (!p) return;
-  layer.bindPopup(
-    `<strong>NWI Wetland</strong><br/>` +
-    `Type: ${p.wetland_type ?? 'N/A'}<br/>` +
-    `Cowardin Code: ${p.cowardin_code ?? 'N/A'}<br/>` +
-    `Acres: ${p.acres ? Number(p.acres).toFixed(2) : 'N/A'}`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NDVI heat points from buffer centroids
-// ---------------------------------------------------------------------------
-
-function computeHeatPoints(
-  buffers: FeatureCollection | null,
-): Array<[number, number, number]> {
-  if (!buffers?.features) return [];
-
-  return buffers.features
-    .map((f) => {
-      const ndvi = f.properties?.mean_ndvi as number | null;
-      if (ndvi == null) return null; // skip buffers without NDVI data
-      const coords = extractCoords(f.geometry);
-      if (coords.length === 0) return null;
-      const lat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
-      const lng = coords.reduce((s, c) => s + c[0], 0) / coords.length;
-      return [lat, lng, Math.max(0, Math.min(1, ndvi))] as [number, number, number];
-    })
-    .filter((p): p is [number, number, number] => p !== null);
-}
-
-function extractCoords(geometry: Feature['geometry']): number[][] {
-  if (!geometry) return [];
-  if (geometry.type === 'Polygon') return geometry.coordinates[0] ?? [];
-  if (geometry.type === 'MultiPolygon') {
-    return geometry.coordinates.flatMap((ring) => ring[0] ?? []);
-  }
-  return [];
-}
-
-// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const [streams, setStreams] = useState<FeatureCollection | null>(null);
-  const [buffers, setBuffers] = useState<FeatureCollection | null>(null);
-  const [parcels, setParcels] = useState<FeatureCollection | null>(null);
-  const [wetlands, setWetlands] = useState<FeatureCollection | null>(null);
-  const [showWetlands, setShowWetlands] = useState(true);
-  const [summary, setSummary] = useState<ComplianceSummary[]>([]);
-  const [basemap, setBasemap] = useState<'street' | 'satellite' | 'naip'>('street');
+  const mapRef = useRef<MapRef>(null);
 
-  // Timelapse state
+  // GeoJSON state (lightweight layers only)
+  // Wetlands and Soils migrated to vector tiles for performance.
+
+  // Scalar state
+  const [summary, setSummary] = useState<ComplianceSummary[]>([]);
   const [ndviDates, setNdviDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [bufferLoading, setBufferLoading] = useState(false);
-  const bufferVersion = useRef(0);
 
-  // Initial load — streams, latest buffers, parcels, summary, and available NDVI dates
+  // UI toggles
+  const [showStreams, setShowStreams] = useState(true);
+  const [showBuffers, setShowBuffers] = useState(true);
+  const [showParcels, setShowParcels] = useState(true);
+  const [showWetlands, setShowWetlands] = useState(true);
+  const [showSoils, setShowSoils] = useState(false);
+  const [showRiparianExtent, setShowRiparianExtent] = useState(false);
+  const [riparianExtent, setRiparianExtent] =
+    useState<FeatureCollection | null>(null);
+  const [viewMode, setViewMode] = useState<'ndvi' | 'smp' | 'vegetation'>(
+    'ndvi'
+  );
+  const [basemap, setBasemap] = useState<'street' | 'satellite' | 'naip'>(
+    'street',
+  );
+
+  // Popup state
+  const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
+  const [bufferDetail, setBufferDetail] = useState<BufferDetail | null>(null);
+  const [bufferDetailLoading, setBufferDetailLoading] = useState(false);
+  const [cursor, setCursor] = useState('');
+
+  // -------------------------------------------------------------------------
+  // Initial fetch — lightweight data only (~2MB vs ~90MB before)
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     Promise.allSettled([
-      fetchJson<FeatureCollection>(`${API_URL}/api/streams`),
-      fetchJson<FeatureCollection>(`${API_URL}/api/buffers/health`),
-      fetchJson<FeatureCollection>(`${API_URL}/api/parcels`),
       fetchJson<ComplianceSummary[]>(`${API_URL}/api/summary`),
       fetchJson<string[]>(`${API_URL}/api/ndvi/dates`),
-      fetchJson<FeatureCollection>(`${API_URL}/api/wetlands`),
-    ]).then(([s, b, p, sum, dates, w]) => {
-      if (s.status === 'fulfilled') setStreams(s.value);
-      if (b.status === 'fulfilled') setBuffers(b.value);
-      if (p.status === 'fulfilled') setParcels(p.value);
-      if (sum.status === 'fulfilled') setSummary(sum.value);
-      if (dates.status === 'fulfilled') setNdviDates(dates.value);
-      if (w.status === 'fulfilled') setWetlands(w.value);
+    ]).then(([sumR, datesR]) => {
+      if (sumR.status === 'fulfilled') setSummary(sumR.value);
+      else console.error('[API] summary failed:', sumR.reason);
+      if (datesR.status === 'fulfilled') setNdviDates(datesR.value);
+      else console.error('[API] ndvi/dates failed:', datesR.reason);
     });
   }, []);
 
-  // Fetch buffers for a specific date (or latest when null)
+  // Lazy-load Stage-1 riparian extent (GeoJSON) the first time it's toggled on.
+  useEffect(() => {
+    if (!showRiparianExtent || riparianExtent) return;
+    fetchJson<FeatureCollection>(`${API_URL}/api/riparian/extent?method=rf`)
+      .then(setRiparianExtent)
+      .catch((err) => console.error('[API] riparian/extent failed:', err));
+  }, [showRiparianExtent, riparianExtent]);
+
+  // -------------------------------------------------------------------------
+  // Tile URLs
+  // -------------------------------------------------------------------------
+
+  const ndviTileUrl = useMemo(() => {
+    if (selectedDate)
+      return `${API_URL}/api/tiles/buffers-ndvi/${selectedDate}/{z}/{x}/{y}.pbf`;
+    return `${API_URL}/api/tiles/buffers-ndvi/{z}/{x}/{y}.pbf`;
+  }, [selectedDate]);
+
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
+
+  /** Attach session header to all API tile requests. */
+  const transformRequest = useCallback((url: string) => {
+    if (url.includes('/api/')) {
+      return { url, headers: { 'X-Session-Id': SESSION_ID } };
+    }
+    return { url };
+  }, []);
+
+  /** NDVI date slider changed. */
   const handleDateChange = useCallback((date: string | null) => {
     setSelectedDate(date);
     setBufferLoading(true);
-    bufferVersion.current += 1;
-    const version = bufferVersion.current;
-
-    const url = date
-      ? `${API_URL}/api/buffers/health/${date}`
-      : `${API_URL}/api/buffers/health`;
-
-    fetchJson<FeatureCollection>(url)
-      .then((fc) => {
-        // Only apply if this is still the latest request
-        if (version === bufferVersion.current) {
-          setBuffers(fc);
-          setBufferLoading(false);
-        }
-      })
-      .catch(() => {
-        if (version === bufferVersion.current) setBufferLoading(false);
-      });
+    // Tiles load on-demand; brief loading indicator for UX
+    setTimeout(() => setBufferLoading(false), 400);
   }, []);
 
-  const ndviPoints = useMemo(() => computeHeatPoints(buffers), [buffers]);
-  const stats = summary[0] ?? null;
-  // Unique key to force GeoJSON remount when buffer data changes
-  const bufferKey = useMemo(
-    () => `buffers-${selectedDate ?? 'latest'}-${buffers?.features?.length ?? 0}`,
-    [selectedDate, buffers],
+  /** Load buffer detail data on popup open. */
+  const loadBufferDetail = useCallback(async (bufferId: number) => {
+    setBufferDetail(null);
+    setBufferDetailLoading(true);
+
+    const [lcR, vsR, soilR, canopyR, scoreR] = await Promise.allSettled([
+      fetchJson<BufferDetail['landCover']>(
+        `${API_URL}/api/buffers/${bufferId}/landcover`,
+      ),
+      fetchJson<BufferDetail['vegStructure']>(
+        `${API_URL}/api/buffers/${bufferId}/vegetation-structure`,
+      ),
+      fetchJson<BufferDetail['soils']>(
+        `${API_URL}/api/buffers/${bufferId}/soils`,
+      ),
+      fetchJson<BufferDetail['canopy']>(
+        `${API_URL}/api/buffers/${bufferId}/canopy`,
+      ),
+      fetchJson<ScoreDetail[]>(`${API_URL}/api/buffers/${bufferId}/score`),
+    ]);
+
+    setBufferDetail({
+      landCover: lcR.status === 'fulfilled' ? lcR.value : [],
+      vegStructure: vsR.status === 'fulfilled' ? vsR.value : [],
+      soils: soilR.status === 'fulfilled' ? soilR.value : [],
+      canopy: canopyR.status === 'fulfilled' ? canopyR.value : [],
+      score:
+        scoreR.status === 'fulfilled'
+          ? (scoreR.value[0] ?? null)
+          : null,
+    });
+    setBufferDetailLoading(false);
+  }, []);
+
+  /** Map click handler — open popup for the clicked feature. */
+  const handleMapClick = useCallback(
+    (event: MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature) {
+        setPopupInfo(null);
+        return;
+      }
+
+      const { lng, lat } = event.lngLat;
+      const layerId = feature.layer.id;
+
+      let layerType: PopupInfo['layerType'];
+      if (layerId.startsWith('buffer-')) layerType = 'buffer';
+      else if (layerId === 'buffer-vegetation-fill') layerType = 'buffer';
+      else if (layerId === 'stream-line') layerType = 'stream';
+      else if (layerId === 'parcel-fill') layerType = 'parcel';
+      else if (layerId === 'wetland-fill') layerType = 'wetland';
+      else if (layerId === 'soil-fill') layerType = 'soil';
+      else return;
+
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+
+      setPopupInfo({ longitude: lng, latitude: lat, layerType, properties: props });
+      setBufferDetail(null);
+      setBufferDetailLoading(false);
+
+      if (layerType === 'buffer' && props.id != null) {
+        loadBufferDetail(props.id as number);
+      }
+    },
+    [loadBufferDetail],
   );
+
+  const stats = summary[0] ?? null;
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <div className="flex flex-col h-screen">
@@ -291,99 +378,415 @@ export default function App() {
             {stats.compliancePct != null && (
               <span>Compliance: {stats.compliancePct}%</span>
             )}
-            {stats.avgNdvi != null && (
+            {viewMode === 'ndvi' && stats.avgNdvi != null && (
               <span>Avg NDVI: {stats.avgNdvi.toFixed(3)}</span>
+            )}
+            {viewMode === 'smp' && stats.avgCompositeScore != null && (
+              <span className="text-emerald-300">
+                SMP Score: {stats.avgCompositeScore.toFixed(1)}/100
+              </span>
             )}
           </>
         )}
+        <div className="ml-auto flex gap-1">
+          <button
+            onClick={() => setViewMode('ndvi')}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              viewMode === 'ndvi'
+                ? 'bg-green-600 text-white'
+                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+            }`}
+          >
+            NDVI Health
+          </button>
+          <button
+            onClick={() => setViewMode('smp')}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              viewMode === 'smp'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+            }`}
+          >
+            SMP Score
+          </button>
+          <button
+            onClick={() => setViewMode('vegetation')}
+            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+              viewMode === 'vegetation'
+                ? 'bg-lime-600 text-white'
+                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+            }`}
+          >
+            Vegetation
+          </button>
+        </div>
       </header>
 
       {/* Map */}
       <div className="flex-1 relative">
-        <MapContainer
-          center={MAP_CENTER}
-          zoom={DEFAULT_ZOOM}
-          className="h-full w-full"
+        <Map
+          ref={mapRef}
+          initialViewState={{
+            ...MAP_CENTER,
+            zoom: DEFAULT_ZOOM,
+          }}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle={BASEMAP_STYLES[basemap]}
+          transformRequest={transformRequest}
+          interactiveLayerIds={INTERACTIVE_LAYER_IDS}
+          onClick={handleMapClick}
+          onMouseEnter={() => setCursor('pointer')}
+          onMouseLeave={() => setCursor('')}
+          cursor={cursor}
         >
-          {basemap === 'street' && (
-            <TileLayer
-              key="street"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            />
-          )}
-          {basemap === 'satellite' && (
-            <TileLayer
-              key="satellite"
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution="Tiles &copy; Esri"
-              maxZoom={19}
-            />
-          )}
-          {basemap === 'naip' && (
-            <TileLayer
-              key="naip"
-              url="https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}"
-              attribution="USDA NAIP Imagery"
-              maxZoom={19}
-            />
-          )}
+          <NavigationControl position="top-right" />
 
-          {buffers && (
-            <GeoJSON
-              key={bufferKey}
-              data={buffers}
-              style={bufferHealthStyle}
-              onEachFeature={onEachBuffer}
+          {/* ---- Soil fills (bottom data layer) ---- */}
+          <Source
+            id="soils-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/soils/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="soil-fill"
+              type="fill"
+              source-layer="soils"
+              layout={{ visibility: showSoils ? 'visible' : 'none' }}
+              paint={{
+                'fill-color': [
+                  'match',
+                  ['get', 'hydric_rating'],
+                  'Yes', '#8b5cf6',
+                  'Partial', '#c084fc',
+                  '#d1d5db',
+                ],
+                'fill-opacity': [
+                  'match',
+                  ['get', 'hydric_rating'],
+                  'Yes', 0.4,
+                  'Partial', 0.3,
+                  0.15,
+                ],
+                'fill-outline-color': [
+                  'match',
+                  ['get', 'hydric_rating'],
+                  'Yes', '#7c3aed',
+                  'Partial', '#a855f7',
+                  '#9ca3af',
+                ],
+              }}
             />
-          )}
-          {streams && (
-            <GeoJSON
-              data={streams}
-              style={streamStyle}
-              onEachFeature={onEachStream}
-            />
-          )}
-          {parcels && (
-            <GeoJSON
-              data={parcels}
-              style={parcelStyle}
-              onEachFeature={onEachParcel}
-            />
-          )}
-          {showWetlands && wetlands && (
-            <GeoJSON
-              data={wetlands}
-              style={() => WETLAND_STYLE}
-              onEachFeature={onEachWetland}
-            />
-          )}
+          </Source>
 
-          <NDVILayer points={ndviPoints} />
-        </MapContainer>
+          {/* ---- Wetland fills ---- */}
+          <Source
+            id="wetlands-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/wetlands/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="wetland-fill"
+              type="fill"
+              source-layer="wetlands"
+              layout={{ visibility: showWetlands ? 'visible' : 'none' }}
+              paint={{
+                'fill-color': '#22d3ee',
+                'fill-opacity': 0.35,
+                'fill-outline-color': '#0891b2',
+              }}
+            />
+          </Source>
+
+          {/* ---- Parcel tiles ---- */}
+          <Source
+            id="parcels-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/parcels/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="parcel-fill"
+              type="fill"
+              source-layer="parcels"
+              layout={{ visibility: showParcels ? 'visible' : 'none' }}
+              paint={{
+                'fill-color': [
+                  'case',
+                  ['==', ['get', 'is_focus_area'], true],
+                  '#dc2626',
+                  ['==', ['get', 'is_focus_area'], false],
+                  '#16a34a',
+                  '#6b7280',
+                ],
+                'fill-opacity': [
+                  'case',
+                  ['==', ['get', 'is_focus_area'], true],
+                  0.4,
+                  ['==', ['get', 'is_focus_area'], false],
+                  0.3,
+                  0.2,
+                ],
+                'fill-outline-color': [
+                  'case',
+                  ['==', ['get', 'is_focus_area'], true],
+                  '#dc2626',
+                  ['==', ['get', 'is_focus_area'], false],
+                  '#16a34a',
+                  '#6b7280',
+                ],
+              }}
+            />
+          </Source>
+
+          {/* ---- Riparian extent (Stage 1 delineation, GeoJSON) ---- */}
+          <Source
+            id="riparian-extent-source"
+            type="geojson"
+            data={
+              riparianExtent ??
+              ({ type: 'FeatureCollection', features: [] } as FeatureCollection)
+            }
+          >
+            <Layer
+              id="riparian-extent-fill"
+              type="fill"
+              layout={{
+                visibility: showRiparianExtent ? 'visible' : 'none',
+              }}
+              paint={{
+                'fill-color': [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'riparian_probability'],
+                  0.5, '#a7f3d0',
+                  0.75, '#34d399',
+                  1.0, '#059669',
+                ],
+                'fill-opacity': 0.6,
+                'fill-outline-color': '#047857',
+              }}
+            />
+          </Source>
+
+          {/* ---- Buffer SMP tiles ---- */}
+          <Source
+            id="buffer-smp-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="buffer-smp-fill"
+              type="fill"
+              source-layer="buffers"
+              layout={{
+                visibility:
+                  showBuffers && viewMode === 'smp' ? 'visible' : 'none',
+              }}
+              paint={{
+                'fill-color': [
+                  'match',
+                  ['get', 'grade'],
+                  'A', '#16a34a',
+                  'B', '#84cc16',
+                  'C', '#eab308',
+                  'D', '#f97316',
+                  'F', '#dc2626',
+                  '#34d399',
+                ],
+                'fill-opacity': 0.5,
+                'fill-outline-color': [
+                  'match',
+                  ['get', 'grade'],
+                  'A', '#15803d',
+                  'B', '#65a30d',
+                  'C', '#ca8a04',
+                  'D', '#ea580c',
+                  'F', '#b91c1c',
+                  '#059669',
+                ],
+              }}
+            />
+          </Source>
+
+          {/* ---- Buffer Vegetation tiles ---- */}
+          <Source
+            id="buffer-vegetation-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/vegetation/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="buffer-vegetation-fill"
+              type="fill"
+              source-layer="vegetation"
+              layout={{
+                visibility:
+                  showBuffers && viewMode === 'vegetation' ? 'visible' : 'none',
+              }}
+              paint={{
+                'fill-color': [
+                  'match',
+                  ['coalesce', ['get', 'lifeform'], 'Unknown'], // Add coalesce just in case
+                  'Agriculture', '#eab308', // Yellow
+                  'Water/Barren', '#cbd5e1', // Light Gray
+                  'Tree', '#15803d', // Green
+                  'Shrub', '#84cc16', // Light Green
+                  'Herb', '#facc15', // Yellowish
+                  'Unknown', '#ff00ff', // DEBUG: Hot Pink
+                  '#ff0000', // DEBUG: Red (Fallthrough)
+                ],
+                'fill-opacity': 0.8,
+                'fill-outline-color': '#475569',
+              }}
+            />
+          </Source>
+
+          {/* ---- Buffer NDVI tiles ---- */}
+          <Source
+            key={`ndvi-tiles-${selectedDate ?? 'latest'}`}
+            id="buffer-ndvi-source"
+            type="vector"
+            tiles={[ndviTileUrl]}
+          >
+            <Layer
+              id="buffer-ndvi-fill"
+              type="fill"
+              source-layer="buffers"
+              layout={{
+                visibility:
+                  showBuffers && viewMode === 'ndvi' ? 'visible' : 'none',
+              }}
+              paint={{
+                'fill-color': [
+                  'match',
+                  ['coalesce', ['get', 'health_category'], ''],
+                  'healthy', '#16a34a',
+                  'degraded', '#f59e0b',
+                  'bare', '#dc2626',
+                  '#34d399',
+                ],
+                'fill-opacity': 0.45,
+                'fill-outline-color': [
+                  'match',
+                  ['coalesce', ['get', 'health_category'], ''],
+                  'healthy', '#15803d',
+                  'degraded', '#b45309',
+                  'bare', '#b91c1c',
+                  '#059669',
+                ],
+              }}
+            />
+          </Source>
+
+          {/* ---- Stream tiles ---- */}
+          <Source
+            id="streams-source"
+            type="vector"
+            tiles={[`${API_URL}/api/tiles/streams/{z}/{x}/{y}.pbf`]}
+          >
+            <Layer
+              id="stream-line"
+              type="line"
+              source-layer="streams"
+              layout={{ visibility: showStreams ? 'visible' : 'none' }}
+              paint={{
+                'line-color': '#2563eb',
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['coalesce', ['get', 'stream_order'], 1],
+                  1, 1,
+                  3, 2,
+                  5, 4,
+                ],
+                'line-opacity': 0.8,
+              }}
+            />
+          </Source>
+
+          {/* ---- NDVI heatmap overlay ---- */}
+          <NDVILayer />
+
+          {/* ---- Popup ---- */}
+          {popupInfo && (
+            <Popup
+              longitude={popupInfo.longitude}
+              latitude={popupInfo.latitude}
+              anchor="bottom"
+              closeOnClick={false}
+              onClose={() => setPopupInfo(null)}
+              maxWidth="360px"
+            >
+              <PopupContent
+                info={popupInfo}
+                viewMode={viewMode}
+                detail={bufferDetail}
+                detailLoading={bufferDetailLoading}
+              />
+            </Popup>
+          )}
+        </Map>
 
         {/* Layer toggles */}
         <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs space-y-1">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showWetlands}
-              onChange={(e) => setShowWetlands(e.target.checked)}
-              className="accent-cyan-600"
-            />
-            NWI Wetlands
-          </label>
+          <span className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+            Layers
+          </span>
+          <LayerToggle
+            label="Streams"
+            checked={showStreams}
+            onChange={setShowStreams}
+            accent="accent-blue-600"
+          />
+          <LayerToggle
+            label="Buffers"
+            checked={showBuffers}
+            onChange={setShowBuffers}
+            accent="accent-green-600"
+          />
+          <LayerToggle
+            label="Parcels"
+            checked={showParcels}
+            onChange={setShowParcels}
+            accent="accent-amber-600"
+          />
+          <LayerToggle
+            label="NWI Wetlands"
+            checked={showWetlands}
+            onChange={setShowWetlands}
+            accent="accent-cyan-600"
+          />
+          <LayerToggle
+            label="SSURGO Soils"
+            checked={showSoils}
+            onChange={setShowSoils}
+            accent="accent-violet-600"
+          />
+          <LayerToggle
+            label="Riparian Extent (Stage 1)"
+            checked={showRiparianExtent}
+            onChange={setShowRiparianExtent}
+            accent="accent-emerald-600"
+          />
         </div>
 
         {/* Basemap toggle */}
         <button
-          onClick={() => setBasemap((b) => {
-            const cycle = { street: 'satellite', satellite: 'naip', naip: 'street' } as const;
-            return cycle[b];
-          })}
-          className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs font-medium hover:bg-gray-100 transition-colors"
+          onClick={() =>
+            setBasemap((b) => {
+              const cycle = {
+                street: 'satellite',
+                satellite: 'naip',
+                naip: 'street',
+              } as const;
+              return cycle[b];
+            })
+          }
+          className="absolute top-16 right-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs font-medium hover:bg-gray-100 transition-colors"
         >
-          {{ street: 'Satellite', satellite: 'NAIP Aerial', naip: 'Street Map' }[basemap]}
+          {
+            { street: 'Satellite', satellite: 'NAIP Aerial', naip: 'Street Map' }[
+              basemap
+            ]
+          }
         </button>
 
         {/* Timelapse slider */}
@@ -399,21 +802,503 @@ export default function App() {
           <h3 className="font-semibold mb-2 text-sm">Legend</h3>
           <div className="space-y-1.5 text-xs">
             <LegendItem color="bg-blue-600" shape="line" label="Streams" />
-            <span className="block text-[10px] text-gray-500 pt-1">Buffer NDVI Health</span>
-            <LegendItem color="bg-green-600/70" shape="box" label="Healthy (>0.3)" />
-            <LegendItem color="bg-amber-400/70" shape="box" label="Degraded (0.15-0.3)" />
-            <LegendItem color="bg-red-600/70" shape="box" label="Bare (<0.15)" />
-            <LegendItem color="bg-emerald-400/50" shape="box" label="No NDVI Data" />
-            <span className="block text-[10px] text-gray-500 pt-1">Parcels</span>
-            <LegendItem color="bg-green-600/60" shape="box" label="Compliant" />
-            <LegendItem color="bg-red-600/60" shape="box" label="Focus Area" />
-            <LegendItem color="bg-gray-500/40" shape="box" label="Unknown Status" />
-            <span className="block text-[10px] text-gray-500 pt-1">Overlays</span>
-            <LegendItem color="bg-cyan-400/60" shape="box" label="NWI Wetlands" />
+            {showRiparianExtent && (
+              <LegendItem
+                color="bg-emerald-600"
+                shape="box"
+                label="Riparian extent (Stage 1, RF)"
+              />
+            )}
+            {viewMode === 'ndvi' ? (
+              <>
+                <span className="block text-[10px] text-gray-500 pt-1">
+                  Buffer NDVI Health
+                </span>
+                <LegendItem
+                  color="bg-green-600/70"
+                  shape="box"
+                  label="Healthy (>0.3)"
+                />
+                <LegendItem
+                  color="bg-amber-400/70"
+                  shape="box"
+                  label="Degraded (0.15-0.3)"
+                />
+                <LegendItem
+                  color="bg-red-600/70"
+                  shape="box"
+                  label="Bare (<0.15)"
+                />
+                <LegendItem
+                  color="bg-emerald-400/50"
+                  shape="box"
+                  label="No NDVI Data"
+                />
+              </>
+            ) : (
+              <>
+                <span className="block text-[10px] text-gray-500 pt-1">
+                  SMP Health Grade
+                </span>
+                <LegendItem
+                  color="bg-green-600/70"
+                  shape="box"
+                  label={'A \u2014 Excellent (\u226580)'}
+                />
+                <LegendItem
+                  color="bg-lime-500/70"
+                  shape="box"
+                  label={'B \u2014 Good (\u226560)'}
+                />
+                <LegendItem
+                  color="bg-yellow-400/70"
+                  shape="box"
+                  label={'C \u2014 Fair (\u226540)'}
+                />
+                <LegendItem
+                  color="bg-orange-500/70"
+                  shape="box"
+                  label={'D \u2014 Poor (\u226520)'}
+                />
+                <LegendItem
+                  color="bg-red-600/70"
+                  shape="box"
+                  label="F \u2014 Failing (<20)"
+                />
+                <LegendItem
+                  color="bg-emerald-400/50"
+                  shape="box"
+                  label="No Score Data"
+                />
+              </>
+            )}
+            <span className="block text-[10px] text-gray-500 pt-1">
+              Parcels
+            </span>
+            <LegendItem
+              color="bg-green-600/60"
+              shape="box"
+              label="Compliant"
+            />
+            <LegendItem
+              color="bg-red-600/60"
+              shape="box"
+              label="Focus Area"
+            />
+            <LegendItem
+              color="bg-gray-500/40"
+              shape="box"
+              label="Unknown Status"
+            />
+            <span className="block text-[10px] text-gray-500 pt-1">
+              Overlays
+            </span>
+            <LegendItem
+              color="bg-cyan-400/60"
+              shape="box"
+              label="NWI Wetlands"
+            />
+            <LegendItem
+              color="bg-violet-500/50"
+              shape="box"
+              label="Hydric Soils"
+            />
+            <LegendItem
+              color="bg-gray-300/50"
+              shape="box"
+              label="Non-Hydric Soils"
+            />
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Popup content
+// ---------------------------------------------------------------------------
+
+function PopupContent({
+  info,
+  viewMode,
+  detail,
+  detailLoading,
+}: Readonly<{
+  info: PopupInfo;
+  viewMode: 'ndvi' | 'smp' | 'vegetation';
+  detail: BufferDetail | null;
+  detailLoading: boolean;
+}>) {
+  const p = info.properties;
+
+  if (info.layerType === 'stream') {
+    return (
+      <div className="text-xs">
+        <div className="font-semibold text-sm">
+          {(p.gnis_name as string) ?? 'Unnamed Stream'}
+        </div>
+        <div>COMID: {p.comid as number}</div>
+        <div>Order: {(p.stream_order as number) ?? 'N/A'}</div>
+        <div>
+          Length: {p.length_km ? `${p.length_km} km` : 'N/A'}
+        </div>
+      </div>
+    );
+  }
+
+  if (info.layerType === 'parcel') {
+    let status = 'No data';
+    if (p.is_focus_area === true) status = 'Focus Area';
+    else if (p.is_focus_area === false) status = 'Compliant';
+    return (
+      <div className="text-xs">
+        <div className="font-semibold text-sm">
+          Parcel {p.parcel_id as string}
+        </div>
+        <div>Owner: {(p.owner_name as string) ?? 'Unknown'}</div>
+        <div>Land Use: {(p.land_use_desc as string) ?? 'N/A'}</div>
+        <div>Acres: {(p.land_acres as number) ?? 'N/A'}</div>
+        <div>Status: {status}</div>
+        {p.overlap_pct != null && (
+          <div>Buffer Overlap: {p.overlap_pct as number}%</div>
+        )}
+        {p.focus_area_reason ? (
+          <div>Reason: {p.focus_area_reason as string}</div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (info.layerType === 'wetland') {
+    return (
+      <div className="text-xs">
+        <div className="font-semibold text-sm">NWI Wetland</div>
+        <div>Type: {(p.wetland_type as string) ?? 'N/A'}</div>
+        <div>Cowardin Code: {(p.cowardin_code as string) ?? 'N/A'}</div>
+        <div>
+          Acres:{' '}
+          {p.acres != null ? Number(p.acres).toFixed(2) : 'N/A'}
+        </div>
+      </div>
+    );
+  }
+
+  if (info.layerType === 'soil') {
+    return (
+      <div className="text-xs">
+        <div className="font-semibold text-sm">SSURGO Soil</div>
+        <div>
+          Map Unit:{' '}
+          {(p.muname as string) ??
+            (p.musym as string) ??
+            (p.mukey as string) ??
+            'N/A'}
+        </div>
+        <div>MUKEY: {(p.mukey as string) ?? 'N/A'}</div>
+        {p.hydric_rating ? (
+          <div>
+            Hydric: <strong>{p.hydric_rating as string}</strong>{' '}
+            ({(p.hydric_pct as number) ?? 0}% components)
+          </div>
+        ) : (
+          <div>Hydric: N/A</div>
+        )}
+      </div>
+    );
+  }
+
+  // Buffer popup
+  return (
+    <BufferPopupContent
+      properties={p}
+      viewMode={viewMode}
+      detail={detail}
+      detailLoading={detailLoading}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Buffer popup (with lazy-loaded detail)
+// ---------------------------------------------------------------------------
+
+const fmt = (v: number | null | undefined) =>
+  v != null ? v.toFixed(1) : '-';
+
+function BufferPopupContent({
+  properties: p,
+  viewMode,
+  detail,
+  detailLoading,
+}: Readonly<{
+  properties: Record<string, unknown>;
+  viewMode: 'ndvi' | 'smp' | 'vegetation';
+  detail: BufferDetail | null;
+  detailLoading: boolean;
+}>) {
+  const distM = p.buffer_distance_m as number;
+  const areaSqM = p.area_sq_m as number | null;
+  const acres = areaSqM ? (areaSqM / 4046.86).toFixed(2) : null;
+  const streamName = (p.stream_name as string) ?? null;
+
+  // SMP properties
+  const grade = (p.grade as string) ?? null;
+  const compositeScore =
+    p.composite_score != null ? Number(p.composite_score).toFixed(1) : null;
+
+  // NDVI properties
+  const ndvi =
+    p.mean_ndvi != null ? Number(p.mean_ndvi).toFixed(3) : null;
+  const healthCat = (p.health_category as string) ?? null;
+  const acqDate = (p.acquisition_date as string) ?? null;
+
+  return (
+    <div className="text-xs max-w-[340px]">
+      {viewMode === 'vegetation' ? (
+        <>
+          <div className="font-semibold text-sm">Vegetation Structure</div>
+          {streamName && <div>Stream: {streamName}</div>}
+          <div className="my-1">
+            <span className="font-medium">Lifeform: </span>
+            {p.lifeform as string}
+          </div>
+          <div>
+            <span className="font-medium">Type: </span>
+            {p.evt_name as string}
+          </div>
+        </>
+      ) : viewMode === 'smp' ? (
+        <>
+          <div className="font-semibold text-sm">SMP Health Score</div>
+          {streamName && <div>Stream: {streamName}</div>}
+          <div>Distance: {distM}m</div>
+          {acres && <div>Area: {acres} acres</div>}
+          {grade && (
+            <div className="flex items-center gap-2 my-1">
+              <span
+                className="text-2xl font-bold"
+                style={{ color: GRADE_COLORS[grade] ?? '#9ca3af' }}
+              >
+                {grade}
+              </span>
+              {compositeScore && (
+                <span className="text-base">{compositeScore}/100</span>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="font-semibold text-sm">Riparian Buffer</div>
+          {streamName && <div>Stream: {streamName}</div>}
+          <div>Distance: {distM}m</div>
+          {acres && <div>Area: {acres} acres</div>}
+          {ndvi && (
+            <div>
+              NDVI: {ndvi} ({healthCat})
+            </div>
+          )}
+          {acqDate && <div>Acquired: {acqDate}</div>}
+        </>
+      )}
+
+      {/* Loading indicator */}
+      {detailLoading && (
+        <div className="text-gray-400 italic mt-2">Loading datasets...</div>
+      )}
+
+      {/* Detail sections */}
+      {detail && (
+        <>
+          {/* SMP score breakdown */}
+          {detail.score && viewMode === 'smp' && (
+            <div className="border-t border-gray-200 mt-2 pt-2">
+              <div className="font-semibold">
+                Vegetation (80%):{' '}
+                {fmt(detail.score.vegetationStructureScore)}/100
+              </div>
+              <div className="ml-2 text-[11px]">
+                NDVI: {fmt(detail.score.ndviScore)}/10 &middot; Complexity:{' '}
+                {fmt(detail.score.verticalComplexityScore)}/10
+                <br />
+                Species: {fmt(detail.score.speciesCompositionScore)}/10
+                &middot; Shrub: {fmt(detail.score.shrubLayerScore)}/10
+                <br />
+                Patchiness: {fmt(detail.score.patchinessScore)}/10 &middot;
+                Regen: {fmt(detail.score.nativeRegenerationScore)}/10
+                <br />
+                Native Cover: {fmt(detail.score.nativeCoverScore)}/10
+              </div>
+              <div className="font-semibold mt-1">
+                Connectivity (10%):{' '}
+                {fmt(detail.score.connectivityScore)}/100
+              </div>
+              <div className="font-semibold">
+                Contributing (10%):{' '}
+                {fmt(detail.score.contributingAreaScore)}/100
+              </div>
+            </div>
+          )}
+
+          {/* Soils */}
+          {detail.soils.length > 0 && (
+            <div className="border-t border-gray-200 mt-2 pt-2">
+              <div className="font-semibold">
+                Soils (
+                {detail.soils
+                  .filter(
+                    (s) =>
+                      s.hydricRating === 'Yes' ||
+                      s.hydricRating === 'Partial',
+                  )
+                  .reduce((a, c) => a + (c.soilPctOfBuffer ?? 0), 0)
+                  .toFixed(0)}
+                % hydric)
+              </div>
+              <div className="text-[11px]">
+                {detail.soils.slice(0, 3).map((soil, i) => {
+                  const color =
+                    soil.hydricRating === 'Yes'
+                      ? '#7c3aed'
+                      : soil.hydricRating === 'Partial'
+                        ? '#a855f7'
+                        : '#9ca3af';
+                  return (
+                    <div key={i}>
+                      <span style={{ color }}>&#9632;</span>{' '}
+                      {soil.muname ?? 'Unknown'}{' '}
+                      {(soil.soilPctOfBuffer ?? 0).toFixed(1)}%
+                      {soil.hydricRating && ` (${soil.hydricRating})`}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* NLCD Land Cover */}
+          {detail.landCover.length > 0 && (
+            <div className="border-t border-gray-200 mt-2 pt-2">
+              <div className="font-semibold">
+                NLCD Land Cover (
+                {detail.landCover
+                  .filter((c) => c.isNatural)
+                  .reduce((a, c) => a + (c.areaPct ?? 0), 0)
+                  .toFixed(0)}
+                % natural)
+              </div>
+              <div className="text-[11px]">
+                {detail.landCover.slice(0, 5).map((lc, i) => (
+                  <div key={i}>
+                    <span
+                      style={{
+                        color: lc.isNatural ? '#16a34a' : '#dc2626',
+                      }}
+                    >
+                      {'\u2588'.repeat(
+                        Math.max(1, Math.round((lc.areaPct ?? 0) / 5)),
+                      )}
+                    </span>{' '}
+                    {lc.nlcdDescription} {(lc.areaPct ?? 0).toFixed(1)}%
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LANDFIRE Vegetation Structure */}
+          {detail.vegStructure.length > 0 && (() => {
+            const vs = detail.vegStructure[0];
+            return (
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <div className="font-semibold">Vegetation Structure</div>
+                <div className="text-[11px]">
+                  <div>Type: {vs.evtName ?? 'N/A'}</div>
+                  <div>Lifeform: {vs.dominantLifeform ?? 'N/A'}</div>
+                  <div>
+                    Height: {vs.evhClass ?? 'N/A'}
+                    {vs.meanHeightM != null &&
+                      ` (${vs.meanHeightM.toFixed(1)}m)`}
+                  </div>
+                  <div>Coverage: {(vs.areaPct ?? 0).toFixed(1)}%</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 3DEP LiDAR Canopy */}
+          {detail.canopy.length > 0 && (() => {
+            const c = detail.canopy[0];
+            return (
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <div className="font-semibold">
+                  Canopy Height (3DEP LiDAR)
+                </div>
+                <div className="text-[11px]">
+                  Mean:{' '}
+                  {c.meanHeightM != null
+                    ? c.meanHeightM.toFixed(1) + 'm'
+                    : 'N/A'}{' '}
+                  &middot; Max:{' '}
+                  {c.maxHeightM != null
+                    ? c.maxHeightM.toFixed(1) + 'm'
+                    : 'N/A'}
+                  <br />
+                  P95:{' '}
+                  {c.p95HeightM != null
+                    ? c.p95HeightM.toFixed(1) + 'm'
+                    : 'N/A'}{' '}
+                  &middot; Cover:{' '}
+                  {c.canopyCoverPct != null
+                    ? c.canopyCoverPct.toFixed(1) + '%'
+                    : 'N/A'}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* No data fallback */}
+          {detail.soils.length === 0 &&
+            detail.landCover.length === 0 &&
+            detail.vegStructure.length === 0 &&
+            detail.canopy.length === 0 &&
+            !detail.score && (
+              <div className="text-gray-400 italic mt-2 text-[11px]">
+                No raster data available
+              </div>
+            )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Layer toggle
+// ---------------------------------------------------------------------------
+
+function LayerToggle({
+  label,
+  checked,
+  onChange,
+  accent,
+}: Readonly<{
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  accent: string;
+}>) {
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className={accent}
+      />
+      {label}
+    </label>
   );
 }
 
