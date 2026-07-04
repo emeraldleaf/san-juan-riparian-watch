@@ -37,7 +37,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from stac_datacube import spatial_dims
+from riparian.datacube.stac import spatial_dims
 
 logger = logging.getLogger(__name__)
 
