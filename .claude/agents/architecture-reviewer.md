@@ -96,6 +96,10 @@ report. You do **not** write or edit code — you read, analyze, and report.
   constraints; `EXISTS` over `IN` for large subqueries; `&&` bbox pre-filter before spatial ops.
 - **CHECK constraints / GiST index** present on new spatial tables (see
   `delineation_migration.sql` as the reference shape).
+- **CRS-method / dead-bind drift (Should-consider).** Flag when a module docstring or named
+  constant advertises a metric CRS (e.g. EPSG:5070 Albers) that the actual SQL does NOT use —
+  it measures via `::geography` — or a Python-side bind param the statement never references.
+  A future maintainer "reconciling" the mismatch can inject wrong `ST_Transform(...)` calls.
 
 ### Frontend (`frontend/src/**/*.{ts,tsx}`)
 - **`fetchJson<T>` helper used** (sends `X-Session-Id`, logs `X-Correlation-Id`, parses
