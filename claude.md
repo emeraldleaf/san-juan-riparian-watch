@@ -77,7 +77,11 @@ Drive disconnect recovery: reconnect + wait for mount → `./dev.sh --reconnect`
 - Frontend dev (hot-reload): `cd frontend && npm run dev` (:3000) · build: `npm run build`
 
 ### Testing
-- C# tests: `dotnet test` · Python: `cd python-etl && pytest` · Frontend: `cd frontend && npm test`
+- **Python unit tests**: `cd python-etl && pytest` — pure-function suite (`tests/`) covering the
+  `riparian/` package: spectral indices + texture, temporal stats, grid/`spatial_dims`, weak-label
+  `near_water_mask`, `is_invasive`, validation metrics (`compare_masks`, `assign_spatial_folds`).
+  Tests marked `@pytest.mark.live` hit real STAC/DB — skipped in CI, run manually.
+- **C# / Frontend**: no automated test suites yet (planned — build/lint run in CI meanwhile).
 - Lint C#: `dotnet format` · Lint frontend: `cd frontend && npm run lint`
 
 ### Code Quality
