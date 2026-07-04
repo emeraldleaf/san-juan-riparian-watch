@@ -1,0 +1,60 @@
+# Project Status
+
+**Last updated:** 2026-07-03
+
+Cross-session entry point. Surfaced automatically at session start by the
+`inject-status.sh` hook. Refresh with `/sync-status`.
+
+## Where we are
+
+Pivoting the riparian POC into a portfolio piece for the Ai2 "AI for the Planet" Senior SWE
+role, on two tracks — both substantially landed this session.
+
+### Track 1 — Encoding-loop method port (DONE, verified)
+All three loops from the NextAurora repo are ported and dogfooded: 5 surfaces × 3 tiers,
+lean CLAUDE.md (333 lines), `.coderabbit.yaml`, `architecture-reviewer` agent, 6 commands +
+10 skills, CI gates (lean-canon + doc/diagram pairing, both green), and the diagrams loop
+(seed diagram renders SVG+PNG). See CONTEXT.md.
+
+### Track 2 — Riparian delineation (baseline slice VERIFIED end-to-end)
+Reframed off fixed hydrology buffers to a learned pipeline. **The baseline vertical slice
+runs end-to-end against the live DB:** STAC datacube → 22 multitemporal features → weak
+labels (ESA WorldCover ∧ io-lulc "woody-near-water" ∧ NWI) → RandomForest → **spatial**
+cross-validation → vectorize → `silver.riparian_extent`. Served via `GET /api/riparian/extent`.
+First real run: 102k weak-labeled samples, spatial-CV ROC-AUC 0.90 / precision 0.81, 66
+riparian polygons written.
+
+## Recently landed
+- Baseline delineation modules: `stac_datacube.py`, `feature_builder.py`,
+  `weak_label_sampler.py` (STAC land-cover — replaced dead NLCD/LANDFIRE ArcGIS endpoints),
+  `delineation_baseline.py`, `delineation_validate.py`, `delineation_runner.py`.
+- `sql/delineation_migration.sql` applied; `/api/riparian/extent` endpoint.
+- Strategic AOI pivot encoded in the Stage-1 spec (revision 2026-07-03b).
+
+## AOI decision (San Juan River HUC watershed, CO + NM)
+- Organizing unit = **HUC12** (713 in subregion 1408), subset-first then scale.
+- **Three representative tiles locked** (verified against USGS WBD):
+  - Headwaters CO — **140801010401** Turkey Creek — bbox (-107.035, 37.348, -106.915, 37.49)
+  - Mid-valley NM — **140801041003** Tucker Canyon–Animas River — bbox (-108.017, 36.872, -107.804, 36.977)
+  - Lowland/ag — **140801051001** Malpais Arroyo–San Juan River — bbox (-108.822, 36.81, -108.673, 36.951)
+
+## What's next (network-first build, on the 3 tiles first)
+1. **HUC12 tiling** — add `huc12` column to `silver.riparian_extent` + samples; runner writes
+   per-tile (restartable); run all 3 tiles.
+2. **Stage 1A — HAND / valley-bottom envelope** from 3DEP DEM (needs `pysheds`/`richdem` — a
+   new dep, requires sign-off) to constrain inference + cut false positives.
+3. **Per-reach outputs** — NHD flowlines → 250 m reaches → `%riparian_cover` + confidence +
+   quality flags.
+4. **Reference-layer validation** — NMRipMap (NM) + CO-RIP (CO), IoU/F1 stratified by stream
+   order; validate NM vs CO separately.
+5. **OlmoEarth-everywhere** on the **Hyperstack GPU VM** — embedding store, head training,
+   baseline-vs-OlmoEarth disagreement maps.
+6. **Web app** — frontend map layer for extent (endpoint exists) + reach summaries.
+
+## Environment notes
+- ETL host env is polluted (pandas bumped to 3.0.3 by odc-stac; a broken `vision` nspkg
+  warning is cosmetic). The real ETL runs in Docker; new delineation deps installed on host
+  for verification. Consider a dedicated venv.
+- Dead upstream endpoints: repo's `NLCD_EROS_URL` (HTML) + LANDFIRE `US_250EVT` (404) — the
+  delineation labels no longer use them (STAC land-cover instead); the *existing* NLCD/LANDFIRE
+  ETL steps may need the same repointing.

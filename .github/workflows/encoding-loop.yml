@@ -1,0 +1,65 @@
+name: encoding-loop
+
+# Mechanical gates for the encoding-loop method (the two that need CI rather than a
+# PostToolUse hook): lean-canon budget on CLAUDE.md, and doc+diagram pairing. The other two
+# floor disciplines (greppable paraphrases, file-move detection) run as local Claude Code
+# hooks. See CONTEXT.md "Mechanical floor" and CLAUDE.md "AI Workflow (Encoding Loop)".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encoding-loop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lean-canon:
+    name: CLAUDE.md size budget (soft 400 / hard 500)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Enforce the canon budget
+        run: |
+          set -euo pipefail
+          lines=$(wc -l < CLAUDE.md | tr -d ' ')
+          echo "CLAUDE.md is $lines lines."
+          if [ "$lines" -gt 500 ]; then
+            echo "::error file=CLAUDE.md::CLAUDE.md is $lines lines — over the 500-line hard budget. Move detail to a paired docs/ doc and leave a headline + 'See CLAUDE.md'."
+            exit 1
+          fi
+          if [ "$lines" -gt 400 ]; then
+            echo "::warning file=CLAUDE.md::CLAUDE.md is $lines lines — over the 400-line soft budget. Consider trimming."
+          fi
+          echo "Within budget."
+
+  doc-diagram-pairing:
+    name: Every .excalidraw has a sibling .svg
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check pairing
+        run: |
+          set -euo pipefail
+          missing=0
+          # Every docs/**/*.excalidraw must have a committed sibling <name>.svg.
+          while IFS= read -r -d '' src; do
+            svg="${src%.excalidraw}.svg"
+            if [ ! -f "$svg" ]; then
+              echo "::error file=$src::No sibling SVG for $src — run .claude/scripts/rebuild-diagrams.sh and commit the .svg."
+              missing=$((missing + 1))
+            fi
+          done < <(find docs -name '*.excalidraw' -type f -print0 2>/dev/null)
+          if [ "$missing" -gt 0 ]; then
+            echo "$missing diagram(s) missing their paired SVG."
+            exit 1
+          fi
+          echo "All diagrams paired (or none present)."
