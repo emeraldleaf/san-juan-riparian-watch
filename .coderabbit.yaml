@@ -62,7 +62,11 @@ reviews:
     - path: "python-etl/**/*.py"
       instructions: |
         Type hints on ALL function params + returns (Must-fix on a new public function
-        without them). Use Protocol classes for I/O boundaries + constructor injection
+        without them) — including private helpers and opaque third-party handles: use the
+        concrete type (RandomForestClassifier, Affine, torch.nn.Module) or Any/Callable,
+        never leave a param bare. Also flag a docstring/constant that advertises a metric
+        CRS (e.g. EPSG:5070) the SQL doesn't use (it measures via ::geography), or a bind
+        param the statement never references. Use Protocol classes for I/O boundaries + constructor injection
         (reference: ndvi_processor.py ImagerySearcher/NdviWriter); frozen dataclasses for data
         structures. Separate pure functions (index math, stats) from I/O so they're testable
         without network/DB. SQL must be SQLAlchemy text() parameterized — flag any f-string /
