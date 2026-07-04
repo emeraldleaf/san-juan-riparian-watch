@@ -20,3 +20,7 @@ pgdata/
 
 # Database backups
 backups/
+
+# Encoding-loop skill local envs (recreated via uv sync)
+.claude/skills/**/.venv/
+.claude/skills/**/__pycache__/
