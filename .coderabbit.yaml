@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit configuration for the Riparian Buffer Compliance POC.
+# Docs: https://docs.coderabbit.ai/getting-started/configure-coderabbit
+#
+# Role in the encoding loop: CodeRabbit is the Tier-2 AI-review surface. It carries THIS
+# project's CLAUDE.md conventions into every PR (CodeRabbit doesn't load CLAUDE.md
+# automatically — these path_instructions are the bridge). The architecture-reviewer agent
+# is the pre-PR reviewer; SonarQube is the Tier-3 static gate. Tuned to be opinionated about
+# this project's polyglot conventions, not generic nits. See CLAUDE.md.
+
+language: en
+
+reviews:
+  # "assertive" surfaces more findings; right for a repo that demonstrates AI-workflow rigor.
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: false
+
+  path_instructions:
+    - path: "RiparianPoc.Api/Endpoints/**/*.cs"
+      instructions: |
+        Endpoints must be THIN: inject a service interface, call ONE method, return
+        TypedResults.Ok(...). Flag any SQL, NpgsqlDataSource use, or business logic in an
+        endpoint — it belongs in the service (Must-fix). Require TypedResults (not
+        Results.Ok) for compile-time OpenAPI. Require CancellationToken accepted + threaded.
+        See CLAUDE.md "Service Layer Architecture".
+
+    - path: "RiparianPoc.Api/Services/**/*.cs"
+      instructions: |
+        Services own SQL + business logic. GeoJSON queries use ST_AsGeoJSON(geom) AS geojson
+        and call _repository.QueryGeoJsonAsync() (dynamic) or QueryAsync<T>() (typed). Flag a
+        service issuing SQL directly instead of via IPostGisRepository. Input validation lives
+        here (ArgumentException for bad IDs, e.g. bufferId <= 0) — not in the endpoint. New
+        methods must add an observability span (using var activity = Source.StartActivity(...)
+        + SetTag for result counts). New interface methods go on the narrow ISP interface the
+        consumer uses (ISpatialQueryService for GeoJSON, IComplianceDataService for typed) —
+        flag speculative interface widening. See CLAUDE.md "Service Layer Architecture" +
+        "Observability".
+
+    - path: "RiparianPoc.Api/Repositories/**/*.cs"
+      instructions: |
+        Data access is Dapper + NpgsqlDataSource with CommandDefinition carrying the
+        CancellationToken. Flag ANY EF Core (DbContext/DbSet) — Dapper is mandated for geo
+        queries (Must-fix). NpgsqlException must be caught, logged with timing context,
+        Activity.SetStatus(Error) set, and rethrown — never swallowed. See CLAUDE.md "Data
+        Access (Dapper)" + "Error Handling".
+
+    - path: "**/*.cs"
+      instructions: |
+        Spatial correctness: storage CRS is EPSG:4269 (NAD83) — flag hardcoded 4326/3857
+        storage or a reprojection that changes the stored CRS (Must-fix). Distance/area must
+        cast geom::geography and ST_Buffer(geom::geography, meters) — degrees-based
+        distance/area is a Must-fix. file-scoped namespaces; sealed classes when not designed
+        for inheritance; record DTOs; nullable reference types with ? annotations; constructor
+        injection with null guards; ILogger<T> message templates (not string interpolation);
+        async methods take + propagate CancellationToken, avoid async void. Flag a new NuGet
+        PackageReference added without explicit sign-off (Must-fix — Do-Not-Modify list).
+        See CLAUDE.md "Spatial Data" + "C# / .NET".
+
+    - path: "python-etl/**/*.py"
+      instructions: |
+        Type hints on ALL function params + returns (Must-fix on a new public function
+        without them). Use Protocol classes for I/O boundaries + constructor injection
+        (reference: ndvi_processor.py ImagerySearcher/NdviWriter); frozen dataclasses for data
+        structures. Separate pure functions (index math, stats) from I/O so they're testable
+        without network/DB. SQL must be SQLAlchemy text() parameterized — flag any f-string /
+        string-concatenated SQL (Must-fix, injection). GeoPandas for PostGIS I/O with
+        gdf.rename_geometry("geometry") after read_postgis (DB column is geom).
+        planetary_computer.sign_inplace for STAC. odc-stac geographic (EPSG:4269) cubes name
+        spatial dims latitude/longitude, not x/y — use stac_datacube.spatial_dims(), don't
+        hardcode. No bare `except Exception`; functions < 25 lines. See CLAUDE.md "Python".
+
+    - path: "sql/**/*.sql"
+      instructions: |
+        Never edit sql/create_schemas.sql — additive sql/*_migration.sql only (Must-fix,
+        Do-Not-Modify list). Name columns explicitly, never SELECT * in shipped SQL. snake_case
+        names; audit timestamps (imported_at/processed_at) on new tables; FK constraints;
+        EXISTS over IN for large subqueries; && bbox pre-filter before expensive spatial ops.
+        New spatial tables need a GiST index + CHECK constraints (reference:
+        delineation_migration.sql). Data flow is one-way bronze → silver → gold — flag a
+        write to an upstream schema (Must-fix). See CLAUDE.md "SQL" + "Medallion Architecture".
+
+    - path: "frontend/src/**/*.{ts,tsx}"
+      instructions: |
+        This is MapLibre GL (react-map-gl/maplibre), not Leaflet — layers are <Source> +
+        <Layer> with layout.visibility toggles and MapLibre paint expressions. API calls use
+        the fetchJson<T> helper (sends X-Session-Id, logs X-Correlation-Id, parses
+        ApiErrorResponse) — flag a raw fetch that drops the session header. A new map layer
+        (<Source>/<Layer>) must add a matching LayerToggle + LegendItem, and interactive
+        layers must be in interactiveLayerIds. API base URL from VITE_API_URL (not hardcoded).
+        Flag a new npm dependency added without explicit sign-off. See CLAUDE.md "Frontend".
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  auto_reply: true
