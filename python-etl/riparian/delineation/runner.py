@@ -34,10 +34,8 @@ from riparian.datacube.stac import (
     StacSearcher,
     build_landcover_grid,
     build_sentinel2_cube,
-    spatial_dims,
 )
 from riparian.delineation.weak_labels import (
-    LABEL_POSITIVE,
     LabelGrid,
     PostGISWeakLabelWriter,
     build_weak_label_grid,
