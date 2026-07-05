@@ -1,6 +1,6 @@
 # Project Status
 
-**Last updated:** 2026-07-03
+**Last updated:** 2026-07-04
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
@@ -8,7 +8,9 @@ Cross-session entry point. Surfaced automatically at session start by the
 ## Where we are
 
 Pivoting the riparian POC into a portfolio piece for the Ai2 "AI for the Planet" Senior SWE
-role, on two tracks — both substantially landed this session.
+role. Renamed → **san-juan-riparian-watch** (GitHub repo renamed by user; local remote update
++ branch push still PENDING). README fully rewritten to the delineation/health/change framing.
+Three tracks now.
 
 ### Track 1 — Encoding-loop method port (DONE, verified)
 All three loops from the NextAurora repo are ported and dogfooded: 5 surfaces × 3 tiers,
@@ -24,7 +26,27 @@ cross-validation → vectorize → `silver.riparian_extent`. Served via `GET /ap
 First real run: 102k weak-labeled samples, spatial-CV ROC-AUC 0.90 / precision 0.81, 66
 riparian polygons written.
 
+### Track 3 — Document Intelligence (RAG + map-linked geo citations) — SPEC + Phase-A scaffold
+New second surface over the same AOI: Olmo 2 *explains* (RAG Q&A with citations over watershed
+docs), OlmoEarth *sees* (EO layers), joined at the map. **Decision: reuse the existing
+Re-find Catalog RAG harness** (`the private Quartzose repo` — Haystack 2.0 +
+Qdrant + 10-stage pipeline w/ CRAG + citations + guards + pluggable `LLMProvider`); build only the
+**geospatial delta** + corpus swap. **Not airgapped** → hosted OpenAI-compat provider now, Olmo 2
+later behind the existing provider seam. Landed this session:
+- Spec `docs/specs/2026-07-04-document-intelligence-rag.md` + ADR
+  `docs/decisions/2026-07-04-document-intelligence-subsystem.md` (vendoring=trimmed copy;
+  Qdrant semantic / PostGIS geo split, joined by chunk_id; LLM-never-emits-geometry invariant).
+- `sql/docintel_migration.sql` — additive `docs` schema (`documents`, `chunk_geo_mentions`).
+- `docintel/` scaffold: `corpus/seed_sources.yaml` (11 real public San Juan docs incl. SJRIP
+  Bassett-2015 riparian/invasive + monitoring reports), `scripts/vendor_harness.sh` (trimmed
+  harness copy), and the NEW-IP geo modules `geo/models.py` + `geo/resolver.py` (deterministic
+  free-form-place → geometry against PostGIS; compile-clean, live queries are Phase-C TODOs).
+- **Next (Phase A→C):** run `vendor_harness.sh`, re-domain prompts, ingest corpus → Qdrant,
+  wire `geo_mentions[]` + resolver live queries + `/docs/ask` & `/docs/for-area`.
+
 ## Recently landed
+- README.md rewritten accurate/current (delineation/health/change; riparian/ package; MapLibre;
+  tests+CI; honest stratified results). Doc-intelligence spec+ADR+scaffold (Track 3 above).
 - Baseline delineation modules: `stac_datacube.py`, `feature_builder.py`,
   `weak_label_sampler.py` (STAC land-cover — replaced dead NLCD/LANDFIRE ArcGIS endpoints),
   `delineation_baseline.py`, `delineation_validate.py`, `delineation_runner.py`.
