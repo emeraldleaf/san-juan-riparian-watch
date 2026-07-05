@@ -1,15 +1,18 @@
-# Riparian Buffer Compliance POC
+# San Juan Riparian Watch
 
 ## Project Overview
-A .NET Aspire-orchestrated proof-of-concept that monitors riparian vegetation health
-using PostgreSQL/PostGIS spatial analysis, Python geospatial ETL, a C# REST API, and a
-React + Leaflet map frontend. Includes NDVI vegetation health scoring via Microsoft
-Planetary Computer satellite imagery.
+A basin-scale **riparian vegetation delineation + health + change-monitoring** platform for
+the San Juan River watershed. Learns *where riparian vegetation actually is* from satellite
+time series (replacing fixed hydrology buffers), scores its condition (incl. tamarisk /
+Russian-olive invasive cover), and detects change over the long EO record. Stack: STAC
+Earth-observation ETL (Sentinel-2/1, Landsat, land cover, 3DEP DEM via Microsoft Planetary
+Computer) + PostgreSQL/PostGIS + Python ML (`riparian/` package: RF baseline vs. OlmoEarth
+foundation model) + .NET Aspire-orchestrated C# REST API + React/MapLibre map frontend.
 
-> **Active reframe (2026-07):** moving off fixed hydrology buffers to a learned 3-stage
-> pipeline — delineate riparian extent → score condition → detect change. See
-> `docs/STATUS.md` for current state, `docs/specs/` for the Stage-1 spec, and
-> `docs/decisions/` for the ADR. Buffer-centric tables below remain until Stage 1 lands.
+> **3-stage pipeline:** delineate riparian extent (Stage 1, built + validated vs NMRipMap) →
+> score condition + invasives (Stage 2) → detect annual change / invasive spread (Stage 3).
+> See `docs/STATUS.md` for current state, `docs/specs/` for the specs, `docs/decisions/` for
+> ADRs. Some legacy buffer-centric tables/modules remain from the original POC.
 
 ## AI Workflow (Encoding Loop)
 This repo uses the NextAurora **encoding-loop method**: rules encoded across 5 surfaces
