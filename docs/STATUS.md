@@ -39,10 +39,25 @@ later behind the existing provider seam. Landed this session:
 - `sql/docintel_migration.sql` — additive `docs` schema (`documents`, `chunk_geo_mentions`).
 - `docintel/` scaffold: `corpus/seed_sources.yaml` (11 real public San Juan docs incl. SJRIP
   Bassett-2015 riparian/invasive + monitoring reports), `scripts/vendor_harness.sh` (trimmed
-  harness copy), and the NEW-IP geo modules `geo/models.py` + `geo/resolver.py` (deterministic
-  free-form-place → geometry against PostGIS; compile-clean, live queries are Phase-C TODOs).
-- **Next (Phase A→C):** run `vendor_harness.sh`, re-domain prompts, ingest corpus → Qdrant,
-  wire `geo_mentions[]` + resolver live queries + `/docs/ask` & `/docs/for-area`.
+  harness copy), and the NEW-IP geo modules `geo/models.py` + `geo/resolver.py`.
+
+**Phase A + B BUILT & VERIFIED end-to-end (2026-07-05).** Public/private split held:
+- **Private repo `github.com/emeraldleaf/riparian-rag-harness`** (harness must not be public):
+  vendored the RAG harness, ingested 7 watershed PDFs → **Qdrant `riparian_watershed` (527 pts)**,
+  re-domained prompts (generation + CRAG + system), and a **live cited answer** verified via local
+  Ollama (`llama3.2:3b`) — no hosted key needed. `scripts/ask_map_linked.py` +
+  **`docintel_server.py` (FastAPI `POST /docs/ask`)** return `{answer, citations, geo_mentions,
+  resolved_geometries}`; verified over HTTP.
+- **Public repo**: `sql/docintel_migration.sql` **applied** (`docs` schema live); resolver PostGIS
+  queries **implemented + verified** ('Animas River near Farmington' → reach geom, HUC8/HUC12 codes
+  resolve, towns honestly unresolved). `docintel/API_CONTRACT.md` added. All on PR #2.
+- **Full loop demonstrated:** question → cited answer → geo_mentions → resolved reach geometries.
+- **Env caveat:** the riparian PostGIS host-port zombies repeatedly on the external drive (Docker
+  drops the binding / container goes exec-dead). The server **degrades gracefully** (`geo_available`
+  flag) — RAG+citations work regardless; geo populates when the DB is healthy. Consider moving PG
+  off the external drive for a stable demo.
+- **Next:** `/docs/for-area` reverse lookup + ingest-time `docs.chunk_geo_mentions` tagging +
+  **frontend** (MapLibre Q&A panel → highlight `resolved_geometries`) — best done with a stable DB.
 
 ## Recently landed
 - README.md rewritten accurate/current (delineation/health/change; riparian/ package; MapLibre;
