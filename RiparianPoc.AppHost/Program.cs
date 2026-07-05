@@ -1,10 +1,12 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // PostGIS database — postgis/postgis:16-3.4 with ripariandb
+// Data bind-mounted to ./pgdata so it survives Docker restarts on external drive.
 var ripariandb = builder.AddPostgres("postgres")
     .WithImage("postgis/postgis")
     .WithImageTag("16-3.4")
     .WithLifetime(ContainerLifetime.Persistent)
+    .WithDataBindMount("../pgdata")
     .AddDatabase("ripariandb");
 
 // C# REST API — waits for PostGIS, exposes HTTP externally
@@ -14,11 +16,12 @@ var api = builder.AddProject<Projects.RiparianPoc_Api>("api")
     .WithExternalHttpEndpoints();
 
 // Python ETL pipeline — Dockerfile-based, waits for PostGIS
-// Set ETL_MODE=scheduled + ETL_SCHEDULE_CRON for recurring updates
+// Default to incremental to avoid truncating NDVI data on restart.
+// Use ETL_MODE=full explicitly for first-time setup only.
 var etl = builder.AddDockerfile("etl", "../python-etl")
     .WithReference(ripariandb)
     .WaitFor(ripariandb)
-    .WithEnvironment("ETL_MODE", builder.Configuration["ETL_MODE"] ?? "full")
+    .WithEnvironment("ETL_MODE", builder.Configuration["ETL_MODE"] ?? "incremental")
     .WithEnvironment("ETL_SCHEDULE_CRON", builder.Configuration["ETL_SCHEDULE_CRON"] ?? "")
     .WithEnvironment("ETL_SCHEDULE_INTERVAL_HOURS", builder.Configuration["ETL_SCHEDULE_INTERVAL_HOURS"] ?? "")
     .WithEnvironment("ETL_UPDATE_TYPE", builder.Configuration["ETL_UPDATE_TYPE"] ?? "incremental");

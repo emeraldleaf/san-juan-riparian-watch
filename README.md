@@ -1,506 +1,386 @@
-# Riparian Buffer Compliance POC
+# San Juan Riparian Watch
 
-A proof-of-concept application that monitors **riparian buffer zone compliance** in the
-San Juan Basin (Colorado) using satellite imagery, geospatial analysis, and public land
-records. It answers the question: *"Which parcels of land are encroaching on protected
-waterway buffer zones, and how healthy is the vegetation in those zones?"*
+Basin-scale **riparian vegetation delineation, health scoring, and change monitoring** for
+the San Juan River watershed (Colorado + New Mexico). It learns *where riparian vegetation
+actually is* from satellite time series — instead of assuming a fixed distance from a
+stream — then scores that vegetation's condition (including invasive tamarisk / Russian
+olive cover) and tracks how it changes over the long Earth-observation record.
+
+The stack is a STAC Earth-observation ETL, a PostGIS spatial database, a Python ML package
+(a RandomForest baseline measured head-to-head against the **OlmoEarth** foundation model),
+a .NET Aspire-orchestrated C# REST API, and a React + MapLibre map frontend.
+
+[![ci-python](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-python.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-python.yml)
+[![ci-dotnet](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-dotnet.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-dotnet.yml)
+[![ci-frontend](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-frontend.yml)
 
 ---
 
 ## Table of Contents
 
-- [What This Project Does](#what-this-project-does)
-- [Architecture Overview](#architecture-overview)
-- [How the Spatial Analysis Works](#how-the-spatial-analysis-works)
-- [NDVI Vegetation Health Scoring](#ndvi-vegetation-health-scoring)
-- [Data Pipeline (ETL)](#data-pipeline-etl)
-- [Incremental Updates](#incremental-updates)
+- [The Problem: Why Not Fixed Buffers](#the-problem-why-not-fixed-buffers)
+- [The Three-Stage Pipeline](#the-three-stage-pipeline)
+- [What's Built Today](#whats-built-today)
+- [How Delineation Works](#how-delineation-works)
+- [Study Area](#study-area)
+- [Architecture](#architecture)
+- [Repository Structure](#repository-structure)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
+- [API Endpoints](#api-endpoints)
+- [Database & Medallion Architecture](#database--medallion-architecture)
+- [Testing & CI](#testing--ci)
+- [Engineering Method (Encoding Loop)](#engineering-method-encoding-loop)
 - [Getting Started](#getting-started)
 - [Commands Reference](#commands-reference)
-- [API Endpoints](#api-endpoints)
-- [Database Schema](#database-schema)
-- [Code Quality (SonarQube)](#code-quality-sonarqube)
-- [Azure Deployment](#azure-deployment)
-- [Troubleshooting](#troubleshooting)
+- [Data Sources](#data-sources)
 - [Observability](#observability)
+- [Code Quality (SonarQube)](#code-quality-sonarqube)
+- [Roadmap](#roadmap)
 
 ---
 
-## What This Project Does
+## The Problem: Why Not Fixed Buffers
 
-**For Product Managers:** Riparian buffers are strips of vegetation along rivers and
-streams that prevent erosion, filter pollution, and protect water quality. Many
-jurisdictions require landowners to maintain these buffers — typically 100 feet (30.48
-meters) from the stream centerline.
+The project began as a buffer-compliance POC: define "riparian" as a fixed 30.48 m (100 ft)
+buffer around every stream centerline, then score vegetation inside it. That encodes a false
+assumption. In the semi-arid San Juan Basin, riparian zones are controlled by geomorphology,
+water-table access, and actual phreatophyte vegetation (cottonwood, willow — and invasive
+tamarisk / Russian olive), **not by distance from a line**. Many buffered pixels are dry
+upland; many real riparian strips fall outside any fixed buffer. Every downstream product —
+health, compliance, the "unhealthy riparian" map — inherits that error.
 
-This application:
+So the project was reframed ([ADR](docs/decisions/2026-07-03-delineation-over-hydrology-buffers.md)):
+**delineate riparian extent as a learned map first**, with a per-pixel confidence layer,
+then build condition and change on top of a correct extent. This mirrors the applied
+remote-sensing literature — Pace et al. 2022 (*Ecological Indicators* 144:109519) compute
+vegetation indices only on "pure riparian pixels" identified from land cover, precisely to
+avoid the mixed-pixel error a fixed buffer bakes in.
 
-1. **Pulls stream data** from the National Hydrography Dataset (NHDPlus V2.1) to know
-   where every waterway is located in the San Juan Basin.
-2. **Generates buffer zones** — 100-foot protective corridors around each stream.
-3. **Pulls parcel data** from the Colorado Public Parcels database to know property
-   boundaries and ownership.
-4. **Identifies focus areas** — any parcel that physically overlaps a buffer zone is flagged.
-   The parcel is clipped to the buffer boundary, and the overlap area and percentage of
-   buffer encroachment are calculated.
-5. **Scores vegetation health** using Sentinel-2 satellite imagery (NDVI) to determine
-   whether the vegetation in each buffer zone is healthy, degraded, or bare.
-6. **Displays everything on a map** — an interactive web application where you can see
-   streams, buffers, parcels (color-coded by compliance), and NDVI heatmaps.
-7. **Tracks changes over time** — an incremental update system that checks for new data
-   and refreshes only what has changed.
-
-**Current results (San Juan Basin, HUC8 14080101):**
-- ~2,000 stream segments monitored
-- ~5,000 parcels analyzed
-- ~89% compliance rate
-- ~167 focus area parcels identified
+> The original buffer-era ETL (streams → buffers → parcel compliance → NDVI/NLCD/LANDFIRE/
+> SSURGO/LiDAR enrichment → SMP health grades) still exists and runs — it's the A/B baseline
+> the learned pipeline is measured against. `generate_buffers()` was demoted from *foundation*
+> to *comparison*.
 
 ---
 
-## Architecture Overview
+## The Three-Stage Pipeline
+
+| Stage | Product | Status |
+|-------|---------|--------|
+| **1 — Delineate** | *Where* is riparian vegetation? A learned extent map + per-pixel probability, plus per-reach `%riparian_cover`. | **Built & validated** (baseline slice end-to-end) |
+| **2 — Score condition** | *How healthy* is it? Greenness + moisture + persistence + structure, penalized by invasive (tamarisk / Russian olive) cover. | Specced; invasive labeling module built |
+| **3 — Detect change** | *How is it changing?* Annual extent gain/loss + health delta + invasive spread over the longest feasible record (Landsat 1982+ → Sentinel-2/HLS). | [Specced](docs/specs/2026-07-04-stage3-annual-change.md), phased |
+
+Each stage's design is captured as a spec in [`docs/specs/`](docs/specs/) and material decisions
+as ADRs in [`docs/decisions/`](docs/decisions/). The live state of the build is tracked in
+[`docs/STATUS.md`](docs/STATUS.md).
+
+---
+
+## What's Built Today
+
+The **Stage-1 baseline vertical slice runs end-to-end against the live database**:
 
 ```
-                    ┌───────────────────────────────────┐
-                    │       .NET Aspire AppHost          │
-                    │  (Orchestrates all services)       │
-                    └──────────┬────────────────────────┘
-                               │
-             ┌─────────────────┼─────────────────────┐
-             │                 │                      │
-    ┌────────▼───────┐  ┌─────▼──────┐  ┌───────────▼──────────┐
-    │  Python ETL    │  │  C# REST   │  │  React Frontend      │
-    │  Pipeline      │  │  API       │  │  (Leaflet Map)       │
-    │                │  │            │  │                      │
-    │  - ArcGIS APIs │  │  - GeoJSON │  │  - Stream lines      │
-    │  - PostGIS     │  │  - Dapper  │  │  - Buffer polygons   │
-    │  - Sentinel-2  │  │  - 6 endpts│  │  - Parcel colors     │
-    │  - NDVI calc   │  │  - OTEL   │  │  - NDVI heatmap      │
-    └────────┬───────┘  └─────┬──────┘  └───────────┬──────────┘
-             │                │                      │
-             │         ┌──────▼──────┐               │
-             └────────►│  PostgreSQL │◄──────────────┘
-                       │  + PostGIS  │    (via API)
-                       │             │
-                       │  bronze ──► │  Raw data from APIs
-                       │  silver ──► │  Buffers, compliance, NDVI
-                       │  gold   ──► │  Summary statistics
-                       │  meta   ──► │  ETL run tracking
-                       └─────────────┘
+STAC datacube  →  multitemporal features  →  weak labels        →  RandomForest
+(S2 L2A over    (NDVI/EVI/NDMI/NDRE/kNDVI   (WorldCover ∧ io-lulc    (spatial CV)
+ the AOI)        + terrain, per season)      "woody-near-water"          │
+                                             ∧ NWI)                      ▼
+                                                              vectorize → silver.riparian_extent
+                                                              served via GET /api/riparian/extent
 ```
 
-### Service Communication
+**First verified run** (documented in [STATUS.md](docs/STATUS.md)): ~102k weak-labeled samples,
+**spatial-CV ROC-AUC ≈ 0.90 / precision ≈ 0.81**, riparian polygons written to
+`silver.riparian_extent` and served as a MapLibre layer.
+
+The honest result is **stratified**: delineation is excellent on broad lowland alluvial
+reaches (e.g. Malpais Arroyo–San Juan River) and hardest in narrow headwaters and the
+agricultural valley interface, where the corridor is a few pixels wide and irrigated crops
+mimic phreatophyte phenology. That reliability-varies-by-stream-order story — stated, not
+hidden — is the point: the model ships with a confidence layer, spatial-CV metrics, and
+independent reference-layer validation, not a single inflated accuracy number.
+
+Also landed: a **HAND (Height Above Nearest Drainage)** valley-bottom envelope (Stage 1A),
+a **per-reach** processor (NHD flowlines → ~250 m reaches → `%riparian_cover`), an
+**invasive-species** labeling module (NMRipMap → tamarisk / Russian-olive labels), an
+**OlmoEarth** embedding scaffold (the foundation-model contender, finished on a GPU VM),
+and **reference-layer validation** against NMRipMap (NM) with CO-RIP planned for Colorado.
+
+---
+
+## How Delineation Works
+
+The Stage-1 pipeline (Python `riparian/` package) is network-first and multi-evidence.
+
+**1A — Candidate envelope (physics first).** `riparian/delineation/hand.py` derives a
+HAND / valley-bottom mask from the 3DEP DEM: low HAND = hydrologically connected valley
+bottom where riparian vegetation *can* exist. This constrains inference and eliminates
+uplands early, cutting false positives and compute — the physically-motivated replacement
+for the fixed buffer as the "container".
+
+**1B — EO delineation inside the envelope.** `riparian/datacube/stac.py` turns a STAC query
+(AOI + time window + cloud filter) into an analysis-ready multitemporal `xarray` cube via
+`odc-stac` — the data-selection step becomes queryable and auditable instead of manual
+per-scene downloads. `riparian/datacube/features.py` builds the per-pixel feature stack:
+per-season spectral indices (NDVI, EVI, NDMI SWIR-moisture, NDRE red-edge, kNDVI) plus
+terrain. Dry-season contrast is the phreatophyte discriminator — groundwater-subsidized
+vegetation stays green when uplands brown off.
+
+**1C — Weak-label fusion.** `riparian/delineation/weak_labels.py` builds training labels from
+the *agreement* of independent land-cover products sampled on the Sentinel-2 grid — ESA
+WorldCover ∧ Impact-Observatory io-lulc "woody-near-water" ∧ NWI wetlands. Agreement is the
+supervision signal; it is deliberately **not** the definition (avoiding "green near water =
+riparian"). There is no field data — that's the stated ceiling on "reliable".
+
+**Models — baseline vs. foundation model.** `riparian/delineation/baseline.py` trains a
+scikit-learn RandomForest on the feature stack (the label-efficient, literature-standard
+baseline; XGBoost is a drop-in when `libomp` is present). `riparian/delineation/olmoearth.py`
+extracts **OlmoEarth** multimodal embeddings as features for the same task, so the two run on
+the same labels and validation harness and can be diffed with agreement/disagreement maps —
+the portfolio's core ML story.
+
+**Validation — spatial, not random.** Riparian training data is strongly spatially
+autocorrelated, so a random train/test split leaks (a test pixel's neighbors are in the
+training set). `riparian/delineation/validate.py` blocks the study area into spatial tiles and
+holds out whole tiles per fold (GroupKFold on tile id) — the defensible way to estimate
+generalization. `riparian/validation/reference.py` adds an *independent* check against
+NMRipMap v2.0+ (queried live from its ArcGIS MapServer), stratified by stream order / valley
+type, with NM and CO validated separately to respect their different source methodologies.
+
+**Orchestration.** `riparian/delineation/runner.py::run_delineation()` ties the verified
+pieces into one run and writes `silver.riparian_extent` (+ persists the weak-labeled samples
+to `bronze.riparian_training_samples` for reproducibility). `riparian/reaches/processor.py`
+produces the manager-facing per-reach product into `gold.reach_riparian`.
+
+---
+
+## Study Area
+
+**AOI = the San Juan River hydrologic watershed (HUC 1408), Colorado + New Mexico**,
+headwaters → lowlands. The organizing unit is the **HUC12** (each an independently
+processable, restartable tile); river segmentation is **NHD flowlines split into ~250 m
+reaches**. Development runs subset-first on three representative tiles (verified against the
+USGS Watershed Boundary Dataset):
+
+| Tile (HUC12) | Character | Location |
+|--------------|-----------|----------|
+| `140801010401` Turkey Creek | Headwaters | CO |
+| `140801041003` Tucker Canyon–Animas River | Mid-valley / ag interface | NM |
+| `140801051001` Malpais Arroyo–San Juan River | Lowland / alluvial | NM |
+
+Storage CRS is **EPSG:4269 (NAD83)** throughout; all metric math casts to `geography`.
+
+---
+
+## Architecture
+
+```
+                         ┌───────────────────────────────────┐
+                         │        .NET Aspire AppHost         │
+                         │  (orchestration, DI, OpenTelemetry)│
+                         └──────────────┬────────────────────┘
+                                        │
+          ┌─────────────────────────────┼─────────────────────────────┐
+          │                             │                             │
+ ┌────────▼─────────┐        ┌──────────▼──────────┐       ┌──────────▼──────────┐
+ │  Python ETL      │        │   C# REST API       │       │  React Frontend     │
+ │                  │        │                     │       │  (MapLibre GL)      │
+ │  riparian/       │        │  Endpoints (thin)   │       │                     │
+ │   datacube/      │        │    ↓                │       │  - riparian extent  │
+ │   delineation/   │        │  Services (SQL +    │       │  - reach summaries  │
+ │   health/        │        │   ActivitySource)   │       │  - buffer layers    │
+ │   reaches/       │        │    ↓                │       │  - NDVI / grades    │
+ │   validation/    │        │  Repository (Dapper │       │  - timelapse slider │
+ │                  │        │   + GeoJSON/MVT)    │       │                     │
+ │  STAC / ML       │        │                     │       │  session tracking   │
+ └────────┬─────────┘        └──────────┬──────────┘       └──────────┬──────────┘
+          │ writes                      │ reads (all schemas)         │ HTTP + GeoJSON
+          │                             │                             │
+          └──────────────► ┌────────────▼─────────────┐ ◄────────────┘
+                           │   PostgreSQL + PostGIS    │
+                           │                           │
+                           │  bronze  raw ingest       │  streams, parcels, wetlands, soils,
+                           │          + training samples│  nhd_flowlines, riparian_training_samples
+                           │  silver  spatial + learned│  riparian_extent, buffers, compliance,
+                           │                           │  vegetation_health, intersections
+                           │  gold    analytics        │  reach_riparian, summaries, health scores
+                           │  meta    ETL run tracking │
+                           └───────────────────────────┘
+```
 
 | Service | Role | Port |
 |---------|------|------|
 | **Aspire AppHost** | Orchestrates containers, injects connection strings, manages lifecycle | Dashboard: 18888 |
-| **PostgreSQL + PostGIS** | Shared spatial database (persistent container) | 5432 |
-| **C# REST API** | Reads from all schemas, returns GeoJSON via service layer + Dapper | 8000 |
-| **Python ETL** | Writes to bronze/silver/gold schemas | No port (batch job) |
-| **React Frontend** | Vite dev server, calls C# API with session tracking | 3000 |
+| **PostgreSQL + PostGIS** | Shared spatial database (persistent bind-mount) | 5432 |
+| **C# REST API** | Reads all schemas, returns GeoJSON/MVT via service → repository (Dapper) | 8000 |
+| **Python ETL / ML** | Writes bronze/silver/gold; STAC datacube + delineation | batch |
+| **React frontend** | MapLibre map, calls the API with session tracking | 3000 |
 
-Aspire automatically:
-- Starts PostGIS with a persistent container (data survives restarts)
-- Injects database connection strings into the API and ETL containers
-- Manages startup ordering (PostGIS first, then API, then frontend)
-- Provides a dashboard for monitoring all services
-
----
-
-## How the Spatial Analysis Works
-
-This section explains the core geospatial logic step by step. All spatial operations use
-PostGIS, the spatial extension for PostgreSQL.
-
-### Step 1: Identify Streams
-
-The ETL pipeline queries the **NHDPlus V2.1** (National Hydrography Dataset Plus) REST
-API for all stream centerlines within the San Juan Basin watershed (HUC8 code 14080101).
-
-Each stream is stored as a **LineString** geometry — a series of connected coordinates
-tracing the stream's path. In the database, this looks like:
-
-```
-LINESTRING(-107.81 37.28, -107.82 37.29, -107.83 37.30)
-```
-
-The pipeline also fetches waterbodies (lakes, reservoirs) and sinks, but buffers are
-generated from streams only.
-
-### Step 2: Generate Buffer Zones
-
-For each stream, PostGIS creates a **buffer polygon** — a shape that extends 100 feet
-(30.48 meters) outward from every point along the stream centerline.
-
-```sql
-ST_Buffer(stream_geom::geography, 30.48)
-```
-
-**Why `::geography`?** Coordinates are stored in degrees (EPSG:4269 / NAD83), but buffer
-distances need to be in meters. Casting to the `geography` type tells PostGIS to treat
-the coordinates as points on Earth's curved surface and measure the buffer distance in
-meters. Without this cast, `ST_Buffer(geom, 30.48)` would create a buffer of 30.48
-*degrees* — roughly 3,400 kilometers wide.
-
-The result is a polygon that hugs the stream's shape:
-
-```
-         Stream (LineString)         Buffer (Polygon)
-              │                    ╭──────────────╮
-              │                    │    30.48m    │
-    ──────────┤──────────  →      │──────┤───────│
-              │                    │              │
-              │                    ╰──────────────╯
-```
-
-### Step 3: Identify Parcel Focus Areas
-
-Next, the pipeline checks every parcel against every buffer to find **overlaps**. This is
-the most computationally intensive step, so it uses a two-stage filter:
-
-```sql
-FROM bronze.parcels p
-JOIN silver.riparian_buffers b
-    ON p.geom && b.geom                     -- Stage 1: Bounding box
-    AND ST_Intersects(p.geom, b.geom)       -- Stage 2: Exact geometry
-WHERE ST_Area(ST_Intersection(...)::geography) > 1  -- Ignore < 1 sq meter
-```
-
-**Stage 1 — Bounding box pre-filter (`&&`):** Every geometry has a bounding box (the
-smallest rectangle that contains it). The `&&` operator checks whether two bounding boxes
-overlap. This is extremely fast because PostGIS stores bounding boxes in a GiST index
-(a spatial tree structure). It eliminates ~99% of parcel-buffer pairs that clearly don't
-intersect.
-
-```
-   Parcel bbox        Buffer bbox
-   ┌──────────┐       ┌──────────┐
-   │          │       │          │
-   │   Parcel │       │  Buffer  │    Bboxes don't overlap → skip
-   │          │       │          │    (no expensive calculation needed)
-   └──────────┘       └──────────┘
-```
-
-**Stage 2 — Exact intersection (`ST_Intersects`):** For the remaining candidates, PostGIS
-computes whether the actual polygon shapes touch or overlap. This is slower but precise.
-
-**Computing the overlap:** For every parcel-buffer pair that intersects, the pipeline
-clips the parcel to the buffer boundary and calculates metrics on that clipped portion only:
-
-- **Overlap geometry:** `ST_Intersection(parcel, buffer)` — the exact shape of the
-  parcel within the buffer (not the full parcel)
-- **Overlap area:** `ST_Area(overlap::geography)` — area of the clipped portion in
-  square meters
-- **Overlap percentage:** overlap area / **buffer** area * 100 — what percentage of the
-  buffer zone this parcel encroaches on
-
-Any parcel with more than 1 square meter of overlap is identified as a **focus area**.
-
-### Step 4: Aggregate Compliance Statistics
-
-The gold layer summarizes everything at the watershed level using Common Table
-Expressions (CTEs):
-
-- **Total stream length** — sum of all stream segment lengths in meters
-- **Total buffer area** — sum of all buffer polygon areas
-- **Total parcels** — count of all parcels in the watershed
-- **Focus area parcels** — count of parcels identified as focus areas
-- **Compliance rate** — (total - focus areas) / total * 100
+The API follows a strict **endpoint → service → repository** layering (thin handlers, SQL in
+services, a generic Dapper repository). An [ADR](docs/decisions/2026-07-04-nextaurora-rules-applicability.md)
+records why `IPostGisRepository` is a legitimate abstraction here (Dapper is a raw query
+executor, not EF's `DbContext`/`DbSet` unit-of-work — so the repository earns its keep as the
+mock seam for unit tests and as the owner of GeoJSON/MVT building).
 
 ---
 
-## NDVI Vegetation Health Scoring
-
-**NDVI** (Normalized Difference Vegetation Index) measures how green and healthy
-vegetation is using satellite imagery. This project uses free **Sentinel-2** satellite
-data from Microsoft's Planetary Computer.
-
-### How NDVI Works
-
-Plants absorb red light for photosynthesis but reflect near-infrared (NIR) light.
-Healthy vegetation reflects a lot of NIR and absorbs a lot of red. NDVI captures this
-ratio:
+## Repository Structure
 
 ```
-NDVI = (NIR - Red) / (NIR + Red)
+san-juan-riparian-watch/
+├── RiparianPoc.AppHost/               # .NET Aspire orchestrator (entry point)
+├── RiparianPoc.Api/                   # C# REST API
+│   ├── Endpoints/GeoDataEndpoints.cs  #   Thin route handlers + DTO records
+│   ├── Services/                      #   ISpatialQueryService + IComplianceDataService (SQL + logic)
+│   ├── Repositories/                  #   IPostGisRepository — Dapper + GeoJSON/MVT
+│   ├── Middleware/                    #   Correlation/session + global exception handling
+│   └── Models/                        #   ApiErrorResponse
+├── RiparianPoc.Api.Tests/             # xUnit + NSubstitute (service validation, mocked repo)
+├── RiparianPoc.ServiceDefaults/       # Shared Aspire config (OTEL, resilience, discovery)
+│
+├── python-etl/
+│   ├── riparian/                      # ── Modern domain package (Stage 1+) ──
+│   │   ├── datacube/                  #   stac.py (odc-stac cube) · features.py (index/terrain stack)
+│   │   ├── delineation/               #   hand.py · weak_labels.py · baseline.py (RF) ·
+│   │   │                              #   validate.py (spatial CV) · olmoearth.py (FM) · runner.py
+│   │   ├── health/invasive.py         #   tamarisk / Russian-olive labels from NMRipMap
+│   │   ├── reaches/processor.py       #   NHD flowlines → ~250 m reaches → %riparian_cover
+│   │   └── validation/reference.py    #   NMRipMap / CO-RIP reference validation
+│   ├── tests/                         #   pytest (pure-function unit tests)
+│   ├── etl_pipeline.py                # ── Legacy buffer-era ETL (A/B baseline) ──
+│   ├── ndvi_processor.py              #   Sentinel-2 NDVI + health scoring
+│   ├── nlcd_processor.py, landfire_processor.py, ssurgo_processor.py,
+│   ├── lidar_processor.py, raster_processor.py, health_scorer.py
+│   ├── entrypoint.py                  #   full/incremental/ndvi/all/scheduled dispatcher
+│   ├── requirements.txt               #   full runtime deps
+│   └── requirements-test.txt          #   curated CI subset (no torch/geopandas)
+│
+├── frontend/                          # React 18 + TypeScript + MapLibre GL + Tailwind (Vite)
+│
+├── sql/                               # Additive migrations (create_schemas.sql = source of truth)
+│   ├── create_schemas.sql             #   base bronze/silver/gold schema
+│   ├── delineation_migration.sql      #   silver.riparian_extent + bronze.riparian_training_samples
+│   ├── reach_migration.sql            #   bronze.nhd_flowlines + gold.reach_riparian
+│   └── nwi/raster/ssurgo/lidar/health/incremental_migration.sql
+│
+├── docs/
+│   ├── STATUS.md                      #   cross-session live state
+│   ├── specs/                         #   Stage-1, Stage-3 feature specs
+│   ├── decisions/                     #   ADRs (delineation-over-buffers, NextAurora-rules)
+│   ├── sonarqube.md                   #   full SonarQube setup guide
+│   └── riparian-pipeline.{excalidraw,svg,png}   # paired architecture diagram
+│
+├── .github/workflows/                 # ci-python · ci-dotnet · ci-frontend · encoding-loop
+├── .claude/                           # encoding-loop method (commands, skills, agents)
+├── dev.sh                             # all-in-one dev script
+├── CLAUDE.md                          # AI-assistant + contributor conventions (lean canon)
+└── RiparianPoc.sln
 ```
 
-| NDVI Value | Meaning | Color on Map |
-|------------|---------|--------------|
-| > 0.6 | **Healthy** — dense, green vegetation | Dark green |
-| 0.3 – 0.6 | **Degraded** — sparse or stressed vegetation | Yellow-orange |
-| < 0.3 | **Bare** — little to no vegetation | Red |
-| Any (dormant season) | **Dormant** — expected low values outside growing season | Gray |
-
-The San Juan Basin's **peak growing season** is June through August. Only readings from
-these months are used for health classification. Outside this window, low NDVI values are
-tagged as "dormant" rather than "bare" to avoid false alarms.
-
-### Processing Pipeline
-
-1. **Query Planetary Computer STAC API** for Sentinel-2 L2A images covering each buffer
-   zone, filtered to < 20% cloud cover.
-2. **Sign the asset URLs** using `planetary_computer.sign_inplace()` (Planetary Computer
-   provides free access but requires URL signing).
-3. **Clip the satellite raster** to the buffer polygon using `rasterio.mask.mask()` — this
-   extracts only the pixels that fall within the buffer boundary.
-4. **Calculate NDVI** for each pixel: `(B08 - B04) / (B08 + B04)` where B08 is the NIR
-   band and B04 is the red band.
-5. **Aggregate statistics** — mean, min, and max NDVI across all pixels in the buffer.
-6. **Classify health** based on mean NDVI and season.
-7. **Store results** in `silver.vegetation_health` with deduplication (same buffer + date
-   + satellite combination is never processed twice).
-
-### NDVI on the Map
-
-The frontend renders NDVI data as a **heatmap overlay** using Leaflet's heat plugin. Each
-buffer's centroid is a heat point with intensity based on NDVI values. The gradient runs
-from red (bare/unhealthy) through yellow (degraded) to green (healthy).
-
----
-
-## Data Pipeline (ETL)
-
-The ETL (Extract, Transform, Load) pipeline follows a **medallion architecture** — data
-flows through three layers of increasing refinement.
-
-### Medallion Layers
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│  BRONZE (Raw)         SILVER (Processed)      GOLD (Analytics)  │
-│  ─────────────        ──────────────────      ────────────────  │
-│                                                                 │
-│  streams ──────────►  riparian_buffers ─┐                       │
-│  waterbodies          (30.48m buffers)  │                       │
-│  sinks                                  ├──► riparian_summary   │
-│  watersheds           parcel_compliance │    (compliance stats) │
-│  parcels ──────────►  (focus area flags) ┘                       │
-│                                                                 │
-│                       vegetation_health                         │
-│                       (NDVI scores)                             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-| Layer | Schema | Purpose | Write Policy |
-|-------|--------|---------|--------------|
-| **Bronze** | `bronze` | Raw data from external APIs, minimal transformation | Append or upsert |
-| **Silver** | `silver` | Spatial analysis results — buffers, compliance, NDVI | Derived from bronze |
-| **Gold** | `gold` | Aggregated statistics for dashboards | Derived from silver |
-| **Meta** | `meta` | ETL run tracking and audit trail | Internal bookkeeping |
-
-Data flows one direction: **bronze → silver → gold**. Never write back upstream.
-
-### Data Sources
-
-| Source | API | What It Provides |
-|--------|-----|------------------|
-| **NHDPlus V2.1** | ArcGIS REST (USGS) | Stream centerlines, waterbodies, sinks |
-| **Colorado Public Parcels** | ArcGIS REST (CO GIS) | Property boundaries, ownership, land use |
-| **USDA Watersheds** | ArcGIS REST (USDA Forest Service) | HUC8 watershed boundary |
-| **Sentinel-2 L2A** | STAC API (Planetary Computer) | Satellite imagery for NDVI |
-
-### Pipeline Steps (Full Run)
-
-```
-1. load_watershed()          Fetch HUC8 boundary        → bronze.watersheds
-2. load_nhdplus_layers()     Fetch streams, waterbodies  → bronze.streams, waterbodies, sinks
-3. load_parcels()            Fetch parcels (paginated)   → bronze.parcels
-4. generate_buffers()        ST_Buffer on streams        → silver.riparian_buffers
-5. analyze_compliance()      ST_Intersects check         → silver.parcel_compliance
-6. calculate_summary()       CTE aggregation             → gold.riparian_summary
-```
-
-### Design Decisions
-
-**Why Protocol-based DI?** The Python ETL uses `Protocol` classes (PEP 544) to define
-interfaces for the feature client (`FeatureClient`) and database writer (`SpatialWriter`).
-This allows swapping implementations for testing without changing the pipeline logic.
-
-**Why a staging table for upserts?** GeoPandas `to_postgis()` doesn't support SQL
-`ON CONFLICT` clauses. The upsert method writes data to a temporary staging table first,
-then uses `INSERT INTO target SELECT FROM staging ON CONFLICT ... DO UPDATE` to merge it
-into the real table. The staging table is dropped after each upsert.
-
-**Why the `xmax = 0` trick?** When PostgreSQL executes an `INSERT ... ON CONFLICT DO UPDATE`,
-it returns the affected rows but doesn't tell you which were inserts vs. updates. The
-system column `xmax` is 0 for newly inserted rows and non-zero for updated rows. By
-including `RETURNING (xmax = 0) AS inserted` in the query, the pipeline can count
-exactly how many rows were inserted vs. updated.
-
----
-
-## Incremental Updates
-
-The system supports **incremental updates** so you don't have to reload everything from
-scratch each time.
-
-### How It Works
-
-```
-Full Run:           Truncate all tables → reload everything from APIs → recompute all
-
-Incremental Run:    Fetch from APIs → upsert (merge) into bronze
-                    → Only recompute silver if bronze changed
-                    → Only recompute gold if silver changed
-```
-
-The incremental pipeline makes smart decisions about what to recompute:
-
-| If This Changed... | Then Recompute... | Reason |
-|---------------------|-------------------|--------|
-| Streams | Buffers, compliance, summary | Buffer shapes depend on stream geometry |
-| Parcels (only) | Compliance, summary | New/moved parcels may overlap buffers |
-| Nothing | Skip silver and gold entirely | Data is already current |
-
-### Run Tracking
-
-Every ETL run is logged in `meta.etl_runs` with:
-- Run type (full, incremental, ndvi, all)
-- Start/end timestamps
-- Status (running, completed, failed)
-- Row counts (inserted, updated, skipped)
-- Change flags (streams/parcels/buffers changed)
-- Error message (if failed)
-
-### Triggering Updates
-
-**Manual (CLI):**
-```bash
-./dev.sh --update                 # Incremental + NDVI (default: "all")
-./dev.sh --update incremental     # Bronze upsert + smart silver/gold recompute
-./dev.sh --update ndvi            # NDVI refresh only
-./dev.sh --update full            # Full reload from scratch
-```
-
-**Scheduled (via Aspire):**
-
-Set environment variables in your Aspire configuration:
-
-```
-ETL_MODE=scheduled
-ETL_SCHEDULE_CRON=0 2 * * *          # Run at 2 AM daily
-ETL_UPDATE_TYPE=incremental           # What kind of update to run
-```
-
-Or use an interval instead of cron:
-
-```
-ETL_MODE=scheduled
-ETL_SCHEDULE_INTERVAL_HOURS=24        # Run every 24 hours
-ETL_UPDATE_TYPE=all                   # Incremental + NDVI
-```
+> The `.NET`/frontend projects keep their original `RiparianPoc.*` names — only the GitHub
+> repository and product were renamed to *San Juan Riparian Watch*.
 
 ---
 
 ## Tech Stack
 
-### Backend (.NET)
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **.NET** | 10.0 | Runtime for API and Aspire |
-| **ASP.NET Core** | 10.0 | REST API framework (minimal APIs) |
-| **.NET Aspire** | 13.1.0 | Service orchestration, health checks, OpenTelemetry |
-| **Npgsql** | via Aspire | .NET data provider for PostgreSQL (NpgsqlDataSource) |
-| **Dapper** | 2.1 | Micro-ORM for typed and dynamic SQL queries |
-| **NetTopologySuite (NTS)** | 4.0.0 | Spatial data types + GeoJSON serialization |
-| **OpenTelemetry** | via Aspire | Distributed tracing, metrics, and structured logging |
+**ETL / ML (Python 3.11+)** — `odc-stac` + `pystac-client` + `planetary-computer` (STAC
+datacube), `xarray` / `rasterio` (raster), `scikit-learn` (RandomForest baseline), OlmoEarth
++ `torch` (foundation-model track), `shapely` / GeoPandas (vectorize + PostGIS I/O),
+SQLAlchemy `text()` (parameterized SQL), `pysheds` (HAND). Weak labels from ESA WorldCover +
+io-lulc + NWI.
 
-### Database
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **PostgreSQL** | 16 | Relational database |
-| **PostGIS** | 3.4 | Spatial extension (geometry types, spatial functions, GiST indexes) |
+**API (.NET 10)** — ASP.NET Core minimal APIs, .NET Aspire 13 (orchestration + OpenTelemetry),
+Dapper (micro-ORM, `NpgsqlDataSource`), NetTopologySuite (GeoJSON), OpenTelemetry tracing.
 
-### ETL Pipeline
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **Python** | 3.12 | ETL runtime |
-| **GeoPandas** | >= 1.0 | Spatial DataFrames, read/write PostGIS |
-| **SQLAlchemy** | >= 2.0 | Database engine and parameterized SQL |
-| **Rasterio** | >= 1.3 | Satellite imagery (COG) reading and clipping |
-| **pystac-client** | >= 0.8 | STAC API client for Planetary Computer |
-| **APScheduler** | >= 3.10 | Cron/interval job scheduling |
-| **GDAL/GEOS/PROJ** | System | Geospatial C libraries (installed in Docker) |
+**Database** — PostgreSQL 16 + PostGIS 3.4 (GiST-indexed geometry, `geography` metric math).
 
-### Frontend
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **React** | 18.3 | UI framework |
-| **TypeScript** | 5.7 | Type-safe JavaScript |
-| **Leaflet** | 1.9 | Interactive map rendering |
-| **react-leaflet** | 4.2 | React bindings for Leaflet |
-| **leaflet.heat** | 0.2 | NDVI heatmap overlay |
-| **Tailwind CSS** | 3.4 | Utility-first styling |
-| **Vite** | 6.0 | Dev server and build tool |
+**Frontend** — React 18, TypeScript, **MapLibre GL** via `react-map-gl`, Tailwind CSS, Vite.
+(Migrated from Leaflet; some legacy NDVI-heatmap components remain from the buffer era.)
+
+**Quality** — pytest, xUnit + NSubstitute, ruff + mypy, `dotnet format`, SonarQube, GitHub
+Actions CI, CodeRabbit review.
 
 ---
 
-## Project Structure
+## API Endpoints
 
-```
-riparian-poc/
-├── RiparianPoc.AppHost/               # .NET Aspire orchestrator
-│   ├── Program.cs                     #   Service definitions + env var config
-│   └── RiparianPoc.AppHost.csproj
-│
-├── RiparianPoc.Api/                   # C# REST API
-│   ├── Endpoints/
-│   │   └── GeoDataEndpoints.cs        #   Thin route handlers + DTO records
-│   ├── Services/
-│   │   ├── IGeoDataServices.cs        #   ISpatialQueryService + IComplianceDataService
-│   │   └── GeoDataServices.cs         #   SQL queries + business logic
-│   ├── Repositories/
-│   │   ├── IPostGisRepository.cs      #   Data access abstraction
-│   │   └── PostGisRepository.cs       #   Dapper queries + GeoJSON deserialization
-│   ├── Middleware/
-│   │   ├── CorrelationMiddleware.cs    #   X-Correlation-Id + X-Session-Id tracking
-│   │   └── ExceptionHandlingMiddleware.cs  # Global error → structured JSON
-│   ├── Models/
-│   │   └── ApiErrorResponse.cs        #   Structured error response record
-│   ├── Program.cs                     #   DI registration, middleware pipeline, OTEL setup
-│   └── RiparianPoc.Api.csproj
-│
-├── RiparianPoc.ServiceDefaults/       # Shared Aspire config
-│   └── RiparianPoc.ServiceDefaults.csproj  # OpenTelemetry, resilience, service discovery
-│
-├── python-etl/                        # Python geospatial ETL
-│   ├── etl_pipeline.py                #   Main pipeline: fetch → transform → load → analyze
-│   ├── ndvi_processor.py              #   Sentinel-2 NDVI calculation + health scoring
-│   ├── run_tracker.py                 #   ETL run metadata tracking
-│   ├── entrypoint.py                  #   Multi-mode dispatcher (full/incremental/ndvi/scheduled)
-│   ├── scheduler.py                   #   APScheduler cron/interval wrapper
-│   ├── requirements.txt               #   Python dependencies
-│   └── Dockerfile                     #   Python 3.12 + GDAL/GEOS/PROJ
-│
-├── frontend/                          # React + Leaflet map UI
-│   ├── src/
-│   │   ├── App.tsx                    #   Main component: map, layers, popups, legend
-│   │   ├── main.tsx                   #   React DOM entry point
-│   │   ├── index.css                  #   Tailwind directives
-│   │   └── components/
-│   │       └── NDVILayer.tsx           #   NDVI heatmap overlay component
-│   ├── vite.config.ts                 #   Dev server config + API proxy
-│   ├── tailwind.config.js
-│   ├── nginx.conf                     #   Production SPA routing
-│   ├── Dockerfile                     #   Multi-stage: Node build → nginx serve
-│   └── package.json
-│
-├── sql/
-│   ├── create_schemas.sql             #   Database schema (source of truth)
-│   └── incremental_migration.sql      #   meta.etl_runs + unique constraints
-│
-├── dev.sh                             #   All-in-one dev script
-├── docker-compose.sonar.yml            #   SonarQube server (docker compose)
-├── sonar-project.properties            #   SonarQube scanner config
-├── azure.yaml                         #   Azure Developer CLI config
-├── CLAUDE.md                          #   AI assistant instructions
-└── RiparianPoc.sln                    #   .NET solution file
-```
+All spatial endpoints return **GeoJSON FeatureCollections**; errors return a structured
+`ApiErrorResponse` (see [Observability](#observability)).
+
+### Learned delineation (Stage 1)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/riparian/extent` | Learned riparian extent + probability from `silver.riparian_extent` (`?method=rf\|olmoearth`) |
+
+### Buffer-era layers (legacy / A/B baseline)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/streams` | Stream centerlines (comid, gnis_name, stream_order) |
+| `GET /api/buffers` | Fixed 30.48 m buffers (stream_id, area_sq_m) |
+| `GET /api/buffers/health` · `/health/{date}` | Buffers with latest / dated NDVI health |
+| `GET /api/buffers/scores` | Buffers with SMP composite health grades (A–F) |
+| `GET /api/parcels` · `/focus-areas` | Parcels with compliance / encroachment status |
+| `GET /api/wetlands` · `/soils` | NWI wetland / SSURGO soil polygons |
+| `GET /api/buffers/{id}/wetlands\|landcover\|vegetation-structure\|soils\|canopy\|score` | Per-buffer enrichment detail |
+| `GET /api/vegetation/buffers/{id}` · `/api/ndvi/dates` | NDVI time series / acquisition dates |
+| `GET /api/summary` | Gold-layer compliance + grade summary |
+
+---
+
+## Database & Medallion Architecture
+
+Data flows one direction — **bronze → silver → gold** — and never writes back upstream.
+
+| Layer | Schema | Purpose | Key tables |
+|-------|--------|---------|-----------|
+| **Bronze** | `bronze` | Raw ingest, minimal transform | `streams`, `parcels`, `nwi_wetlands`, `ssurgo_soils`, `nhd_flowlines`, `riparian_training_samples` |
+| **Silver** | `silver` | Spatial + learned processing | `riparian_extent` (learned), `riparian_buffers`, `parcel_compliance`, `vegetation_health`, `buffer_*` intersections |
+| **Gold** | `gold` | Aggregated analytics | `reach_riparian` (per-reach `%cover`), `riparian_summary`, `buffer_health_score` |
+| **Meta** | `meta` | ETL run tracking / audit | `etl_runs` |
+
+`sql/create_schemas.sql` is the schema source of truth; every later change is an **additive**
+`*_migration.sql` (never an edit to the base file). Every geometry column has a GiST index;
+spatial joins use a `&&` bounding-box pre-filter before exact `ST_Intersects`.
+
+---
+
+## Testing & CI
+
+| Suite | What it covers | How to run |
+|-------|----------------|-----------|
+| **Python** (pytest) | Pure-function unit tests: spectral indices, spatial-fold grids, weak-label logic, validation math | `cd python-etl && pytest -m "not live"` |
+| **C#** (xUnit + NSubstitute) | Service-layer validation + behavior with a mocked `IPostGisRepository` | `dotnet test RiparianPoc.Api.Tests/` |
+| **Frontend** | `tsc` + Vite build gate; ESLint | `cd frontend && npm run build` |
+
+Four GitHub Actions workflows run on pull requests (path-filtered, concurrency-cancel):
+
+- **`ci-python`** — ruff (gate) → mypy (advisory) → pytest (gate), using the curated
+  `requirements-test.txt` so CI stays fast (no torch/GDAL).
+- **`ci-dotnet`** — restore → build → `dotnet test` (gate) → `dotnet format --verify` (advisory),
+  scoped to the API test project (not the Aspire AppHost).
+- **`ci-frontend`** — `npm ci` → build (gate) → lint (advisory).
+- **`encoding-loop`** — lean-canon + doc/diagram-pairing checks for the AI workflow.
+
+`live`-marked tests (real STAC / DB) are skipped in CI and run locally against Planetary
+Computer + PostGIS.
+
+---
+
+## Engineering Method (Encoding Loop)
+
+This repo dogfoods a portable **encoding-loop method** (ported from a private DDD codebase and
+retuned to this system's actual architecture): project rules are encoded across five surfaces —
+`CLAUDE.md` + `.claude/`, `.coderabbit.yaml`, an `architecture-reviewer` agent, commands +
+skills, and `docs/` + a paired diagram — across three enforcement tiers, kept from drifting by
+mechanical git hooks (a lean-canon budget on `CLAUDE.md`, doc↔diagram pairing, and a
+stale-reference audit on `git mv`). Feature work starts from a `/feature-spec` (value gate →
+acceptance criteria → affects → ADR trigger) that lands in `docs/specs/`. The intent: keep an
+AI-assisted codebase coherent and reviewable as it scales, and make architectural divergences
+*conscious decisions* (recorded as ADRs) rather than drift.
 
 ---
 
@@ -508,49 +388,34 @@ riparian-poc/
 
 ### Prerequisites
 
-- **macOS** (project runs from an external drive)
+- **macOS** (the project runs from an external drive — see below)
 - **Docker Desktop** — configured to store data on the external drive
-- **.NET 10 SDK** — `dotnet --version` should show 10.x
-- **Node.js 20+** — `node --version` should show 20.x or higher
+- **.NET 10 SDK** · **Node.js 20+** · **Python 3.11+**
 - **External drive** mounted at `/Volumes/Mac OS Extended 1/`
+
+> **External-drive note.** This repo and its Docker data live on an external drive. Verify it's
+> mounted (`ls "/Volumes/Mac OS Extended 1/"`) before starting anything. `dev.sh` runs a
+> drive-I/O probe on startup and provides `--reconnect` recovery + `--backup`/`--restore` for
+> the database, because Docker on an external drive restarts often.
 
 ### Quick Start
 
 ```bash
-# 1. Navigate to the project
 cd "/Volumes/Mac OS Extended 1/riparian-poc"
 
-# 2. Start everything (builds, starts PostGIS, API, frontend, applies schema)
-./dev.sh
-
-# 3. In a new terminal, check status
-./dev.sh --status
-
-# 4. If data is empty (first run), the ETL runs automatically via Aspire.
-#    For manual data refresh:
-./dev.sh --update
+./dev.sh              # start everything (drive check → PostGIS → Aspire → API → frontend)
+./dev.sh --status     # health + drive I/O + data counts (incl. NDVI)
 ```
-
-### What `./dev.sh` Does
-
-1. **Pre-flight checks** — verifies the external drive is mounted, Docker is running,
-   .NET SDK and Node.js are installed.
-2. **Installs frontend dependencies** — runs `npm install` in `frontend/` if
-   `node_modules/` doesn't exist.
-3. **Builds the .NET solution** — compiles the API, AppHost, and ServiceDefaults projects.
-4. **Starts Aspire** — launches the AppHost which starts PostGIS, the API, the ETL
-   container, and the frontend dev server.
-5. **Waits for PostGIS** — polls the database for up to 90 seconds until it's ready.
-6. **Applies the schema** — runs `create_schemas.sql` if the `bronze.streams` table
-   doesn't exist yet.
-
-### Accessing the Application
 
 | Service | URL |
 |---------|-----|
-| **Frontend (map)** | http://localhost:3000 |
-| **Aspire Dashboard** | http://localhost:18888 |
-| **API** | http://localhost:8000 |
+| Frontend (map) | http://localhost:3000 |
+| Aspire Dashboard | http://localhost:18888 |
+| API / Swagger | http://localhost:8000 · http://localhost:8000/swagger |
+
+The learned delineation pipeline runs from the Python package —
+`riparian.delineation.runner.run_delineation(...)` — against Planetary Computer STAC + the
+live PostGIS. The legacy buffer-era ETL runs via `./dev.sh --update` (see below).
 
 ---
 
@@ -559,355 +424,98 @@ cd "/Volumes/Mac OS Extended 1/riparian-poc"
 | Command | Description |
 |---------|-------------|
 | `./dev.sh` | Start all services |
-| `./dev.sh --status` | Check health of all services + data counts |
-| `./dev.sh --stop` | Stop Aspire (PostGIS container persists with data) |
-| `./dev.sh --restart` | Stop and restart all services |
-| `./dev.sh --update` | Run incremental + NDVI update (alias for `--update all`) |
-| `./dev.sh --update incremental` | Upsert bronze data, smart-recompute silver/gold |
-| `./dev.sh --update ndvi` | Refresh NDVI vegetation health only |
-| `./dev.sh --update full` | Full reload from scratch |
-| `./dev.sh --sonar` | Start SonarQube server (http://localhost:9000) |
-| `./dev.sh --sonar-stop` | Stop SonarQube (data persists in Docker volumes) |
-| `./dev.sh --lint` | Run static analysis: Python + TypeScript + SQL |
-| `./dev.sh --lint-dotnet` | Run static analysis: C# .NET projects |
-| `./dev.sh --help` | Show usage help |
-
-### Build Commands
+| `./dev.sh --status` | Health of all services + data counts |
+| `./dev.sh --stop` / `--restart` | Stop / restart (PostGIS persists its data) |
+| `./dev.sh --reconnect` | Recover after an external-drive disconnect |
+| `./dev.sh --backup` / `--restore` | Snapshot / restore the database (`pg_dump -Fc`) |
+| `./dev.sh --update [incremental\|ndvi\|full]` | Legacy buffer-era ETL (default incremental; preserves NDVI) |
+| `./dev.sh --sonar` / `--sonar-stop` | Start / stop the SonarQube server |
+| `./dev.sh --lint` / `--lint-dotnet` | Static analysis (Python+TS+SQL / C#) |
 
 ```bash
-dotnet build RiparianPoc.sln          # Build all .NET projects
-cd frontend && npm run dev            # Frontend dev server (standalone)
-cd frontend && npm run build          # Frontend production build
-cd python-etl && python entrypoint.py # Run ETL directly (needs DATABASE_URL)
+dotnet build RiparianPoc.sln          # build all .NET projects
+dotnet test RiparianPoc.Api.Tests/    # C# unit tests
+cd python-etl && pytest -m "not live" # Python unit tests
+cd frontend && npm run dev            # frontend dev server
 ```
 
-### Database Commands
-
-```bash
-# Check status (includes row counts)
-./dev.sh --status
-
-# Connect to the database manually (find container ID first)
-docker exec -it <container_id> bash -c 'PGPASSWORD=$POSTGRES_PASSWORD psql -U postgres -d ripariandb'
-
-# Example queries once connected:
-SELECT count(*) FROM bronze.streams;
-SELECT count(*) FROM silver.parcel_compliance WHERE is_focus_area = TRUE;
-SELECT * FROM gold.riparian_summary;
-SELECT * FROM meta.etl_runs ORDER BY started_at DESC;
-```
+> **Never** kill Aspire processes directly — it can restart the PostgreSQL container and
+> corrupt data. Always use `./dev.sh --stop`.
 
 ---
 
-## API Endpoints
+## Data Sources
 
-All endpoints return **GeoJSON FeatureCollections** (except vegetation and summary which
-return typed JSON arrays). On error, all endpoints return a structured
-`ApiErrorResponse` JSON body (see [Observability](#observability)).
+All are free and require no API key.
 
-### GET /api/streams
-Returns all stream centerlines from the bronze layer.
+| Source | Access | Provides |
+|--------|--------|----------|
+| **Sentinel-2 L2A / Sentinel-1 RTC** | STAC (Planetary Computer) | Optical + SAR time series for delineation |
+| **Landsat C2 L2 / HLS** | STAC (Planetary Computer) | Long-record (1982+) trend backbone for change |
+| **ESA WorldCover / io-lulc-9-class** | STAC (Planetary Computer) | Weak-label land-cover agreement |
+| **3DEP DEM (seamless / cop-dem-glo-30)** | STAC (Planetary Computer) | Terrain + HAND envelope |
+| **3DEP LiDAR (DSM/DTM)** | STAC (Planetary Computer) | Canopy height structure |
+| **NHDPlus V2.1 / NHD flowlines** | ArcGIS REST (USGS / National Map) | Stream network + reach segmentation |
+| **NWI Wetlands** | ArcGIS REST (FWS) | Wetland weak-label signal |
+| **NMRipMap v2.0+** | ArcGIS MapServer (NHNM) | NM reference-riparian validation + invasive labels |
+| **CO-RIP** | Dryad dataset | CO reference-riparian validation (planned) |
+| **Colorado Public Parcels / SSURGO / NLCD / LANDFIRE** | ArcGIS / WFS / WCS | Legacy buffer-era enrichment |
 
-**Response properties:** `comid`, `gnis_name`, `reach_code`, `ftype`, `fcode`,
-`stream_order`, `length_km`
-
-### GET /api/buffers
-Returns riparian buffer polygons from the silver layer, joined with stream names.
-
-**Response properties:** `stream_id`, `buffer_distance_m`, `area_sq_m`, `stream_name`
-
-### GET /api/parcels
-Returns all parcels with their compliance status (left-joined with compliance data).
-
-**Response properties:** `parcel_id`, `land_use_desc`, `land_use_code`, `zoning_desc`,
-`owner_name`, `land_acres`, `is_focus_area`, `overlap_pct`, `focus_area_reason`
-
-### GET /api/focus-areas
-Returns only parcels identified as focus areas.
-
-**Response properties:** Same as parcels, but only where `is_focus_area = TRUE`.
-
-### GET /api/vegetation/buffers/{bufferId}
-Returns NDVI time series for a specific buffer zone.
-
-**Response fields:** `buffer_id`, `acquisition_date`, `mean_ndvi`, `min_ndvi`,
-`max_ndvi`, `health_category`, `season_context`, `satellite`, `processed_at`
-
-### GET /api/summary
-Returns watershed-level compliance summary from the gold layer.
-
-**Response fields:** `huc8`, `total_stream_length_m`, `total_buffer_area_sq_m`,
-`total_parcels`, `compliant_parcels`, `focus_area_parcels`, `compliance_pct`,
-`avg_ndvi`, `healthy_buffer_pct`, `degraded_buffer_pct`, `bare_buffer_pct`
-
----
-
-## Database Schema
-
-### Bronze Layer (Raw Data)
-
-| Table | Source | Key Column | Geometry |
-|-------|--------|------------|----------|
-| `bronze.streams` | NHDPlus V2.1 | `comid` (UNIQUE) | LineString |
-| `bronze.waterbodies` | NHDPlus V2.1 | `comid` | Polygon |
-| `bronze.sinks` | NHDPlus V2.1 | `comid` | Point |
-| `bronze.parcels` | Colorado Parcels | `parcel_id` (UNIQUE) | MultiPolygon |
-| `bronze.watersheds` | USDA Watersheds | `huc8` | MultiPolygon |
-
-### Silver Layer (Processed)
-
-| Table | Derived From | Key Relationships |
-|-------|-------------|-------------------|
-| `silver.riparian_buffers` | bronze.streams | `stream_id` → streams.id |
-| `silver.parcel_compliance` | parcels + buffers | `parcel_id` → parcels.id, `buffer_id` → buffers.id |
-| `silver.vegetation_health` | Sentinel-2 imagery | `buffer_id` → buffers.id, UNIQUE(buffer_id, acquisition_date, satellite) |
-
-### Gold Layer (Analytics)
-
-| Table | Aggregation Level |
-|-------|-------------------|
-| `gold.riparian_summary` | Per watershed (HUC8) |
-
-### Meta Layer (Operations)
-
-| Table | Purpose |
-|-------|---------|
-| `meta.etl_runs` | Tracks every ETL execution with status, counts, and timing |
-
-### Coordinate Reference System
-
-All geometry is stored in **EPSG:4269 (NAD83)** — coordinates are in degrees of latitude
-and longitude. For distance and area calculations, geometry is cast to the `geography`
-type, which computes on Earth's curved surface in meters.
-
-### Indexes
-
-Every geometry column has a **GiST index** for fast spatial queries. Additional B-tree
-indexes exist on foreign keys and frequently queried columns. A **partial index** on
-`is_focus_area = TRUE` speeds up focus-area queries.
-
----
-
-## Code Quality (SonarQube)
-
-The project uses **SonarQube Community Edition** for local static code analysis. The
-server runs as a Docker container via `docker-compose.sonar.yml`, and scanners run
-as one-shot Docker containers or CLI tools.
-
-### What SonarQube Analyzes
-
-| Language | Scanner | What It Catches |
-|----------|---------|-----------------|
-| **Python** | Generic scanner (`sonar-scanner-cli`) | Bugs, code smells, security hotspots, complexity, duplication |
-| **TypeScript** | Generic scanner (`sonar-scanner-cli`) | Bugs, code smells, security vulnerabilities, unused imports |
-| **SQL** | Generic scanner (`sonar-scanner-cli`) | Code smells in SQL files |
-| **C#** | .NET scanner (`dotnet-sonarscanner`) | All of the above plus Roslyn-based semantic analysis |
-
-### Quick Start
-
-```bash
-# 1. Start the SonarQube server (first run pulls the image + initializes, ~60s)
-./dev.sh --sonar
-
-# 2. Set up authentication (required before scanning):
-#    a. Open http://localhost:9000, log in with admin / admin
-#    b. Change your password when prompted
-#    c. Go to My Account > Security > Generate Token
-#    d. Export the token:
-export SONAR_TOKEN="sqp_your-token-here"
-
-# 3. Run analysis on Python + TypeScript + SQL
-./dev.sh --lint
-
-# 4. (Optional) Run analysis on C# .NET code
-./dev.sh --lint-dotnet
-
-# 5. View results
-open http://localhost:9000/dashboard?id=riparian-poc
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `./dev.sh --sonar` | Start SonarQube via docker compose (http://localhost:9000) |
-| `./dev.sh --sonar-stop` | Stop SonarQube via docker compose (data persists) |
-| `./dev.sh --lint` | Analyze Python, TypeScript, and SQL (requires `SONAR_TOKEN`) |
-| `./dev.sh --lint-dotnet` | Analyze C# .NET projects (requires `SONAR_TOKEN`, auto-installs `dotnet-sonarscanner`) |
-
-### How It Works
-
-The SonarQube server is defined in `docker-compose.sonar.yml` with:
-- `SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true` (avoids needing `vm.max_map_count` on macOS)
-- Health check that polls `/api/system/status` until the server reports `UP`
-- Named Docker volumes for persistent data, logs, and extensions
-
-**Python + TypeScript scanning** runs the `sonarsource/sonar-scanner-cli` Docker image.
-The scanner reads `sonar-project.properties`, scans `python-etl/`, `frontend/src/`, and
-`sql/`, then uploads results to SonarQube. On macOS, it reaches the server via
-`host.docker.internal:9000` (since `--network host` doesn't work on Docker Desktop).
-
-**C# scanning** uses `dotnet-sonarscanner` (a .NET global tool) which wraps the
-`dotnet build` process. It instruments the MSBuild pipeline to extract Roslyn diagnostics
-and sends them to SonarQube. This runs directly on the host, so it connects to
-`localhost:9000`.
-
-### Authentication
-
-SonarQube requires **token-based authentication** (username/password auth is deprecated
-in SonarQube 10+). After first login:
-
-1. Open http://localhost:9000
-2. Log in with **admin / admin**, change your password when prompted
-3. Go to **My Account > Security > Generate Token**
-4. Export the token before running scans:
-   ```bash
-   export SONAR_TOKEN="sqp_your-token-here"
-   ```
-   Or persist it in `.env` (already in `.gitignore`):
-   ```bash
-   echo 'SONAR_TOKEN=sqp_your-token-here' >> .env
-   ```
-
-### Data Persistence
-
-SonarQube data is stored in Docker volumes (`sonarqube-data`, `sonarqube-logs`,
-`sonarqube-extensions`). Running `./dev.sh --sonar-stop` preserves all project history,
-quality profiles, and analysis results. To fully reset, remove the volumes:
-```bash
-docker compose -f docker-compose.sonar.yml down -v
-```
-
----
-
-## Azure Deployment
-
-The project includes Azure deployment configuration via the Azure Developer CLI (`azd`).
-
-```bash
-azd init           # First-time setup
-azd up             # Deploy all services
-azd deploy         # Redeploy after changes
-azd deploy --service api   # Redeploy a single service
-azd down           # Tear down all resources
-```
-
-The frontend Dockerfile uses a multi-stage build: Node.js builds the Vite app, then
-nginx serves the static files with SPA routing support.
-
----
-
-## Troubleshooting
-
-### "External drive not mounted"
-Mount the drive at `/Volumes/Mac OS Extended 1/` before running any commands.
-
-### Aspire dashboard won't start (HTTPS error)
-The dev script uses HTTP-only mode (`ASPIRE_ALLOW_UNSECURED_TRANSPORT=true`). If you see
-HTTPS certificate errors, ensure `dev.sh` is setting this environment variable.
-
-### ETL container exits with code 1
-Check the container logs in the Aspire dashboard. Common causes:
-- **Connection string format:** Aspire injects ADO.NET format; the ETL converts it to
-  PostgreSQL URI format automatically.
-- **Schema not applied:** The ETL expects tables to exist. Run `./dev.sh` (which applies
-  the schema) before running `./dev.sh --update`.
-
-### Empty map (no layers displayed)
-Run `./dev.sh --status` to check data counts. If streams/parcels/buffers show 0, the ETL
-hasn't run yet or failed. Check the ETL container logs in the Aspire dashboard.
-
-### "ON CONFLICT" duplicate key errors
-The Colorado Parcels API sometimes returns duplicate `parcel_id` values within a single
-batch. The upsert method handles this by deduplicating the staging table before merging.
-
-### PostGIS container keeps restarting
-Check Docker Desktop's disk space. PostGIS data is stored in Docker volumes on the
-external drive at `/Volumes/Mac OS Extended 1/DockerData/`.
+Study area: San Juan River watershed, HUC 1408 (subbasin 14080101).
 
 ---
 
 ## Observability
 
-The API includes built-in distributed tracing, structured logging, and error handling
-powered by **OpenTelemetry** and **.NET Aspire**.
+The API has built-in distributed tracing, structured logging, and layered error handling via
+**OpenTelemetry** + **.NET Aspire**.
 
-### Correlation & Session Tracking
+- **Correlation & session tracking** — middleware extracts `X-Correlation-Id` (or W3C TraceId)
+  and `X-Session-Id`, tags the trace, and wraps downstream logs in a scope so every entry
+  carries `CorrelationId` / `SessionId` / `ClientIp`. The frontend generates a session id per
+  page load and sends it on every fetch. Filter Aspire Dashboard traces by `session.id` to see
+  one user's whole session.
+- **Nested spans** — three custom `ActivitySource`s produce `HTTP → Service → Repository →
+  Npgsql` span hierarchies visible in the dashboard.
+- **Defense-in-depth errors** — the repository catches `NpgsqlException` (enriches trace +
+  rethrows); services validate input (`ArgumentException`); a global middleware maps exception
+  types to HTTP status (`NpgsqlException`→503, `ArgumentException`→400, `KeyNotFoundException`→404,
+  `OperationCanceledException`→504, else 500) and returns a structured `ApiErrorResponse`
+  (`detail` only in Development).
 
-Every API request is tagged with two identifiers:
+---
 
-- **Correlation ID** (`X-Correlation-Id` header) — ties a single HTTP request to all
-  its downstream database queries and log entries. Derived from the W3C TraceId.
-- **Session ID** (`X-Session-Id` header) — ties multiple API calls together for a
-  single user session. Generated by the frontend on page load.
+## Code Quality (SonarQube)
 
-The frontend sends `X-Session-Id` with every request. The middleware extracts both IDs,
-attaches them to the OpenTelemetry trace as tags, and wraps all downstream logging in a
-scope so every log entry includes `CorrelationId`, `SessionId`, and `ClientIp`.
+Static analysis for Python / TypeScript / SQL / C# runs against a local SonarQube Community
+server (Docker). Quick start:
 
-### Distributed Tracing
-
-Three custom `ActivitySource` instances create nested trace spans:
-
-```
-HTTP GET /api/streams (ASP.NET Core auto-span)
-  └── SpatialQuery.GetStreams (service span)
-       └── PostGis.QueryGeoJson (repository span)
-            └── Npgsql query (auto-instrumented)
-```
-
-In the Aspire Dashboard (http://localhost:18888):
-- **Traces** tab — view the full span hierarchy for each request
-- Filter by `session.id` tag to see all API calls for one user session
-- Filter by `correlation.id` to drill into a single request
-
-### Error Handling
-
-Errors are handled in layers (defense in depth):
-
-| Layer | Responsibility |
-|-------|---------------|
-| **Repository** | Catches `NpgsqlException`, enriches trace with timing, wraps with context |
-| **Service** | Validates input (e.g., `bufferId <= 0` → `ArgumentException`) |
-| **ExceptionHandlingMiddleware** | Maps exception types to HTTP status codes, returns structured JSON |
-
-Error responses use a consistent JSON format:
-
-```json
-{
-  "error": "Buffer ID must be positive, got -1",
-  "correlationId": "a1b2c3d4e5f6...",
-  "statusCode": 400,
-  "detail": "System.ArgumentException: ..."
-}
+```bash
+./dev.sh --sonar          # start the server (http://localhost:9000)
+./dev.sh --lint           # scan Python + TypeScript + SQL (needs SONAR_TOKEN in .env)
+./dev.sh --lint-dotnet    # scan C# via dotnet-sonarscanner
 ```
 
-The `detail` field is only populated in the Development environment. Exception type
-mapping:
+Full setup, VS Code connected mode, replication for other projects, and troubleshooting live in
+**[docs/sonarqube.md](docs/sonarqube.md)**.
 
-| Exception | HTTP Status | Message Policy |
-|-----------|-------------|----------------|
-| `NpgsqlException` | 503 | Generic ("Database temporarily unavailable") |
-| `ArgumentException` | 400 | Exception message exposed (user-facing) |
-| `KeyNotFoundException` | 404 | Exception message exposed |
-| `OperationCanceledException` | 504 | Generic ("Request timed out") |
-| Other | 500 | Generic ("An unexpected error occurred") |
+---
 
-### API Architecture
+## Roadmap
 
-The API follows a layered architecture with interface segregation:
+Tracked live in [`docs/STATUS.md`](docs/STATUS.md). Near-term:
 
-```
-Endpoints (thin handlers)
-    ↓ inject
-Services (ISpatialQueryService, IComplianceDataService)
-    ↓ inject
-Repository (IPostGisRepository)
-    ↓ uses
-NpgsqlDataSource + Dapper
-```
+1. **HUC12 tiling** — per-tile, restartable delineation across the three locked tiles, then scale.
+2. **Stage 1A wiring** — HAND envelope constraining inference basin-wide.
+3. **Per-reach rollups** — `gold.reach_riparian` populated for "which reaches are riparian /
+   degrading", with confidence + quality flags.
+4. **Reference validation** — NMRipMap (NM) + CO-RIP (CO), IoU/F1 stratified by stream order,
+   validated per state then reconciled at the seam.
+5. **OlmoEarth everywhere** — GPU embedding store + head training + baseline-vs-FM disagreement maps.
+6. **Stage 2 / Stage 3** — condition score (invasive-penalized) and annual change / invasive-spread
+   products on the Landsat 1982+ backbone.
 
-- **Endpoints** — route handlers only, no SQL or business logic
-- **Services** — own SQL queries, input validation, ActivitySource tracing
-- **Repository** — generic data access (GeoJSON and typed queries via Dapper)
-- All registered as scoped services in DI
+---
+
+*A learned, confidence-aware riparian monitoring platform for the San Juan Basin — extent,
+condition, and change from open Earth-observation data.*
