@@ -78,6 +78,35 @@ public sealed class PostGisRepository : IPostGisRepository
     }
 
     /// <inheritdoc />
+    public async Task<byte[]> QueryMvtAsync(
+        string sql, object? parameters, CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("PostGis.QueryMvt");
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            await using var conn = await _db.OpenConnectionAsync(ct);
+            
+            // ExecuteScalarAsync returns the binary MVT blob directly
+            var result = await conn.ExecuteScalarAsync<byte[]>(
+                new CommandDefinition(sql, parameters, cancellationToken: ct));
+
+            sw.Stop();
+            activity?.SetTag(DurationTag, sw.ElapsedMilliseconds);
+            activity?.SetTag("mvt.size_bytes", result?.Length ?? 0);
+
+            return result ?? Array.Empty<byte>();
+        }
+        catch (NpgsqlException ex)
+        {
+            sw.Stop();
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<T>> QueryAsync<T>(
         string sql, object? parameters, CancellationToken ct)
     {
