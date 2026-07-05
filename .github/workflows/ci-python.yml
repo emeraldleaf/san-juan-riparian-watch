@@ -1,0 +1,49 @@
+name: ci-python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'python-etl/**'
+      - '.github/workflows/ci-python.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-python-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-etl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install ruff mypy pytest
+          pip install -r requirements-test.txt
+
+      - name: Ruff (lint) — gate
+        run: ruff check riparian tests
+
+      - name: Mypy (type-check) — advisory
+        continue-on-error: true
+        run: mypy riparian --ignore-missing-imports --no-error-summary
+
+      - name: Pytest (unit tests; skip live) — gate
+        run: pytest -m "not live"

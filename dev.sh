@@ -39,6 +39,27 @@ check_drive() {
     fi
 }
 
+check_drive_io() {
+    # Quick I/O health probe — write and read a temp file on the drive.
+    # Detects flaky USB connections that leave the mount point visible
+    # but cause EIO errors on actual read/write.
+    local probe_file="/Volumes/Mac OS Extended 1/riparian-poc/.drive_probe_$$"
+    if ! echo "ok" > "$probe_file" 2>/dev/null; then
+        rm -f "$probe_file" 2>/dev/null
+        error "External drive I/O error — drive mounted but not writable."
+        error "Try: eject and reconnect the drive, then restart Docker Desktop."
+        exit 1
+    fi
+    local contents
+    contents=$(cat "$probe_file" 2>/dev/null || true)
+    rm -f "$probe_file" 2>/dev/null
+    if [ "$contents" != "ok" ]; then
+        error "External drive I/O error — read-back verification failed."
+        error "Try: eject and reconnect the drive, then restart Docker Desktop."
+        exit 1
+    fi
+}
+
 check_docker() {
     if ! docker info >/dev/null 2>&1; then
         error "Docker is not running. Start Docker Desktop and try again."
@@ -62,6 +83,7 @@ check_node() {
 
 preflight() {
     check_drive
+    check_drive_io
     check_docker
     check_dotnet
     check_node
@@ -214,6 +236,14 @@ cmd_status() {
     # Drive
     if [ -d "/Volumes/Mac OS Extended 1/riparian-poc" ]; then
         info "External drive:  mounted"
+        # Quick I/O test
+        local probe_file="/Volumes/Mac OS Extended 1/riparian-poc/.drive_probe_$$"
+        if echo "ok" > "$probe_file" 2>/dev/null && [ "$(cat "$probe_file" 2>/dev/null)" = "ok" ]; then
+            info "Drive I/O:       healthy"
+        else
+            error "Drive I/O:       FAILING (eject + reconnect drive, restart Docker)"
+        fi
+        rm -f "$probe_file" 2>/dev/null
     else
         error "External drive:  NOT mounted"
     fi
@@ -238,14 +268,16 @@ cmd_status() {
                 info "Schema:          applied"
 
                 # Row counts
-                local streams parcels buffers
+                local streams parcels buffers ndvi
                 streams=$(container_psql "$cid" -d ripariandb -tAc \
                     "SELECT count(*) FROM bronze.streams" 2>/dev/null || echo "?")
                 parcels=$(container_psql "$cid" -d ripariandb -tAc \
                     "SELECT count(*) FROM bronze.parcels" 2>/dev/null || echo "?")
                 buffers=$(container_psql "$cid" -d ripariandb -tAc \
                     "SELECT count(*) FROM silver.riparian_buffers" 2>/dev/null || echo "?")
-                info "Data:            streams=$streams  parcels=$parcels  buffers=$buffers"
+                ndvi=$(container_psql "$cid" -d ripariandb -tAc \
+                    "SELECT count(*) FROM silver.vegetation_health" 2>/dev/null || echo "?")
+                info "Data:            streams=$streams  parcels=$parcels  buffers=$buffers  ndvi=$ndvi"
             else
                 warn "Schema:          NOT applied (run ./dev.sh to apply)"
             fi
@@ -264,6 +296,101 @@ cmd_status() {
     else
         warn "Aspire:          not running"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# Reconnect — recover after external drive disconnect/reconnect
+# ---------------------------------------------------------------------------
+
+cmd_reconnect() {
+    echo "=== Riparian POC — Drive Reconnect Recovery ==="
+    echo ""
+
+    # 1. Check the drive is mounted and writable
+    check_drive
+    check_drive_io
+    info "Drive is mounted and writable."
+
+    # 2. Check Docker
+    if ! docker info >/dev/null 2>&1; then
+        error "Docker is not running."
+        error "Restart Docker Desktop, wait for it to start, then re-run: ./dev.sh --reconnect"
+        exit 1
+    fi
+    info "Docker is running."
+
+    # 3. Check if PostGIS container is responsive
+    local cid
+    cid=$(get_postgis_container)
+    if [ -n "$cid" ]; then
+        if docker exec "$cid" echo "ok" >/dev/null 2>&1; then
+            info "PostGIS container ($cid) is responsive."
+            if container_psql "$cid" -d ripariandb -c '\q' 2>/dev/null; then
+                info "Database is accessible."
+
+                # Show data counts so user can verify nothing was lost
+                local streams buffers ndvi
+                streams=$(container_psql "$cid" -d ripariandb -tAc \
+                    "SELECT count(*) FROM bronze.streams" 2>/dev/null || echo "0")
+                buffers=$(container_psql "$cid" -d ripariandb -tAc \
+                    "SELECT count(*) FROM silver.riparian_buffers" 2>/dev/null || echo "0")
+                ndvi=$(container_psql "$cid" -d ripariandb -tAc \
+                    "SELECT count(*) FROM silver.vegetation_health" 2>/dev/null || echo "0")
+                info "Data: streams=$streams  buffers=$buffers  ndvi=$ndvi"
+
+                if [ "$streams" = "0" ] && [ -d "$BACKUP_DIR" ]; then
+                    local latest_backup
+                    latest_backup=$(ls -1t "$BACKUP_DIR"/ripariandb_*.dump 2>/dev/null | head -1)
+                    if [ -n "$latest_backup" ]; then
+                        warn "Database appears empty but a backup exists."
+                        warn "Run: ./dev.sh --restore"
+                    fi
+                fi
+
+                info ""
+                info "Everything looks good. Run ./dev.sh to start services."
+                return 0
+            else
+                warn "PostGIS running but ripariandb not accessible."
+            fi
+        else
+            warn "PostGIS container exists but is NOT responsive (I/O error likely)."
+            warn "Stopping unresponsive container..."
+            docker stop "$cid" --time 5 2>/dev/null || docker kill "$cid" 2>/dev/null || true
+            info "Container stopped. It will be recreated on next ./dev.sh start."
+        fi
+    else
+        info "No PostGIS container found — will be created on next ./dev.sh start."
+    fi
+
+    # 4. Clean up zombie ETL containers
+    local etl_zombies
+    etl_zombies=$(docker ps -a --filter "status=exited" --filter "ancestor=riparian-etl" -q 2>/dev/null || true)
+    if [ -n "$etl_zombies" ]; then
+        info "Cleaning up $(echo "$etl_zombies" | wc -l | tr -d ' ') exited ETL containers..."
+        echo "$etl_zombies" | xargs docker rm 2>/dev/null || true
+    fi
+
+    # 5. Check for backups
+    if [ -d "$BACKUP_DIR" ]; then
+        local latest_backup
+        latest_backup=$(ls -1t "$BACKUP_DIR"/ripariandb_*.dump 2>/dev/null | head -1)
+        if [ -n "$latest_backup" ]; then
+            local backup_size backup_date
+            backup_size=$(du -sh "$latest_backup" | cut -f1)
+            backup_date=$(basename "$latest_backup" | sed 's/ripariandb_//;s/\.dump//')
+            info "Latest backup: $backup_date ($backup_size)"
+            info "If data looks wrong after starting, run: ./dev.sh --restore"
+        fi
+    else
+        warn "No backups found. Consider: ./dev.sh --backup after starting."
+    fi
+
+    echo ""
+    info "Recovery check complete. Next steps:"
+    info "  1. ./dev.sh              # Start all services"
+    info "  2. ./dev.sh --status     # Verify data counts"
+    info "  3. ./dev.sh --restore    # (only if data was lost)"
 }
 
 # ---------------------------------------------------------------------------
@@ -296,6 +423,18 @@ cmd_update() {
         docker exec -i "$cid" bash -c \
             'PGPASSWORD=$POSTGRES_PASSWORD psql -U postgres -d ripariandb' \
             < "$SCRIPT_DIR/sql/incremental_migration.sql"
+    fi
+
+    # Auto-backup before full ETL (it truncates all silver tables)
+    if [ "$update_type" = "full" ]; then
+        local ndvi_count
+        ndvi_count=$(container_psql "$cid" -d ripariandb -tAc \
+            "SELECT count(*) FROM silver.vegetation_health" 2>/dev/null || echo "0")
+        if [ "$ndvi_count" -gt 0 ] 2>/dev/null; then
+            warn "Full ETL will delete $ndvi_count NDVI readings."
+            info "Taking automatic backup first..."
+            cmd_backup
+        fi
     fi
 
     info "Running update (type: $update_type)..."
@@ -334,6 +473,96 @@ cmd_update() {
         "SELECT run_type || ': ' || status || ' (' || records_inserted || ' ins, ' || records_updated || ' upd)' FROM meta.etl_runs ORDER BY started_at DESC LIMIT 1" \
         2>/dev/null || echo "unknown")
     info "Last run: $last_run"
+}
+
+# ---------------------------------------------------------------------------
+# Database backup / restore
+# ---------------------------------------------------------------------------
+
+BACKUP_DIR="$SCRIPT_DIR/backups"
+
+cmd_backup() {
+    check_docker
+
+    local cid
+    cid=$(get_postgis_container)
+    if [ -z "$cid" ]; then
+        error "PostGIS is not running."
+        exit 1
+    fi
+
+    mkdir -p "$BACKUP_DIR"
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    local backup_file="$BACKUP_DIR/ripariandb_${timestamp}.dump"
+
+    info "Backing up ripariandb to $backup_file ..."
+    docker exec "$cid" bash -c \
+        'PGPASSWORD=$POSTGRES_PASSWORD pg_dump -U postgres -Fc ripariandb' \
+        > "$backup_file"
+
+    local size
+    size=$(du -sh "$backup_file" | cut -f1)
+    info "Backup complete: $backup_file ($size)"
+
+    # Keep only the 5 most recent backups
+    local count
+    count=$(ls -1 "$BACKUP_DIR"/ripariandb_*.dump 2>/dev/null | wc -l)
+    if [ "$count" -gt 5 ]; then
+        ls -1t "$BACKUP_DIR"/ripariandb_*.dump | tail -n +"6" | xargs rm -f
+        info "Pruned old backups (kept latest 5)"
+    fi
+}
+
+cmd_restore() {
+    check_drive
+    check_drive_io
+    check_docker
+
+    local cid
+    cid=$(get_postgis_container)
+    if [ -z "$cid" ]; then
+        error "PostGIS is not running."
+        exit 1
+    fi
+
+    local backup_file="${1:-}"
+    if [ -z "$backup_file" ]; then
+        # Use the most recent backup
+        backup_file=$(ls -1t "$BACKUP_DIR"/ripariandb_*.dump 2>/dev/null | head -1)
+        if [ -z "$backup_file" ]; then
+            error "No backup files found in $BACKUP_DIR/"
+            error "Usage: ./dev.sh --restore [backup_file]"
+            exit 1
+        fi
+        info "Using most recent backup: $backup_file"
+    fi
+
+    if [ ! -f "$backup_file" ]; then
+        error "Backup file not found: $backup_file"
+        exit 1
+    fi
+
+    warn "This will REPLACE all data in ripariandb."
+    read -rp "Continue? [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        info "Cancelled."
+        return
+    fi
+
+    info "Restoring from $backup_file ..."
+
+    # Drop and recreate the database, then restore
+    container_psql "$cid" -d postgres -c "DROP DATABASE IF EXISTS ripariandb"
+    container_psql "$cid" -d postgres -c "CREATE DATABASE ripariandb"
+    container_psql "$cid" -d ripariandb -c "CREATE EXTENSION IF NOT EXISTS postgis"
+
+    docker exec -i "$cid" bash -c \
+        'PGPASSWORD=$POSTGRES_PASSWORD pg_restore -U postgres -d ripariandb --no-owner --no-acl' \
+        < "$backup_file"
+
+    info "Restore complete."
+    cmd_status
 }
 
 # ---------------------------------------------------------------------------
@@ -491,7 +720,10 @@ case "${1:-}" in
     --status)       cmd_status ;;
     --stop)         cmd_stop ;;
     --restart)      cmd_restart ;;
+    --reconnect)    cmd_reconnect ;;
     --update)       cmd_update "${2:-all}" ;;
+    --backup)       cmd_backup ;;
+    --restore)      cmd_restore "${2:-}" ;;
     --sonar)        cmd_sonar_start ;;
     --sonar-stop)   cmd_sonar_stop ;;
     --lint)         cmd_lint ;;
@@ -503,7 +735,12 @@ case "${1:-}" in
         echo "  --status           Check service health and data counts"
         echo "  --restart          Restart all services"
         echo "  --stop             Stop Aspire (PostGIS container persists)"
+        echo "  --reconnect        Recover after external drive disconnect/reconnect"
         echo "  --update [type]    Run incremental update (full|incremental|ndvi|all)"
+        echo ""
+        echo "  Database:"
+        echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"
+        echo "  --restore [file]   Restore from backup (latest if no file given)"
         echo ""
         echo "  Code Quality (SonarQube):"
         echo "  --sonar            Start SonarQube server (http://localhost:9000)"

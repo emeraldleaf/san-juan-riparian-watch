@@ -70,6 +70,7 @@ def execute_run(update_type: str) -> None:
 
         elif update_type == "ndvi":
             count = _run_ndvi(engine)
+            pipeline.update_summary_ndvi()
             tracker.complete_run(run_id, records_inserted=count)
 
         elif update_type == "all":
@@ -77,6 +78,7 @@ def execute_run(update_type: str) -> None:
                 pipeline.run_incremental()
             )
             ndvi_count = _run_ndvi(engine)
+            pipeline.update_summary_ndvi()
             tracker.complete_run(
                 run_id,
                 records_inserted=ndvi_count,
