@@ -1,0 +1,154 @@
+# San Juan Riparian Watch — document-intelligence corpus seed list
+# ---------------------------------------------------------------------------
+# Reproducible, in-repo list of public San Juan-watershed documents to ingest.
+# The ingestion job (Phase A) reads this file, fetches each source, records
+# provenance (source_url + sha256 + retrieved_at) into docs.documents, then
+# chunks/embeds into Qdrant and geo-tags chunks into docs.chunk_geo_mentions.
+#
+# Fields:
+#   id         stable external_id (kebab-case) -> docs.documents.external_id
+#   title      document title
+#   url        direct fetch URL (PDF or web page)
+#   agency     publishing body (SJRIP/USGS/EPA/NMED/USBR/CO/academic)
+#   year       publication year (null if unknown)
+#   doc_type   plan | report | paper | metadata | webpage
+#   format     pdf | html
+#   license    'public-domain-us-gov' for federal works; else 'verify'
+#   geo_focus  true when the doc is rich in place/reach mentions (priority for
+#              geo-mention testing)
+#   topics     tag list (riparian, invasive, hydrology, restoration, water-quality...)
+#
+# NOTE: URLs verified via web search 2026-07-04; re-verify at fetch time (agency
+# sites move files). Licenses for federal/state works are generally public; the
+# academic/ResearchGate mirrors are pointers only — prefer the agency-hosted PDF.
+# ---------------------------------------------------------------------------
+
+sources:
+  - id: nmed-sjb-watershed-plan-2005
+    title: San Juan Basin Watershed Management Plan
+    url: https://www.env.nm.gov/wp-content/uploads/sites/25/2019/10/SanJuanBasinWatershedPlan01-11-05.pdf
+    agency: NMED
+    year: 2005
+    doc_type: plan
+    format: pdf
+    license: verify            # NM state watershed plan (CWA 319-funded)
+    geo_focus: true
+    topics: [water-quality, watershed-plan, bmp, riparian]
+
+  - id: sjrip-bassett-2015-historical-ecology-riparian
+    title: "San Juan River Historical Ecology Assessment: Changes in Channel Characteristics and Riparian Vegetation"
+    url: https://coloradoriverrecovery.org/sj/wp-content/uploads/sites/3/2022/08/Bassett_2015_San_Juan_River_Historical_Ecology_Assessment_Riparian_Vegetation-508ish-1.pdf
+    agency: SJRIP
+    year: 2015
+    doc_type: report
+    format: pdf
+    license: verify
+    geo_focus: true
+    topics: [riparian, invasive, geomorphology, historical-ecology, channel-change]
+
+  - id: sjrip-standardized-monitoring-5yr-2006
+    title: SJRIP Standardized Monitoring Program — Five-Year Integration Report (2006)
+    url: https://coloradoriverrecovery.org/sj/wp-content/uploads/sites/3/2022/04/data_Standardized_Monitoring_Program_Five_Year_Integration_Report_2006_OCR.pdf
+    agency: SJRIP
+    year: 2006
+    doc_type: report
+    format: pdf
+    license: verify
+    geo_focus: true
+    topics: [monitoring, fish, habitat, riparian, invasive]
+
+  - id: sjrip-habitat-restoration-index
+    title: SJRIP Habitat Restoration — Technical Reports (index)
+    url: https://coloradoriverrecovery.org/sj/science/technical-reports/habitat-restoration/
+    agency: SJRIP
+    year: null
+    doc_type: webpage
+    format: html
+    license: verify
+    geo_focus: true
+    topics: [restoration, habitat, riparian, invasive]   # crawl-seed: linked PDFs
+
+  - id: fws-ea-colorado-san-juan-recovery-2023
+    title: Draft Environmental Assessment — Upper Colorado and San Juan River Basin Recovery Programs
+    url: https://www.fws.gov/sites/default/files/documents/202312_Draft_EA_Colorado_River_Recovery_Programs_forPublicComment.pdf
+    agency: USFWS
+    year: 2023
+    doc_type: report
+    format: pdf
+    license: public-domain-us-gov
+    geo_focus: true
+    topics: [recovery-program, environmental-assessment, endangered-species, flows]
+
+  - id: usbr-navajo-dam-feis-flow-recs-appendix-a
+    title: San Juan River Flow Recommendations — Navajo Dam FEIS, Appendix A
+    url: https://www.usbr.gov/uc/envdocs/eis/navajo/pdfs/feis-vol2/Append_A.pdf
+    agency: USBR
+    year: null
+    doc_type: report
+    format: pdf
+    license: public-domain-us-gov
+    geo_focus: true
+    topics: [hydrology, flow-recommendations, navajo-dam, riparian]
+
+  - id: epa-san-juan-watershed-funded-projects-2017-2021
+    title: "San Juan Watershed Program: Funded Projects 2017–2021 (fact sheet)"
+    url: https://www.epa.gov/system/files/documents/2022-08/12355_San%20Juan%20Program%20FctS%20Funded%20Projects%20June%202022%20508.pdf
+    agency: EPA
+    year: 2022
+    doc_type: report
+    format: pdf
+    license: public-domain-us-gov
+    geo_focus: true
+    topics: [restoration, funding, tribal, water-quality]
+
+  - id: epa-san-juan-watershed-state-tribal-projects
+    title: "San Juan Watershed Program: State and Tribal Projects"
+    url: https://www.epa.gov/san-juan-watershed/san-juan-watershed-program-state-and-tribal-projects
+    agency: EPA
+    year: null
+    doc_type: webpage
+    format: html
+    license: public-domain-us-gov
+    geo_focus: true
+    topics: [restoration, tribal, water-quality]
+
+  - id: usbr-cwmp-phase1-sjswcd-2018
+    title: San Juan SWCD — Cooperative Watershed Management Program Phase I Grant Application
+    url: https://www.usbr.gov/watersmart/cwmp/docs/2018/applications/phase1/029-CWMP-SJSWCD.ARC_508.pdf
+    agency: USBR
+    year: 2018
+    doc_type: report
+    format: pdf
+    license: public-domain-us-gov
+    geo_focus: true
+    topics: [restoration, invasive, noxious-weeds, watershed-management]
+
+  - id: co-san-juan-dolores-planning-model-manual
+    title: San Juan / Dolores River Basin Water Resources Planning Model — User's Manual
+    url: https://hermes.cde.state.co.us/islandora/object/co:36950/datastream/OBJ/download/San_Juan__Dolores_River_Basin_water_resources_planning_model_user_s_manual.pdf
+    agency: CO
+    year: null
+    doc_type: metadata
+    format: pdf
+    license: verify
+    geo_focus: false
+    topics: [hydrology, water-management, modeling]
+
+  - id: nmisc-colorado-sj-water-management
+    title: Colorado River Basin & Compacts — San Juan Water Management (NM ISC)
+    url: https://www.ose.nm.gov/Basins/Colorado/isc_CO_SJwaterManagement.php
+    agency: NMOSE-ISC
+    year: null
+    doc_type: webpage
+    format: html
+    license: verify
+    geo_focus: false
+    topics: [water-management, compacts, administration]
+
+# ---------------------------------------------------------------------------
+# Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
+# 1 hop), then re-listed above with concrete ids before ingest for reproducibility.
+# ---------------------------------------------------------------------------
+crawl_seeds:
+  - https://coloradoriverrecovery.org/sj/science/technical-reports/
+  - https://www.epa.gov/san-juan-watershed
