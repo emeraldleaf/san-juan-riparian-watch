@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit configuration for the Riparian Buffer Compliance POC.
+# CodeRabbit configuration for San Juan Riparian Watch.
 # Docs: https://docs.coderabbit.ai/getting-started/configure-coderabbit
 #
 # Role in the encoding loop: CodeRabbit is the Tier-2 AI-review surface. It carries THIS
@@ -99,6 +99,16 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    # Label-based opt-in: only auto-review PRs tagged 'coderabbit'. Add the label
+    # when a PR is ready for review, so incremental pushes on a WIP/iterating PR
+    # don't each burn a review against the per-developer rolling limit. A review
+    # can always be triggered on demand by commenting '@coderabbitai review'.
+    labels:
+      - coderabbit
+    # Belt-and-suspenders: never auto-review PRs whose title marks them in-progress.
+    ignore_title_keywords:
+      - wip
+      - draft
 
 chat:
   auto_reply: true
