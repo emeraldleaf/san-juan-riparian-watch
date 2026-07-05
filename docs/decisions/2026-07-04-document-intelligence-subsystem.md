@@ -25,12 +25,17 @@ The user directed: **use it as the harness, and it does not need to be airgapped
 
 **Reuse the Re-find Catalog harness; build only the geospatial delta + corpus swap.**
 
-1. **Vendor a trimmed in-repo copy** of the harness backend into `docintel/` (chosen over git
-   submodule/subtree: simplest to run in the Aspire graph and deploy; upstream is stable so manual
-   re-sync is acceptable). Keep `services/`, `llm_providers/`, `middleware/`, `observability/`,
-   `prompts/`, `main.py`, `config.py`, `models.py`, `auth.py`. Drop the legal/financial corpus,
-   weekly snapshots, VM/airgap scripts, and course-submission tooling. A `vendor_harness.sh`
-   script performs the copy reproducibly.
+1. **Keep the harness in a separate PRIVATE repo** (revised 2026-07-04b — the harness is coursework
+   and must not be published). The private repo vendors a trimmed copy of the backend (keep
+   `services/`, `llm_providers/`, `middleware/`, `observability/`, `prompts/`, `main.py`,
+   `config.py`, `models.py`, `auth.py`; drop the legal/financial corpus, snapshots, VM/airgap +
+   submission tooling) via its own `vendor_harness.sh`. **This public repo holds only the
+   geospatial delta + the seam contract** — `docintel/geo/` (resolver IP), `corpus/seed_sources.yaml`,
+   `docintel/API_CONTRACT.md`, `sql/docintel_migration.sql`, and the frontend integration. The
+   private backend **imports the public `docintel/geo/` resolver** and reads the public corpus list;
+   dependency flows private → public only, so nothing private leaks into the portfolio repo.
+   *(Superseded: the original "trimmed in-repo copy into docintel/backend" — that would have
+   published the harness.)*
 
 2. **Two datastores, split by concern.** Qdrant remains the **semantic store** (chunks,
    embeddings, hybrid retrieval, reranking, CRAG) — no migration to pgvector. The riparian
