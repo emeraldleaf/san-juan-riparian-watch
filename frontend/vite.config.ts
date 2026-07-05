@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 // Aspire injects services__api__http__0 with the actual API URL at dev time
 const apiTarget =
-  process.env.services__api__http__0 || 'http://localhost:8000';
+  process.env.services__api__http__0 || 'http://localhost:5237';
 
 export default defineConfig({
   plugins: [react()],
