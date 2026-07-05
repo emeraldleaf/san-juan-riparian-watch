@@ -1,0 +1,45 @@
+name: ci-dotnet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'RiparianPoc.Api/**'
+      - 'RiparianPoc.Api.Tests/**'
+      - 'RiparianPoc.ServiceDefaults/**'
+      - '.github/workflows/ci-dotnet.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-dotnet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Build/test only the API test project (+ its RiparianPoc.Api reference) — NOT the
+      # Aspire AppHost, which needs the aspire workload and isn't needed to test the API.
+      - name: Restore
+        run: dotnet restore RiparianPoc.Api.Tests/RiparianPoc.Api.Tests.csproj
+
+      - name: Build
+        run: dotnet build RiparianPoc.Api.Tests/RiparianPoc.Api.Tests.csproj -c Release --no-restore
+
+      - name: Test — gate
+        run: dotnet test RiparianPoc.Api.Tests/RiparianPoc.Api.Tests.csproj -c Release --no-build --verbosity minimal
+
+      - name: Format check — advisory
+        continue-on-error: true
+        run: dotnet format RiparianPoc.Api/RiparianPoc.Api.csproj --verify-no-changes
