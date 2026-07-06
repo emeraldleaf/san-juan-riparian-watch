@@ -11,9 +11,11 @@ import type { MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import NDVILayer from './components/NDVILayer';
 import TimeSlider from './components/TimeSlider';
+import DocIntelPanel from './components/DocIntelPanel';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+const DOCINTEL_URL = import.meta.env.VITE_DOCINTEL_URL || 'http://localhost:8100';
 
 // Unique session ID for this browser tab — sent with every API call for telemetry correlation.
 const SESSION_ID = crypto.randomUUID();
@@ -199,6 +201,33 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export default function App() {
   const mapRef = useRef<MapRef>(null);
+  const [docGeo, setDocGeo] = useState<FeatureCollection | null>(null);
+
+  // Fit the map to the geometries a doc-intelligence answer resolved.
+  useEffect(() => {
+    if (!docGeo || !mapRef.current) return;
+    let minX = 180;
+    let minY = 90;
+    let maxX = -180;
+    let maxY = -90;
+    const walk = (c: unknown): void => {
+      if (!Array.isArray(c)) return;
+      if (typeof c[0] === 'number') {
+        const x = c[0] as number;
+        const y = c[1] as number;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      } else {
+        c.forEach(walk);
+      }
+    };
+    docGeo.features.forEach((f) => walk((f.geometry as { coordinates?: unknown }).coordinates));
+    if (minX <= maxX && minY <= maxY) {
+      mapRef.current.fitBounds([[minX, minY], [maxX, maxY]], { padding: 80, duration: 800, maxZoom: 12 });
+    }
+  }, [docGeo]);
 
   // GeoJSON state (lightweight layers only)
   // Wetlands and Soils migrated to vector tiles for performance.
@@ -439,7 +468,23 @@ export default function App() {
           onMouseLeave={() => setCursor('')}
           cursor={cursor}
         >
-          <NavigationControl position="top-right" />
+          <NavigationControl position="bottom-right" />
+
+          {/* ---- Doc-intelligence highlight (rivers/reaches/HUCs from an answer) ---- */}
+          {docGeo && (
+            <Source id="docintel-highlight" type="geojson" data={docGeo}>
+              <Layer
+                id="docintel-highlight-fill"
+                type="fill"
+                paint={{ 'fill-color': '#f59e0b', 'fill-opacity': 0.15 }}
+              />
+              <Layer
+                id="docintel-highlight-line"
+                type="line"
+                paint={{ 'line-color': '#f59e0b', 'line-width': 4, 'line-opacity': 0.95 }}
+              />
+            </Source>
+          )}
 
           {/* ---- Soil fills (bottom data layer) ---- */}
           <Source
@@ -724,6 +769,8 @@ export default function App() {
             </Popup>
           )}
         </Map>
+
+        <DocIntelPanel docintelUrl={DOCINTEL_URL} onResolved={setDocGeo} />
 
         {/* Layer toggles */}
         <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 text-xs space-y-1">
