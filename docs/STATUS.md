@@ -52,12 +52,22 @@ later behind the existing provider seam. Landed this session:
   queries **implemented + verified** ('Animas River near Farmington' → reach geom, HUC8/HUC12 codes
   resolve, towns honestly unresolved). `docintel/API_CONTRACT.md` added. All on PR #2.
 - **Full loop demonstrated:** question → cited answer → geo_mentions → resolved reach geometries.
-- **Env caveat:** the riparian PostGIS host-port zombies repeatedly on the external drive (Docker
-  drops the binding / container goes exec-dead). The server **degrades gracefully** (`geo_available`
-  flag) — RAG+citations work regardless; geo populates when the DB is healthy. Consider moving PG
-  off the external drive for a stable demo.
-- **Next:** `/docs/for-area` reverse lookup + ingest-time `docs.chunk_geo_mentions` tagging +
-  **frontend** (MapLibre Q&A panel → highlight `resolved_geometries`) — best done with a stable DB.
+- **FULL STACK working end-to-end (2026-07-06):** frontend `DocIntelPanel` (App.tsx) → docintel
+  `POST /docs/ask` → cited answer + `resolved_geometries` highlighted on the MapLibre map (amber
+  line+fill, auto-fit). tsc+vite build clean; CORS 200 from :3000. Citations now structured (from
+  retrieved docs, not answer regex). Verified /docs/ask: `geo_available:true`, 4 real source PDFs,
+  San Juan + Animas rivers → reach MultiLineStrings.
+- **DB stability SOLVED (root cause + fix):** Docker Desktop's containerd store on the **external
+  drive** fails R/W I/O (`meta.db`/blob `input/output error`) → Postgres zombies, new containers
+  won't start. Durable fix = move Docker's disk-image location off the external drive (GUI). **Stable
+  workaround in place:** a standalone internal-disk PostGIS —
+  `docker run -d --name riparian-pg-stable -p 55432:5432 -v ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`
+  (trust auth; `~/riparian-pgdata-stable` = a copy of pgdata). Point docintel at it via
+  `RIPARIAN_DB_URL=postgresql+psycopg2://postgres@localhost:55432/ripariandb`.
+- **Run the demo:** stable PG (above) + Qdrant (:6333) + Ollama + `LLM_MODEL=llama3.2:3b uv run
+  uvicorn docintel_server:app --port 8100` (in riparian-rag-harness) + `cd frontend && npm run dev`.
+- **Optional next:** `/docs/for-area` reverse lookup + ingest-time `docs.chunk_geo_mentions` tagging
+  + hosted/Olmo 2 provider swap. In-browser click-through is the user's final visual check.
 
 ## Recently landed
 - README.md rewritten accurate/current (delineation/health/change; riparian/ package; MapLibre;
