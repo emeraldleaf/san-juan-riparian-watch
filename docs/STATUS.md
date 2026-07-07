@@ -1,16 +1,50 @@
 # Project Status
 
-**Last updated:** 2026-07-04
+**Last updated:** 2026-07-07
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
 ## Where we are
 
-Pivoting the riparian POC into a portfolio piece for the Ai2 "AI for the Planet" Senior SWE
-role. Renamed → **san-juan-riparian-watch** (GitHub repo renamed by user; local remote update
-+ branch push still PENDING). README fully rewritten to the delineation/health/change framing.
-Three tracks now.
+Portfolio piece for the Ai2 "AI for the Planet" Senior SWE role — **san-juan-riparian-watch**
+(public). All work merged to `main` (PR #2, CodeRabbit-reviewed). Three tracks + the app run
+end-to-end locally.
+
+### Working now (verified end-to-end)
+- **Delineation (Stage 1):** RF baseline → **NMRipMap-trained** on the 2 NM tiles (spatial-CV F1
+  0.90–0.92, vs weak-label 0.00–0.71); HAND envelope; MMU+simplify in `_vectorize`. On the map +
+  NMRipMap reference overlay toggle.
+- **Doc-intelligence (Track 3):** RAG (Qdrant + CRAG + citations, local Ollama) → geo-resolver
+  (rivers/reaches/HUCs) → `/docs/ask` → frontend Q&A panel that highlights answers on the map.
+  Harness is PRIVATE (`riparian-rag-harness`); public repo holds the geo delta + API contract.
+- **Perf:** index-backed bbox pre-filter on all MVT tile queries (10–40× faster); extent de-noised.
+
+### Runtime (local) — how to bring it up
+- **Stable DB** (off the flaky external-drive Docker): `docker run -d --name riparian-pg-stable
+  -p 55432:5432 -v ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`
+  (trust auth, max_connections=200).
+- **C# API** (Release): `ConnectionStrings__ripariandb="Host=localhost;Port=55432;Database=ripariandb;Username=postgres;Maximum Pool Size=40"
+  ASPNETCORE_URLS=http://localhost:5237 dotnet run -c Release --project RiparianPoc.Api`.
+- **docintel** (in riparian-rag-harness): `RIPARIAN_DB_URL=postgresql+psycopg2://postgres@localhost:55432/ripariandb
+  LLM_MODEL=llama3.2:3b uv run uvicorn docintel_server:app --port 8100` + Qdrant :6333 + Ollama.
+- **Frontend:** `cd frontend && npm run dev` → http://localhost:3000.
+
+### Roadmap (priority)
+1. **Shareable** — deploy a demo link (Cloudflare per docintel spec) or a demo video + write-up.
+   Right now it only runs on the local machine → a reviewer can't see it (the #1 practical gap).
+2. **OlmoEarth flagship** — embeddings + light head + RF-vs-OlmoEarth disagreement map (the Ai2
+   differentiator). `delineation/olmoearth.py` scaffold exists; needs the token-mask fix + a GPU
+   for the real run (Nano/CPU for one small tile).
+3. **Invasives + change** — tamarisk/Russian-olive cover within the extent (`health/invasive.py`)
+   → spread over time (Stage-3 spec). Manager-relevant, on-thesis.
+4. **Empty views** — NDVI Health / SMP Score / Vegetation are empty (0 rows); need the NDVI/health
+   ETL (heavy; back up first — buffers truncation cascades).
+5. **MVT for extent + NMRipMap** — the last GeoJSON layers; the fully-correct serving path.
+
+### Original framing (retained below)
+Renamed → **san-juan-riparian-watch**. README rewritten to the delineation/health/change framing.
+Three tracks.
 
 ### Track 1 — Encoding-loop method port (DONE, verified)
 All three loops from the NextAurora repo are ported and dogfooded: 5 surfaces × 3 tiers,
