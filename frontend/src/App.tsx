@@ -468,7 +468,7 @@ export default function App() {
           onMouseLeave={() => setCursor('')}
           cursor={cursor}
         >
-          <NavigationControl position="bottom-right" />
+          <NavigationControl position="top-right" />
 
           {/* ---- Doc-intelligence highlight (rivers/reaches/HUCs from an answer) ---- */}
           {docGeo && (
