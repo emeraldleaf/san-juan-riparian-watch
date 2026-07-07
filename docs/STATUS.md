@@ -26,6 +26,15 @@ cross-validation → vectorize → `silver.riparian_extent`. Served via `GET /ap
 First real run: 102k weak-labeled samples, spatial-CV ROC-AUC 0.90 / precision 0.81, 66
 riparian polygons written.
 
+**Accuracy lever #4 landed (2026-07-06): train the RF on NMRipMap truth, not weak labels.**
+`run_delineation(label_source='nmripmap')` rasterizes NMRipMap mapped-riparian polygons into
+per-pixel training truth (writes `model_version='rf-nmripmap-v1'`). Result on the 2 NM tiles
+(5-fold spatial-CV): **Malpais F1 0.71→0.895 (ROC-AUC 0.96); Animas ~0.00→0.924 (ROC-AUC 0.98)** —
+the weak-label model had ~zero agreement with real riparian on the ag-valley tile. Map (method=rf)
+now serves NMRipMap-trained extent for Animas + Malpais; Turkey Creek (CO) stays weak (no NMRipMap
+— needs CO-RIP). Honest caveat: full-tile map partly reproduces its own tile's NMRipMap; the
+spatial-CV number is the generalization metric that matters. Next: CO-RIP for CO, OlmoEarth flagship.
+
 ### Track 3 — Document Intelligence (RAG + map-linked geo citations) — SPEC + Phase-A scaffold
 New second surface over the same AOI: Olmo 2 *explains* (RAG Q&A with citations over watershed
 docs), OlmoEarth *sees* (EO layers), joined at the map. **Decision: reuse the existing
