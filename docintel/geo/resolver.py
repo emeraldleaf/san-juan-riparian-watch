@@ -21,6 +21,8 @@ import logging
 import re
 from typing import Protocol
 
+from sqlalchemy import text
+
 from .models import (
     GeoCandidate,
     GeoMention,
@@ -145,23 +147,67 @@ class PostGisSpatialBackend:
         self._engine = engine
         self._aoi_huc = aoi_huc
 
+    def _rows(self, sql: str, params: dict) -> list:
+        """Run a parameterized read and return the rows."""
+        with self._engine.connect() as conn:  # type: ignore[attr-defined]
+            return conn.execute(text(sql), params).fetchall()
+
     def huc_by_code(self, code: str) -> list[GeoCandidate]:
-        # TODO(phase-c): SELECT ST_AsGeoJSON(geom), 'huc'||len AS kind FROM the HUC
-        # polygon layer WHERE huc12 = :code OR huc8 = :code. HUC12 lives on
-        # silver.riparian_extent / a HUC polygon table; confirm the source before wiring.
-        raise NotImplementedError("wire to the HUC polygon layer (Phase C)")
+        """Resolve an 8- or 12-digit HUC code to a boundary/extent geometry."""
+        if len(code) == 8:
+            rows = self._rows(
+                "SELECT huc8 AS ref, ST_AsGeoJSON(geom) AS gj "
+                "FROM bronze.watersheds WHERE huc8 = :code",
+                {"code": code},
+            )
+            return [GeoCandidate(ResolvedKind.HUC8, f"huc8={r.ref}", r.gj, 0.95)
+                    for r in rows if r.gj]
+        # HUC12 boundaries aren't stored; approximate the area by unioning the
+        # learned extent cells tagged with that HUC12.
+        rows = self._rows(
+            "SELECT huc12 AS ref, ST_AsGeoJSON(ST_Union(geom)) AS gj "
+            "FROM silver.riparian_extent WHERE huc12 = :code GROUP BY huc12",
+            {"code": code},
+        )
+        return [GeoCandidate(ResolvedKind.HUC12, f"huc12={r.ref}", r.gj, 0.9)
+                for r in rows if r.gj]
 
     def flowline_by_name(self, name: str) -> list[GeoCandidate]:
-        # TODO(phase-c): SELECT ST_AsGeoJSON(geom) FROM bronze.nhd_flowlines
-        # WHERE gnis_name ILIKE :name AND huc12 LIKE :aoi || '%'  (AOI clip).
-        raise NotImplementedError("wire to bronze.nhd_flowlines (Phase C)")
+        """Match named NHD stream centerlines whose gnis_name occurs in the mention."""
+        rows = self._rows(
+            "SELECT gnis_name, ST_AsGeoJSON(ST_Union(geom)) AS gj "
+            "FROM bronze.streams "
+            "WHERE gnis_name IS NOT NULL AND char_length(gnis_name) >= 4 "
+            "  AND :mention ILIKE '%' || gnis_name || '%' "
+            "GROUP BY gnis_name ORDER BY char_length(gnis_name) DESC LIMIT 5",
+            {"mention": name},
+        )
+        return [self._named(ResolvedKind.NHD_FLOWLINE, "gnis", r.gnis_name, r.gj, name)
+                for r in rows if r.gj]
 
     def reach_by_name(self, name: str) -> list[GeoCandidate]:
-        # TODO(phase-c): SELECT ST_AsGeoJSON(geom) FROM gold.reach_riparian
-        # WHERE gnis_name ILIKE :name  (reaches already AOI-scoped by tile).
-        raise NotImplementedError("wire to gold.reach_riparian (Phase C)")
+        """Match named riparian reaches (carry riparian_cover context) by gnis_name."""
+        rows = self._rows(
+            "SELECT gnis_name, ST_AsGeoJSON(ST_Union(geom)) AS gj "
+            "FROM gold.reach_riparian "
+            "WHERE gnis_name IS NOT NULL AND char_length(gnis_name) >= 4 "
+            "  AND :mention ILIKE '%' || gnis_name || '%' "
+            "GROUP BY gnis_name ORDER BY char_length(gnis_name) DESC LIMIT 5",
+            {"mention": name},
+        )
+        return [self._named(ResolvedKind.REACH, "reach_gnis", r.gnis_name, r.gj, name)
+                for r in rows if r.gj]
 
     def gazetteer(self, name: str, mention_type: MentionType) -> list[GeoCandidate]:
-        # TODO(phase-c): GNIS/NHD name lookup, then clip to the AOI bbox so a
-        # same-named feature elsewhere in the US cannot pull the map off-basin.
-        raise NotImplementedError("wire the AOI-clipped gazetteer fallback (Phase C)")
+        del name, mention_type  # required by the SpatialBackend Protocol; unused until a layer exists
+        # No town/place point gazetteer is loaded into PostGIS yet, so town
+        # mentions (e.g. "Farmington") stay UNRESOLVED rather than guessed — the
+        # honest behavior. A GNIS populated-places layer (AOI-clipped) is the
+        # follow-up. Rivers/reaches/HUCs resolve via the methods above.
+        return []
+
+    @staticmethod
+    def _named(kind: ResolvedKind, ref_key: str, gnis_name: str, gj: str, mention: str) -> GeoCandidate:
+        """Build a candidate, scoring an exact name match above a substring hit."""
+        exact = gnis_name.strip().lower() == mention.strip().lower()
+        return GeoCandidate(kind, f"{ref_key}={gnis_name}", gj, 0.92 if exact else 0.68)

@@ -296,7 +296,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     COALESCE(h.score_grade, 'Unknown') as grade,
                     h.composite_score
                 FROM silver.riparian_buffers b
-                JOIN tile ON ST_Intersects(ST_Transform(b.geom, 3857), tile.envelope)
+                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
                 LEFT JOIN LATERAL (
                     SELECT score_grade, composite_score
                     FROM gold.buffer_health_score s
@@ -332,7 +332,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     COALESCE(v.dominant_lifeform, 'Unknown') AS lifeform,
                     COALESCE(v.evt_name, 'Unknown') AS evt_name
                 FROM silver.riparian_buffers b
-                JOIN tile ON ST_Intersects(ST_Transform(b.geom, 3857), tile.envelope)
+                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
                 LEFT JOIN silver.buffer_vegetation_structure v ON b.id = v.buffer_id
             )
             SELECT ST_AsMVT(mvt_geom.*, 'vegetation', 4096, 'geom')
@@ -361,7 +361,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     w.wetland_type,
                     ST_AsMVTGeom(ST_Transform(w.geom, 3857), tile.envelope) AS geom
                 FROM bronze.nwi_wetlands w
-                JOIN tile ON ST_Intersects(ST_Transform(w.geom, 3857), tile.envelope)
+                JOIN tile ON w.geom && ST_Transform(tile.envelope, 4269)
             )
             SELECT ST_AsMVT(mvt_geom.*, 'wetlands', 4096, 'geom')
             FROM mvt_geom;
@@ -390,7 +390,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     s.hydric_rating,
                     ST_AsMVTGeom(ST_Transform(s.geom, 3857), tile.envelope) AS geom
                 FROM bronze.ssurgo_soils s
-                JOIN tile ON ST_Intersects(ST_Transform(s.geom, 3857), tile.envelope)
+                JOIN tile ON s.geom && ST_Transform(tile.envelope, 4269)
             )
             SELECT ST_AsMVT(mvt_geom.*, 'soils', 4096, 'geom')
             FROM mvt_geom;
@@ -421,7 +421,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     s.stream_order,
                     s.length_km
                 FROM bronze.streams s
-                JOIN tile ON ST_Intersects(ST_Transform(s.geom, 3857), tile.envelope)
+                JOIN tile ON s.geom && ST_Transform(tile.envelope, 4269)
             )
             SELECT ST_AsMVT(mvt_geom.*, 'streams', 4096, 'geom')
             FROM mvt_geom;
@@ -455,7 +455,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     pc.overlap_pct,
                     pc.focus_area_reason
                 FROM bronze.parcels p
-                JOIN tile ON ST_Intersects(ST_Transform(p.geom, 3857), tile.envelope)
+                JOIN tile ON p.geom && ST_Transform(tile.envelope, 4269)
                 LEFT JOIN silver.parcel_compliance pc ON pc.parcel_id = p.id
             )
             SELECT ST_AsMVT(mvt_geom.*, 'parcels', 4096, 'geom')
@@ -489,7 +489,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     vh.health_category,
                     vh.acquisition_date::text AS acquisition_date
                 FROM silver.riparian_buffers b
-                JOIN tile ON ST_Intersects(ST_Transform(b.geom, 3857), tile.envelope)
+                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
                 JOIN bronze.streams s ON s.id = b.stream_id
                 LEFT JOIN LATERAL (
                     SELECT mean_ndvi, health_category, acquisition_date
@@ -532,7 +532,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     vh.health_category,
                     vh.acquisition_date::text AS acquisition_date
                 FROM silver.riparian_buffers b
-                JOIN tile ON ST_Intersects(ST_Transform(b.geom, 3857), tile.envelope)
+                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
                 JOIN bronze.streams s ON s.id = b.stream_id
                 LEFT JOIN silver.vegetation_health vh
                     ON vh.buffer_id = b.id
@@ -565,7 +565,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
                     ST_AsMVTGeom(ST_Transform(ST_Centroid(b.geom), 3857), tile.envelope) AS geom,
                     vh.mean_ndvi
                 FROM silver.riparian_buffers b
-                JOIN tile ON ST_Intersects(ST_Transform(b.geom, 3857), tile.envelope)
+                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
                 LEFT JOIN LATERAL (
                     SELECT mean_ndvi
                     FROM silver.vegetation_health
