@@ -248,6 +248,8 @@ export default function App() {
   const [showRiparianExtent, setShowRiparianExtent] = useState(false);
   const [riparianExtent, setRiparianExtent] =
     useState<FeatureCollection | null>(null);
+  const [showNmripmap, setShowNmripmap] = useState(false);
+  const [nmripmap, setNmripmap] = useState<FeatureCollection | null>(null);
   const [viewMode, setViewMode] = useState<'ndvi' | 'smp' | 'vegetation'>(
     'ndvi'
   );
@@ -284,6 +286,13 @@ export default function App() {
       .then(setRiparianExtent)
       .catch((err) => console.error('[API] riparian/extent failed:', err));
   }, [showRiparianExtent, riparianExtent]);
+
+  useEffect(() => {
+    if (!showNmripmap || nmripmap) return;
+    fetchJson<FeatureCollection>(`${API_URL}/api/riparian/extent?method=nmripmap`)
+      .then(setNmripmap)
+      .catch((err) => console.error('[API] nmripmap failed:', err));
+  }, [showNmripmap, nmripmap]);
 
   // -------------------------------------------------------------------------
   // Tile URLs
@@ -613,6 +622,29 @@ export default function App() {
             />
           </Source>
 
+          {/* ---- NMRipMap reference (authoritative NM riparian map, simplified) ---- */}
+          <Source
+            id="nmripmap-source"
+            type="geojson"
+            data={
+              nmripmap ??
+              ({ type: 'FeatureCollection', features: [] } as FeatureCollection)
+            }
+          >
+            <Layer
+              id="nmripmap-fill"
+              type="fill"
+              layout={{ visibility: showNmripmap ? 'visible' : 'none' }}
+              paint={{ 'fill-color': '#a855f7', 'fill-opacity': 0.22 }}
+            />
+            <Layer
+              id="nmripmap-outline"
+              type="line"
+              layout={{ visibility: showNmripmap ? 'visible' : 'none' }}
+              paint={{ 'line-color': '#7e22ce', 'line-width': 1 }}
+            />
+          </Source>
+
           {/* ---- Buffer SMP tiles ---- */}
           <Source
             id="buffer-smp-source"
@@ -813,6 +845,12 @@ export default function App() {
             checked={showRiparianExtent}
             onChange={setShowRiparianExtent}
             accent="accent-emerald-600"
+          />
+          <LayerToggle
+            label="NMRipMap (NM reference)"
+            checked={showNmripmap}
+            onChange={setShowNmripmap}
+            accent="accent-purple-600"
           />
         </div>
 
