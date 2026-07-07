@@ -32,7 +32,11 @@ interface DocIntelPanelProps {
 
 const S = {
   panel: {
-    position: 'absolute' as const, top: 12, right: 12, width: 360, maxHeight: '78vh',
+    // Below the nav control (top-right corner) + basemap toggle (top-16 right-4),
+    // so the right edge stacks cleanly: zoom → basemap → this panel. Capped so it
+    // doesn't reach the bottom-right legend.
+    position: 'absolute' as const, top: 108, right: 12, width: 340,
+    maxHeight: 'calc(100vh - 320px)',
     overflowY: 'auto' as const, background: 'rgba(17,24,39,0.94)', color: '#e5e7eb',
     borderRadius: 10, padding: 14, zIndex: 5, fontSize: 13, lineHeight: 1.5,
     boxShadow: '0 6px 24px rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)',
