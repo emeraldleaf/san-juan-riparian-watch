@@ -38,6 +38,9 @@ logger = logging.getLogger(__name__)
 OLMOEARTH_S2_ORDER = list(Modality.SENTINEL2_L2A.band_order)
 DEFAULT_PATCH_SIZE = 8
 S2_SCALE = 1e-4  # DN → reflectance
+# S2 L2A is tokenized in 3 band-sets (by native resolution); the token mask carries
+# a trailing band-set axis (see build_sample). flexi_vit stacks per-band-set masks.
+S2_NUM_BAND_SETS = 3
 
 
 @dataclass(frozen=True)
@@ -101,14 +104,14 @@ def build_sample(cube: xr.Dataset, bbox: tuple[float, float, float, float]) -> M
     s2 = np.nan_to_num(s2, nan=0.0)
 
     # Token mask, all ONLINE_ENCODER (present) for inference — no MAE removal.
-    # NOTE (finish on GPU VM): the encoder tokenizes S2 into
-    # P_H × P_W × T × band_sets tokens (band_sets = 3, at resolution factors
-    # 16/32/64), so the token count for a 112px/patch8/T8 AOI is 14·14·8·3 = 4704.
-    # A pixel-resolution (1,H,W,T) mask collapses to 588 and mismatches. The
-    # correct token-mask shape/convention (per-band-set, matching flexi_vit's
-    # tokenizer) is the one remaining piece to verify the encoder end-to-end.
+    # flexi_vit tokenizes S2 per BAND-SET: for a spatial modality it reads the mask
+    # as modality_mask[:, 0::stride, 0::stride, ..., idx] for idx in range(band_sets)
+    # — so the mask needs a trailing band-set axis. A pixel-resolution (1,H,W,T) mask
+    # has none and mismatches the token count. Give it (1,H,W,T,band_sets); the
+    # encoder strides H/W down to patch resolution itself.
     valid = np.isfinite(s2).all(axis=-1)           # (1, H, W, T)
-    mask = np.where(valid, MaskValue.ONLINE_ENCODER.value, MaskValue.MISSING.value)
+    mask_pix = np.where(valid, MaskValue.ONLINE_ENCODER.value, MaskValue.MISSING.value)
+    mask = np.repeat(mask_pix[..., np.newaxis], S2_NUM_BAND_SETS, axis=-1)  # (1,H,W,T,B)
 
     # Timestamps (1, T, 3): day, month-1 (zero-indexed), year — integer (used as
     # nn.Embedding indices for the temporal encoding).
