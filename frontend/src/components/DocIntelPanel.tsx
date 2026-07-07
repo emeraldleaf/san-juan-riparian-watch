@@ -32,10 +32,10 @@ interface DocIntelPanelProps {
 
 const S = {
   panel: {
-    // LEFT side, below the Layers card (top-4 left-4, ~6 items). The right edge is
-    // crowded (zoom + basemap + a tall legend), so dock on the open left-center.
-    position: 'absolute' as const, top: 320, left: 16, width: 330,
-    maxHeight: 'calc(100vh - 360px)',
+    // Right-docked panel below the nav control + basemap toggle. The legend (also
+    // bottom-right) is collapsible + defaults collapsed, so it stays out of the way.
+    position: 'absolute' as const, top: 108, right: 12, width: 360,
+    maxHeight: 'calc(100vh - 150px)',
     overflowY: 'auto' as const, background: 'rgba(17,24,39,0.94)', color: '#e5e7eb',
     borderRadius: 10, padding: 14, zIndex: 5, fontSize: 13, lineHeight: 1.5,
     boxShadow: '0 6px 24px rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)',
