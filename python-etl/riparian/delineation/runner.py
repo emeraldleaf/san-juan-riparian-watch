@@ -59,6 +59,12 @@ DEFAULT_RESOLUTION_M = 10.0
 # docs/specs/2026-07-03-stage1-riparian-delineation.md (reference validation).
 PROBABILITY_THRESHOLD = 0.30
 
+# Post-processing: drop speck regions below this area (per-pixel salt-and-pepper
+# that adds noise + payload without signal) and simplify the raster→vector
+# staircase edges — so the stored extent is clean + light by construction.
+MIN_MAPPING_UNIT_M2 = 500.0
+_DEG_PER_M = 1.0 / 111_320.0
+
 
 @dataclass(frozen=True)
 class DelineationResult:
@@ -296,8 +302,16 @@ def _vectorize(
         labeled.astype(np.int32), mask=riparian, transform=transform,
     ):
         region_mask = labeled == int(region_id)
+        # Min-mapping-unit: skip speck regions below the area floor.
+        if int(region_mask.sum()) * resolution_m ** 2 < MIN_MAPPING_UNIT_M2:
+            continue
         mean_prob = round(float(prob_grid[region_mask].mean()), 4)
-        poly = shapely_shape(geom)
+        # Simplify the raster staircase edges (~3/4-pixel tolerance, in degrees).
+        poly = shapely_shape(geom).simplify(
+            resolution_m * _DEG_PER_M * 0.75, preserve_topology=True
+        )
+        if poly.is_empty:
+            continue
         rows.append({
             "method": model.method,
             "model_version": model.model_version,
