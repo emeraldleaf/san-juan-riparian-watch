@@ -26,6 +26,15 @@ cross-validation → vectorize → `silver.riparian_extent`. Served via `GET /ap
 First real run: 102k weak-labeled samples, spatial-CV ROC-AUC 0.90 / precision 0.81, 66
 riparian polygons written.
 
+**Accuracy lever #4 landed (2026-07-06): train the RF on NMRipMap truth, not weak labels.**
+`run_delineation(label_source='nmripmap')` rasterizes NMRipMap mapped-riparian polygons into
+per-pixel training truth (writes `model_version='rf-nmripmap-v1'`). Result on the 2 NM tiles
+(5-fold spatial-CV): **Malpais F1 0.71→0.895 (ROC-AUC 0.96); Animas ~0.00→0.924 (ROC-AUC 0.98)** —
+the weak-label model had ~zero agreement with real riparian on the ag-valley tile. Map (method=rf)
+now serves NMRipMap-trained extent for Animas + Malpais; Turkey Creek (CO) stays weak (no NMRipMap
+— needs CO-RIP). Honest caveat: full-tile map partly reproduces its own tile's NMRipMap; the
+spatial-CV number is the generalization metric that matters. Next: CO-RIP for CO, OlmoEarth flagship.
+
 ### Track 3 — Document Intelligence (RAG + map-linked geo citations) — SPEC + Phase-A scaffold
 New second surface over the same AOI: Olmo 2 *explains* (RAG Q&A with citations over watershed
 docs), OlmoEarth *sees* (EO layers), joined at the map. **Decision: reuse the existing
@@ -39,10 +48,35 @@ later behind the existing provider seam. Landed this session:
 - `sql/docintel_migration.sql` — additive `docs` schema (`documents`, `chunk_geo_mentions`).
 - `docintel/` scaffold: `corpus/seed_sources.yaml` (11 real public San Juan docs incl. SJRIP
   Bassett-2015 riparian/invasive + monitoring reports), `scripts/vendor_harness.sh` (trimmed
-  harness copy), and the NEW-IP geo modules `geo/models.py` + `geo/resolver.py` (deterministic
-  free-form-place → geometry against PostGIS; compile-clean, live queries are Phase-C TODOs).
-- **Next (Phase A→C):** run `vendor_harness.sh`, re-domain prompts, ingest corpus → Qdrant,
-  wire `geo_mentions[]` + resolver live queries + `/docs/ask` & `/docs/for-area`.
+  harness copy), and the NEW-IP geo modules `geo/models.py` + `geo/resolver.py`.
+
+**Phase A + B BUILT & VERIFIED end-to-end (2026-07-05).** Public/private split held:
+- **Private repo `github.com/emeraldleaf/riparian-rag-harness`** (harness must not be public):
+  vendored the RAG harness, ingested 7 watershed PDFs → **Qdrant `riparian_watershed` (527 pts)**,
+  re-domained prompts (generation + CRAG + system), and a **live cited answer** verified via local
+  Ollama (`llama3.2:3b`) — no hosted key needed. `scripts/ask_map_linked.py` +
+  **`docintel_server.py` (FastAPI `POST /docs/ask`)** return `{answer, citations, geo_mentions,
+  resolved_geometries}`; verified over HTTP.
+- **Public repo**: `sql/docintel_migration.sql` **applied** (`docs` schema live); resolver PostGIS
+  queries **implemented + verified** ('Animas River near Farmington' → reach geom, HUC8/HUC12 codes
+  resolve, towns honestly unresolved). `docintel/API_CONTRACT.md` added. All on PR #2.
+- **Full loop demonstrated:** question → cited answer → geo_mentions → resolved reach geometries.
+- **FULL STACK working end-to-end (2026-07-06):** frontend `DocIntelPanel` (App.tsx) → docintel
+  `POST /docs/ask` → cited answer + `resolved_geometries` highlighted on the MapLibre map (amber
+  line+fill, auto-fit). tsc+vite build clean; CORS 200 from :3000. Citations now structured (from
+  retrieved docs, not answer regex). Verified /docs/ask: `geo_available:true`, 4 real source PDFs,
+  San Juan + Animas rivers → reach MultiLineStrings.
+- **DB stability SOLVED (root cause + fix):** Docker Desktop's containerd store on the **external
+  drive** fails R/W I/O (`meta.db`/blob `input/output error`) → Postgres zombies, new containers
+  won't start. Durable fix = move Docker's disk-image location off the external drive (GUI). **Stable
+  workaround in place:** a standalone internal-disk PostGIS —
+  `docker run -d --name riparian-pg-stable -p 55432:5432 -v ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`
+  (trust auth; `~/riparian-pgdata-stable` = a copy of pgdata). Point docintel at it via
+  `RIPARIAN_DB_URL=postgresql+psycopg2://postgres@localhost:55432/ripariandb`.
+- **Run the demo:** stable PG (above) + Qdrant (:6333) + Ollama + `LLM_MODEL=llama3.2:3b uv run
+  uvicorn docintel_server:app --port 8100` (in riparian-rag-harness) + `cd frontend && npm run dev`.
+- **Optional next:** `/docs/for-area` reverse lookup + ingest-time `docs.chunk_geo_mentions` tagging
+  + hosted/Olmo 2 provider swap. In-browser click-through is the user's final visual check.
 
 ## Recently landed
 - README.md rewritten accurate/current (delineation/health/change; riparian/ package; MapLibre;

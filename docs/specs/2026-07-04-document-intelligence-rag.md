@@ -9,6 +9,16 @@ questions with citations over a corpus of published watershed documents, and lin
 to geography on the existing riparian map. The EO pipeline shows *where / how much*; this shows
 *why*, grounded in the literature.
 
+## Revision 2026-07-04b — harness stays private
+
+The RAG harness is a private project and **must not be published**. Corrected split: the **private repo**
+holds the vendored backend (Haystack/Qdrant/CRAG/providers/prompts); **this public repo holds only
+the geospatial delta + the seam** — `docintel/geo/` (resolver), `corpus/seed_sources.yaml`,
+`docintel/API_CONTRACT.md`, `sql/docintel_migration.sql`, and the frontend integration. The private
+backend imports the public resolver (private → public only). Where "Affects" / "vendor into
+`docintel/backend`" appears below, read it as *"in the private repo"*. See the
+[ADR](../decisions/2026-07-04-document-intelligence-subsystem.md) Decision §1 (revised).
+
 ## Harness decision (the load-bearing one)
 
 **Do not build a RAG system from scratch. Fork the existing "Re-find Catalog" production RAG**

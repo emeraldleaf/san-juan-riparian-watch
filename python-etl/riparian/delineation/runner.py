@@ -12,7 +12,7 @@ docs/specs/2026-07-03-stage1-riparian-delineation.md.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from rasterio.features import shapes as raster_shapes
@@ -24,7 +24,12 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from riparian.delineation.baseline import DelineationModel, predict_proba, train
+from riparian.delineation.baseline import (
+    DEFAULT_MODEL_VERSION,
+    DelineationModel,
+    predict_proba,
+    train,
+)
 from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
 from riparian.datacube.features import FeatureStack, build_feature_stack
 from riparian.delineation.hand import build_hand_envelope
@@ -43,6 +48,7 @@ from riparian.delineation.weak_labels import (
     labels_for_pixels,
     load_nwi_mask,
 )
+from riparian.validation.reference import fetch_nmripmap, rasterize_mask
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +58,12 @@ DEFAULT_RESOLUTION_M = 10.0
 # 0.51 / 0.34 / 0.35 at 0.94 precision for the old 0.5 default. See
 # docs/specs/2026-07-03-stage1-riparian-delineation.md (reference validation).
 PROBABILITY_THRESHOLD = 0.30
+
+# Post-processing: drop speck regions below this area (per-pixel salt-and-pepper
+# that adds noise + payload without signal) and simplify the raster→vector
+# staircase edges — so the stored extent is clean + light by construction.
+MIN_MAPPING_UNIT_M2 = 500.0
+_DEG_PER_M = 1.0 / 111_320.0
 
 
 @dataclass(frozen=True)
@@ -87,6 +99,7 @@ def run_delineation(
     persist_samples: bool = True,
     max_train_pixels: int = 50_000,
     probability_threshold: float = PROBABILITY_THRESHOLD,
+    label_source: str = "weak",
 ) -> DelineationResult:
     """Run the RF-baseline delineation over an AOI and write results.
 
@@ -136,6 +149,13 @@ def run_delineation(
         if nwi_mask is not None:
             grid = build_weak_label_grid(landcover, resolution_m, nwi_mask=nwi_mask)
 
+    # Lever #4: train on the NMRipMap reference map (actual mapped riparian) rather
+    # than the weak-label "woody-near-water" proxy. NM-only — CO tiles have no
+    # coverage and must stay label_source='weak' (see _nmripmap_label_grid).
+    if label_source == "nmripmap":
+        grid = _nmripmap_label_grid(grid, bbox, features.valid_mask.shape)
+    model_version = "rf-nmripmap-v1" if label_source == "nmripmap" else DEFAULT_MODEL_VERSION
+
     row_index, labels, latlon = labels_for_pixels(grid, features.valid_mask)
     if len(np.unique(labels)) < 2:
         raise RuntimeError("weak labels are single-class — widen the AOI")
@@ -151,7 +171,7 @@ def run_delineation(
     # Subsample for tractable per-tile compute (stratified — preserves the sparse
     # riparian class). Weak labels are noisy, so a capped sample loses little.
     x_fit, y_fit, latlon_fit = _subsample(x_train, labels, latlon, max_train_pixels)
-    model = train(x_fit, y_fit, features.feature_names, n_estimators=150)
+    model = train(x_fit, y_fit, features.feature_names, n_estimators=150, model_version=model_version)
     blocks = assign_spatial_folds(latlon_fit[:, 0], latlon_fit[:, 1])
     cv = spatial_cv(x_fit, y_fit, blocks, estimator=_cv_estimator())
 
@@ -163,6 +183,28 @@ def run_delineation(
         method=model.method, model_version=model.model_version,
         n_training=len(labels), cv=cv, n_polygons=n_polygons,
     )
+
+
+def _nmripmap_label_grid(
+    grid: LabelGrid, bbox: tuple[float, float, float, float], shape: tuple[int, int],
+) -> LabelGrid:
+    """Replace weak labels with rasterized NMRipMap truth (NM reference map).
+
+    NMRipMap maps riparian-habitat polygons for New Mexico; a pixel inside a
+    polygon is riparian (1), everything else non-riparian (0), aligned to the
+    feature grid. Raises if the AOI has no NMRipMap coverage (e.g. a Colorado
+    tile) so the caller can fall back to ``label_source='weak'``.
+    """
+    geoms = fetch_nmripmap(bbox)
+    ref_mask = rasterize_mask(geoms, bbox, shape)
+    positives = int(ref_mask.sum())
+    if positives == 0:
+        raise RuntimeError(
+            f"NMRipMap has no coverage for {bbox} (New Mexico only — Colorado tiles "
+            "need CO-RIP); use label_source='weak'"
+        )
+    logger.info("NMRipMap labels: %d riparian / %d pixels", positives, ref_mask.size)
+    return replace(grid, label=ref_mask.astype(np.int8))
 
 
 def _subsample(
@@ -260,8 +302,16 @@ def _vectorize(
         labeled.astype(np.int32), mask=riparian, transform=transform,
     ):
         region_mask = labeled == int(region_id)
+        # Min-mapping-unit: skip speck regions below the area floor.
+        if int(region_mask.sum()) * resolution_m ** 2 < MIN_MAPPING_UNIT_M2:
+            continue
         mean_prob = round(float(prob_grid[region_mask].mean()), 4)
-        poly = shapely_shape(geom)
+        # Simplify the raster staircase edges (~3/4-pixel tolerance, in degrees).
+        poly = shapely_shape(geom).simplify(
+            resolution_m * _DEG_PER_M * 0.75, preserve_topology=True
+        )
+        if poly.is_empty:
+            continue
         rows.append({
             "method": model.method,
             "model_version": model.model_version,
