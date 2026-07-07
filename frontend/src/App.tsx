@@ -202,6 +202,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export default function App() {
   const mapRef = useRef<MapRef>(null);
   const [docGeo, setDocGeo] = useState<FeatureCollection | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   // Fit the map to the geometries a doc-intelligence answer resolved.
   useEffect(() => {
@@ -846,8 +847,16 @@ export default function App() {
 
         {/* Legend */}
         <div className="absolute bottom-6 right-6 bg-white rounded-lg shadow-lg p-4 z-[1000]">
-          <h3 className="font-semibold mb-2 text-sm">Legend</h3>
-          <div className="space-y-1.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setLegendOpen((o) => !o)}
+            className="flex items-center gap-1.5 font-semibold text-sm w-full text-left"
+          >
+            <span className="text-gray-400 text-xs">{legendOpen ? '▾' : '▸'}</span>
+            Legend
+          </button>
+          {legendOpen && (
+          <div className="space-y-1.5 text-xs mt-2">
             <LegendItem color="bg-blue-600" shape="line" label="Streams" />
             {showRiparianExtent && (
               <LegendItem
@@ -956,6 +965,7 @@ export default function App() {
               label="Non-Hydric Soils"
             />
           </div>
+          )}
         </div>
       </div>
     </div>
