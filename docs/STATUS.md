@@ -33,9 +33,12 @@ end-to-end locally.
 ### Roadmap (priority)
 1. **Shareable** — deploy a demo link (Cloudflare per docintel spec) or a demo video + write-up.
    Right now it only runs on the local machine → a reviewer can't see it (the #1 practical gap).
-2. **OlmoEarth flagship** — embeddings + light head + RF-vs-OlmoEarth disagreement map (the Ai2
-   differentiator). `delineation/olmoearth.py` scaffold exists; needs the token-mask fix + a GPU
-   for the real run (Nano/CPU for one small tile).
+2. **OlmoEarth flagship — DONE (CPU, 2026-07-06).** Token-mask + square-grid blocker resolved →
+   OlmoEarth-v1-Nano encodes end-to-end on CPU. `run_delineation_olmoearth` (FM contender to the
+   RF runner) + `docs/olmoearth-vs-rf-baseline.md`: honest 5-fold spatial-CV on a balanced AOI —
+   **RF F1 0.73 vs OlmoEarth-Nano F1 0.46** (RF wins in this CPU/Nano/small-AOI setup; FM strengths
+   need scale/GPU). Next: basin-scale OlmoEarth on the GPU VM (larger model, full temporal,
+   embedding store) + RF-vs-OlmoEarth disagreement maps.
 3. **Invasives + change** — tamarisk/Russian-olive cover within the extent (`health/invasive.py`)
    → spread over time (Stage-3 spec). Manager-relevant, on-thesis.
 4. **Empty views** — NDVI Health / SMP Score / Vegetation are empty (0 rows); need the NDVI/health
