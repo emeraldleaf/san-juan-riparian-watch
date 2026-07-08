@@ -14,7 +14,7 @@ docs/specs/2026-07-03-stage1-riparian-delineation.md (OlmoEarth track).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import torch
@@ -30,7 +30,20 @@ from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (
     MaskedOlmoEarthSample,
 )
 
-from riparian.datacube.stac import spatial_dims
+from rasterio.transform import from_bounds
+
+from riparian.datacube.features import build_feature_stack
+from riparian.datacube.stac import (
+    CubeRequest,
+    PlanetaryComputerSearcher,
+    StacSearcher,
+    build_sentinel2_cube,
+    spatial_dims,
+)
+from riparian.delineation.baseline import predict_proba, train
+from riparian.delineation.runner import _cv_estimator, _vectorize, _write_extent
+from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
+from riparian.validation.reference import fetch_nmripmap, rasterize_mask
 
 logger = logging.getLogger(__name__)
 
@@ -172,3 +185,122 @@ def extract_embeddings(
         data=emb_np, patch_size=patch_size,
         y_coords=cube[y_dim].values, x_coords=cube[x_dim].values,
     )
+
+
+# ---------------------------------------------------------------------------
+# OlmoEarth delineation runner — the FM contender to the RF run_delineation.
+# See docs/olmoearth-vs-rf-baseline.md for the head-to-head result + analysis.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OlmoEarthResult:
+    """Outcome of an OlmoEarth delineation run."""
+
+    method: str
+    model_version: str
+    n_patches: int
+    n_polygons: int
+    cv: CvReport
+
+
+def _crop_to_square(cube: xr.Dataset, y_dim: str, x_dim: str, factor: int = 64):
+    """Center-crop the cube to a square whose side is a multiple of ``factor``.
+
+    OlmoEarth's 2D sincos position encoding is square, and its tokenizer needs the
+    grid divisible by the band-set resolution factors (up to 64), so a non-square
+    or oddly-sized AOI fails to encode. Returns ``(cube, side, bbox)``.
+    """
+    h, w = cube.sizes[y_dim], cube.sizes[x_dim]
+    side = max(factor, (min(h, w) // factor) * factor)
+    y0, x0 = (h - side) // 2, (w - side) // 2
+    cube = cube.isel({y_dim: slice(y0, y0 + side), x_dim: slice(x0, x0 + side)})
+    bbox = (float(cube[x_dim].min()), float(cube[y_dim].min()),
+            float(cube[x_dim].max()), float(cube[y_dim].max()))
+    return cube, side, bbox
+
+
+def _aggregate_to_patches(
+    pixel_mask: np.ndarray, valid_mask: np.ndarray, p_h: int, p_w: int, patch: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Majority-aggregate pixel bool grids to ``(p_h*p_w,)`` patch label + validity."""
+    h, w = p_h * patch, p_w * patch
+    lab = pixel_mask[:h, :w].reshape(p_h, patch, p_w, patch).mean(axis=(1, 3)) >= 0.5
+    val = valid_mask[:h, :w].reshape(p_h, patch, p_w, patch).mean(axis=(1, 3)) >= 0.5
+    return lab.astype(np.int64).reshape(-1), val.reshape(-1)
+
+
+def run_delineation_olmoearth(
+    bbox: tuple[float, float, float, float],
+    engine,
+    *,
+    date_range: str,
+    huc12: str | None = None,
+    patch_size: int = DEFAULT_PATCH_SIZE,
+    max_timesteps: int = 5,
+    max_cloud_cover: int = 30,
+    resolution_m: float = 10.0,
+    probability_threshold: float = 0.5,
+    searcher: StacSearcher | None = None,
+) -> OlmoEarthResult:
+    """Delineate riparian extent with OlmoEarth embeddings + a light RF head.
+
+    The foundation-model contender to the RandomForest :func:`run_delineation`.
+    Encodes the Sentinel-2 datacube into per-8x8-patch OlmoEarth embeddings, trains
+    a light RF head on NMRipMap patch labels, spatial-cross-validates, and writes
+    ``silver.riparian_extent`` with ``method='olmoearth'`` — so the two tracks can
+    be diffed head-to-head on the same AOI.
+
+    CPU/Nano needs a SMALL, square AOI + few timesteps (the encoder tokenizes to a
+    square patch grid; the basin-scale "OlmoEarth everywhere" run is GPU). The AOI
+    is center-cropped to a square and timesteps are subsampled to ``max_timesteps``.
+
+    Raises:
+        RuntimeError: no imagery, or NMRipMap labels are single-class over the AOI.
+    """
+    searcher = searcher or PlanetaryComputerSearcher()
+    cube = build_sentinel2_cube(
+        CubeRequest(bbox=bbox, date_range=date_range, resolution_m=resolution_m,
+                    max_cloud_cover=max_cloud_cover),
+        searcher,
+    )
+    if cube is None:
+        raise RuntimeError(f"No Sentinel-2 imagery for {bbox} over {date_range}")
+    step = max(1, cube.sizes["time"] // max_timesteps)
+    cube = cube.isel(time=slice(None, None, step))
+    y_dim, x_dim = spatial_dims(cube)
+    cube, side, aoi = _crop_to_square(cube, y_dim, x_dim)
+    logger.info("OlmoEarth AOI: %dx%d square, %d timesteps", side, side, cube.sizes["time"])
+
+    features = build_feature_stack(cube)
+    ref_mask = rasterize_mask(fetch_nmripmap(aoi), aoi, (side, side))
+    if not 0 < int(ref_mask.sum()) < ref_mask.size:
+        raise RuntimeError("NMRipMap labels single-class over AOI — pick a balanced AOI")
+
+    emb = extract_embeddings(load_olmoearth(), cube, aoi, patch_size=patch_size)
+    p_h, p_w, d = emb.data.shape
+    x_patch = emb.data.reshape(p_h * p_w, d)
+    y_patch, valid_patch = _aggregate_to_patches(
+        ref_mask, features.valid_mask, p_h, p_w, patch_size)
+
+    h, w = p_h * patch_size, p_w * patch_size
+    yc = cube[y_dim].values[:h].reshape(p_h, patch_size).mean(1)
+    xc = cube[x_dim].values[:w].reshape(p_w, patch_size).mean(1)
+    yy, xx = np.meshgrid(yc, xc, indexing="ij")
+    ll = np.column_stack([yy.reshape(-1), xx.reshape(-1)])
+
+    xf, yf, llf = x_patch[valid_patch], y_patch[valid_patch], ll[valid_patch]
+    names = tuple(f"oe_{i}" for i in range(d))
+    head = replace(train(xf, yf, names, n_estimators=150, model_version="olmoearth-nano-v1"),
+                   method="olmoearth")
+    cv = spatial_cv(xf, yf, assign_spatial_folds(llf[:, 0], llf[:, 1], block_deg=0.004),
+                    n_folds=4, estimator=_cv_estimator())
+    logger.info("OlmoEarth spatial-CV: %s", cv.metrics)
+
+    proba = predict_proba(head, x_patch).reshape(p_h, p_w)
+    prob_grid = np.kron(proba, np.ones((patch_size, patch_size), np.float32))[:side, :side]
+    riparian = (prob_grid >= probability_threshold) & features.valid_mask[:side, :side]
+    transform = from_bounds(aoi[0], aoi[1], aoi[2], aoi[3], side, side)
+    rows = _vectorize(riparian, prob_grid, transform, head, resolution_m, huc12)
+    n_polygons = _write_extent(engine, rows, head, huc12)
+    return OlmoEarthResult("olmoearth", head.model_version, int(valid_patch.sum()), n_polygons, cv)
