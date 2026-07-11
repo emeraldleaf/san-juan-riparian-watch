@@ -17,4 +17,8 @@
     <ProjectReference Include="..\RiparianPoc.ServiceDefaults\RiparianPoc.ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="RiparianPoc.Api.Tests" />
+  </ItemGroup>
+
 </Project>
