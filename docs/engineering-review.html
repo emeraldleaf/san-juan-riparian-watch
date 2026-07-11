@@ -1,0 +1,1831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>San Juan Riparian Watch — Engineering &amp; Methodology Review</title>
+<meta name="description" content="How the San Juan Riparian Watch pipeline works — STAC satellite ETL, weak-label and NMRipMap-trained delineation, spatial cross-validation, RF vs OlmoEarth, a PostGIS medallion schema, a C# API and a MapLibre map — with verbatim code and the weak points to scrutinize.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="San Juan Riparian Watch — Engineering &amp; Methodology Review">
+<meta property="og:description" content="Traces one pixel from the Planetary Computer STAC catalog to a polygon in the browser, with the real code at each step and the places a reviewer should push back.">
+<meta property="og:image" content="https://emeraldleaf.github.io/san-juan-riparian-watch/riparian-pipeline.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<style>
+  :root {
+    --bg:        #edf0e8;
+    --surface:   #f7f9f2;
+    --surface-2: #e4e8db;
+    --ink:       #1b211a;
+    --ink-soft:  #414a3d;
+    --muted:     #6d7568;
+    --rule:      #d2d7c8;
+    --veg:       #3c6a37;
+    --water:     #1c5868;
+    --accent:    #1c5868;
+    --accent-dim:#1c586819;
+    --good:      #3c6a37;
+    --warn:      #966211;
+    --crit:      #a23e35;
+    --code-bg:   #12180f;
+    --code-ink:  #dbe3cd;
+    --grid:      rgba(60,106,55,0.05);
+    --ndvi-0:    #bd8a4c;
+    --ndvi-1:    #cabf62;
+    --ndvi-2:    #6f9a45;
+    --ndvi-3:    #35662f;
+
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    /* ~74 chars/line. `ch` here is ~10.7px, so this is NOT 58 characters. */
+    --measure: 58ch;
+    /* the reading column: masthead, prose and code all share this width */
+    --column: 1020px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0d110b; --surface:#151a12; --surface-2:#1d2419;
+      --ink:#e4e8db; --ink-soft:#c2cbb6; --muted:#8a9380; --rule:#262f21;
+      --veg:#83b06f; --water:#57a7bd; --accent:#57a7bd; --accent-dim:#57a7bd24;
+      --good:#83b06f; --warn:#d49a4e; --crit:#df807a;
+      --code-bg:#0a0f07; --code-ink:#d3ddc4; --grid:rgba(131,176,111,0.06);
+      --ndvi-0:#c99a58; --ndvi-1:#d3cd72; --ndvi-2:#7dab54; --ndvi-3:#4b8340;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0d110b; --surface:#151a12; --surface-2:#1d2419;
+    --ink:#e4e8db; --ink-soft:#c2cbb6; --muted:#8a9380; --rule:#262f21;
+    --veg:#83b06f; --water:#57a7bd; --accent:#57a7bd; --accent-dim:#57a7bd24;
+    --good:#83b06f; --warn:#d49a4e; --crit:#df807a;
+    --code-bg:#0a0f07; --code-ink:#d3ddc4; --grid:rgba(131,176,111,0.06);
+    --ndvi-0:#c99a58; --ndvi-1:#d3cd72; --ndvi-2:#7dab54; --ndvi-3:#4b8340;
+  }
+  :root[data-theme="light"] {
+    --bg:#edf0e8; --surface:#f7f9f2; --surface-2:#e4e8db;
+    --ink:#1b211a; --ink-soft:#414a3d; --muted:#6d7568; --rule:#d2d7c8;
+    --veg:#3c6a37; --water:#1c5868; --accent:#1c5868; --accent-dim:#1c586819;
+    --good:#3c6a37; --warn:#966211; --crit:#a23e35;
+    --code-bg:#12180f; --code-ink:#dbe3cd; --grid:rgba(60,106,55,0.05);
+    --ndvi-0:#bd8a4c; --ndvi-1:#cabf62; --ndvi-2:#6f9a45; --ndvi-3:#35662f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .shell {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    padding: 88px 0 44px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    max-width: var(--column);
+    margin: 0 auto;
+    width: 100%;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--veg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* the NDVI ramp — sand→green — is the project's core measurement, so it opens the page */
+  .eyebrow::before {
+    content: "";
+    width: 32px; height: 8px;
+    border-radius: 1px;
+    background: linear-gradient(90deg, var(--ndvi-0), var(--ndvi-1), var(--ndvi-2), var(--ndvi-3));
+  }
+  h1 {
+    font-family: var(--sans);
+    font-weight: 680;
+    font-size: clamp(2.2rem, 4.8vw, 3.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+    margin: 0;
+    color: var(--ink);
+  }
+  .standfirst {
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: clamp(1.05rem, 1.6vw, 1.24rem);
+    line-height: 1.6;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .meta-row span {
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 4px 9px 4px 8px;
+    background: var(--surface);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .meta-row span::before {
+    content: "";
+    width: 5px; height: 5px;
+    background: var(--veg);
+    border-radius: 1px;
+  }
+
+  /* ---------- layout ---------- */
+  /* masthead, map section and body all share --column — one left edge throughout */
+  .body-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+    padding-top: 48px;
+    max-width: var(--column);
+    margin: 0 auto;
+  }
+  @media (min-width: 1040px) {
+    .body-grid { grid-template-columns: 176px minmax(0, 1fr); gap: 48px; }
+  }
+
+  /*
+    The rail is visible by default and hidden only on narrow screens. Do NOT
+    invert this: a bare `.rail { display: none }` declared after the min-width
+    media query has equal specificity, wins on source order, and silently drops
+    the rail out of the grid — which pushes <main> into the 176px rail track.
+  */
+  @media (max-width: 1039px) {
+    .rail { display: none; }
+  }
+  .rail-inner {
+    position: sticky;
+    top: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .rail-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rail-title::before {
+    content: "";
+    width: 14px; height: 6px;
+    border-radius: 1px;
+    background: linear-gradient(90deg, var(--ndvi-0), var(--ndvi-2), var(--ndvi-3));
+  }
+  .rail a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 0 6px 14px;
+    border-left: 1px solid var(--rule);
+    transition: color .15s, border-color .15s;
+  }
+  .rail a:hover, .rail a:focus-visible {
+    color: var(--veg);
+    border-left-color: var(--veg);
+  }
+
+  main { min-width: 0; display: flex; flex-direction: column; gap: 76px; }
+
+  section { scroll-margin-top: 24px; display: flex; flex-direction: column; gap: 18px; }
+
+  h2 {
+    font-family: var(--sans);
+    font-weight: 680;
+    font-size: clamp(1.5rem, 2.5vw, 1.95rem);
+    letter-spacing: -0.022em;
+    line-height: 1.14;
+    text-wrap: balance;
+    margin: 0;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink);
+  }
+  /* section marker: NDVI-ramp swatch + stage index, in mono */
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    color: var(--veg);
+    letter-spacing: 0.16em;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-right: 13px;
+    vertical-align: 0.2em;
+  }
+  h2 .num::before {
+    content: "";
+    width: 26px; height: 9px;
+    border-radius: 1px;
+    background: linear-gradient(90deg, var(--ndvi-0), var(--ndvi-1), var(--ndvi-2), var(--ndvi-3));
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 660;
+    font-size: 1rem;
+    letter-spacing: -0.008em;
+    margin: 0;
+    color: var(--ink);
+  }
+  p { margin: 0; max-width: var(--measure); color: var(--ink-soft); }
+  p.lede { color: var(--ink); font-size: 1.06rem; }
+
+  a {
+    color: var(--water);
+    text-underline-offset: 2px;
+    text-decoration-color: color-mix(in srgb, var(--water) 40%, transparent);
+  }
+  a:hover { text-decoration-color: var(--water); }
+
+  code:not(pre code) {
+    font-family: var(--mono);
+    font-size: 0.84em;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1px 5px;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- code blocks: framed like a raster tile, green band-marker edge ---------- */
+  figure.code {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--veg);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--code-bg);
+  }
+  figure.code figcaption {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    padding: 9px 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  figure.code figcaption .path {
+    color: var(--ink-soft);
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  figure.code figcaption .path::before {
+    content: "";
+    width: 7px; height: 7px;
+    background: var(--veg);
+    border-radius: 1px;
+    flex: none;
+  }
+  figure.code figcaption .lang {
+    color: var(--veg);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  pre {
+    margin: 0;
+    padding: 16px 18px;
+    overflow-x: auto;
+    background: var(--code-bg);
+  }
+  pre code {
+    font-family: var(--mono);
+    font-size: 13.2px;
+    line-height: 1.62;
+    color: var(--code-ink);
+    white-space: pre;
+  }
+  pre .c { color: #7c8a6a; font-style: italic; }
+  pre .k { color: #6fb6c9; }
+  pre .s { color: #a7c072; }
+  pre .n { color: #d0a860; }
+
+  /* ---------- callouts: flat, label-led, colored square marker ---------- */
+  .callout {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 13px;
+    background: color-mix(in srgb, var(--surface) 92%, var(--rule));
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--muted);
+    border-radius: 3px;
+    padding: 15px 17px;
+    max-width: var(--measure);
+  }
+  .callout .chip {
+    grid-row: 1 / span 2;
+    align-self: start;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+  .callout .chip::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 1px;
+    background: currentColor;
+    flex: none;
+  }
+  .callout p { font-size: 14.6px; line-height: 1.6; max-width: none; color: var(--ink-soft); }
+  .callout.scrutiny { border-left-color: var(--warn); }
+  .callout.scrutiny .chip { color: var(--warn); }
+  .callout.caveat { border-left-color: var(--crit); }
+  .callout.caveat .chip { color: var(--crit); }
+  .callout.result { border-left-color: var(--veg); }
+  .callout.result .chip { color: var(--veg); }
+
+  /* ---------- tables ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.2px; min-width: 560px; }
+  th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--surface-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num-col { font-variant-numeric: tabular-nums; }
+  td strong { color: var(--ink); font-weight: 620; }
+
+  /* ---------- diagram ---------- */
+  .map-section {
+    padding-top: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    scroll-margin-top: 24px;
+    max-width: var(--column);
+    margin: 0 auto;
+    width: 100%;
+  }
+  /*
+    Only the diagram escapes --column. This works because .map-section is
+    centred in the viewport, so translateX(-50%) centres on the viewport too.
+    It would NOT hold inside <main>, where the nav rail offsets that column's
+    centre — which is why the diagram lives above the grid, not in it.
+  */
+  .diagram-fig {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    width: min(1252px, calc(100vw - 48px));
+    margin-left: 50%;
+    transform: translateX(-50%);
+  }
+  .diagram-wrap {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background-color: var(--surface);
+    /* faint graticule — this figure is a map */
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    overflow-x: auto;
+    padding: 12px;
+  }
+  .diagram-wrap svg { display: block; min-width: 1240px; width: 100%; height: auto; }
+  .d-col-title { font: 600 12px var(--mono, monospace); fill: var(--veg); letter-spacing: 0.14em; }
+  .d-box { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+  .d-box-accent { fill: var(--accent-dim); stroke: var(--water); stroke-width: 1.2; }
+  .d-t { font: 660 13.5px var(--sans, sans-serif); fill: var(--ink); }
+  .d-s { font: 400 11.5px var(--mono, monospace); fill: var(--muted); }
+  .d-arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+  .d-arrow-dash { stroke: var(--water); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
+  .d-river { stroke: var(--water); stroke-width: 2; fill: none; opacity: 0.4; }
+  .d-caption { font: 400 11.5px var(--mono, monospace); fill: var(--muted); }
+
+  figcaption.fig-note {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 14px;
+    /* the figure is wider than --column; pull its caption back to the column's left edge */
+    padding-left: max(0px, calc((100% - var(--column)) / 2));
+    max-width: calc(var(--measure) + max(0px, (100% - var(--column)) / 2));
+  }
+
+  /* ---------- misc ---------- */
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+  .sub { display: flex; flex-direction: column; gap: 12px; }
+  ul { margin: 0; padding-left: 20px; color: var(--ink-soft); max-width: var(--measure); display: flex; flex-direction: column; gap: 7px; }
+  li::marker { color: var(--accent); }
+
+  .verdict {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+  .stat {
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--muted);
+    border-radius: 3px;
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stat .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat .value {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 1.7rem;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .stat .foot { font-size: 12.6px; color: var(--muted); line-height: 1.45; }
+  .stat.win { border-left-color: var(--veg); }
+  .stat.win .value { color: var(--veg); }
+  .stat.lose { border-left-color: var(--muted); }
+
+  footer {
+    margin-top: 88px;
+    padding-top: 30px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: var(--measure);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  :focus-visible { outline: 2px solid var(--water); outline-offset: 3px; border-radius: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header class="masthead">
+    <div class="eyebrow">Methodology &amp; engineering walkthrough</div>
+    <h1>San Juan Riparian Watch: how the pipeline actually works</h1>
+    <p class="standfirst">
+      A basin-scale system that learns <em>where riparian vegetation is</em> from satellite time
+      series — replacing fixed hydrology buffers — then scores its condition and serves it on a map.
+      This document traces one pixel from the Planetary Computer STAC catalog to a polygon in the
+      browser, with the real code at each step and the places a reviewer should push back.
+    </p>
+    <div class="meta-row">
+      <span>HUC8 14080101</span>
+      <span>EPSG:4269 (NAD83)</span>
+      <span>Python · C# .NET 10 · React</span>
+      <span>PostgreSQL + PostGIS</span>
+      <span>Sentinel-1/2 · Landsat · 3DEP</span>
+    </div>
+  </header>
+
+    <!-- ============ SYSTEM MAP ============ -->
+    <section id="map" class="map-section">
+      <h2><span class="num">00</span>The system in one picture</h2>
+      <p class="lede">
+        Data moves strictly left to right. Nothing downstream ever writes back upstream — that
+        one-directional rule is what makes the medallion layers auditable. The only arrow that runs
+        backwards is the dashed one: independent reference data feeding validation, never training
+        the model it judges.
+      </p>
+
+      <figure class="diagram-fig">
+        <div class="diagram-wrap">
+        <svg viewBox="0 0 1560 600" role="img" aria-labelledby="diagram-title diagram-desc">
+          <title id="diagram-title">Riparian Watch data pipeline</title>
+          <desc id="diagram-desc">
+            Five columns: external sources feed a Python datacube and ETL layer, which feeds
+            machine learning models, which write to a PostGIS medallion database, which is served
+            by a C# API to a React MapLibre frontend.
+          </desc>
+
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+              <path d="M0,0 L8,3.2 L0,6.4 z" fill="currentColor" />
+            </marker>
+          </defs>
+
+          <!-- column titles -->
+          <text class="d-col-title" x="30"   y="28">SOURCES</text>
+          <text class="d-col-title" x="336"  y="28">PYTHON ETL</text>
+          <text class="d-col-title" x="642"  y="28">MODELS</text>
+          <text class="d-col-title" x="948"  y="28">POSTGIS</text>
+          <text class="d-col-title" x="1254" y="28">SERVE</text>
+
+          <!-- ===== col 1: sources ===== -->
+          <g>
+            <rect class="d-box" x="30" y="48" width="276" height="58" rx="4"/>
+            <text class="d-t" x="44" y="72">Planetary Computer</text>
+            <text class="d-s" x="44" y="91">STAC · S2 L2A, S1 RTC, DEM</text>
+
+            <rect class="d-box" x="30" y="120" width="276" height="58" rx="4"/>
+            <text class="d-t" x="44" y="144">ArcGIS REST</text>
+            <text class="d-s" x="44" y="163">NHDPlus, parcels, NWI</text>
+
+            <rect class="d-box" x="30" y="192" width="276" height="58" rx="4"/>
+            <text class="d-t" x="44" y="216">NRCS SDA · MRLC</text>
+            <text class="d-s" x="44" y="235">SSURGO, NLCD, LANDFIRE</text>
+
+            <rect class="d-box" x="30" y="264" width="276" height="58" rx="4"/>
+            <text class="d-t" x="44" y="288">ESA WorldCover</text>
+            <text class="d-s" x="44" y="307">+ io-lulc-9-class</text>
+
+            <rect class="d-box-accent" x="30" y="336" width="276" height="58" rx="4"/>
+            <text class="d-t" x="44" y="360">NMRipMap v2.0+</text>
+            <text class="d-s" x="44" y="379">independent truth (NM)</text>
+          </g>
+
+          <!-- ===== col 2: python etl ===== -->
+          <g>
+            <rect class="d-box" x="336" y="48" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="72">datacube/stac.py</text>
+            <text class="d-s" x="350" y="91">sign → search → SCL mask</text>
+
+            <rect class="d-box" x="336" y="120" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="144">datacube/features.py</text>
+            <text class="d-s" x="350" y="163">22 multitemporal features</text>
+
+            <rect class="d-box" x="336" y="192" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="216">delineation/hand.py</text>
+            <text class="d-s" x="350" y="235">HAND ≤ 8 m envelope</text>
+
+            <rect class="d-box" x="336" y="264" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="288">weak_labels.py</text>
+            <text class="d-s" x="350" y="307">woody ∧ near-water ∧ NWI</text>
+
+            <rect class="d-box" x="336" y="336" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="360">etl_pipeline.py</text>
+            <text class="d-s" x="350" y="379">paginated ingest · buffers</text>
+
+            <rect class="d-box" x="336" y="408" width="276" height="58" rx="4"/>
+            <text class="d-t" x="350" y="432">ndvi_processor.py</text>
+            <text class="d-s" x="350" y="451">scene-first zonal stats</text>
+          </g>
+
+          <!-- ===== col 3: models ===== -->
+          <g>
+            <rect class="d-box" x="642" y="84" width="276" height="58" rx="4"/>
+            <text class="d-t" x="656" y="108">baseline.py — RF</text>
+            <text class="d-s" x="656" y="127">300 trees · balanced</text>
+
+            <rect class="d-box" x="642" y="156" width="276" height="58" rx="4"/>
+            <text class="d-t" x="656" y="180">olmoearth.py — FM</text>
+            <text class="d-s" x="656" y="199">Nano encoder → RF head</text>
+
+            <rect class="d-box-accent" x="642" y="228" width="276" height="58" rx="4"/>
+            <text class="d-t" x="656" y="252">validate.py</text>
+            <text class="d-s" x="656" y="271">GroupKFold on 2 km blocks</text>
+
+            <rect class="d-box" x="642" y="372" width="276" height="58" rx="4"/>
+            <text class="d-t" x="656" y="396">health_scorer.py</text>
+            <text class="d-s" x="656" y="415">SMP 80/10/10 composite</text>
+          </g>
+
+          <!-- ===== col 4: postgis ===== -->
+          <g>
+            <rect class="d-box" x="948" y="84" width="276" height="72" rx="4"/>
+            <text class="d-t" x="962" y="108">bronze</text>
+            <text class="d-s" x="962" y="127">streams, parcels, wetlands,</text>
+            <text class="d-s" x="962" y="145">soils, training_samples</text>
+
+            <rect class="d-box-accent" x="948" y="170" width="276" height="72" rx="4"/>
+            <text class="d-t" x="962" y="194">silver</text>
+            <text class="d-s" x="962" y="213">riparian_extent, buffers,</text>
+            <text class="d-s" x="962" y="231">vegetation_health, canopy</text>
+
+            <rect class="d-box" x="948" y="256" width="276" height="72" rx="4"/>
+            <text class="d-t" x="962" y="280">gold</text>
+            <text class="d-s" x="962" y="299">buffer_health_score,</text>
+            <text class="d-s" x="962" y="317">riparian_summary, reaches</text>
+
+            <rect class="d-box" x="948" y="356" width="276" height="58" rx="4"/>
+            <text class="d-t" x="962" y="380">GiST indexes</text>
+            <text class="d-s" x="962" y="399">bbox &amp;&amp; pre-filter</text>
+          </g>
+
+          <!-- ===== col 5: serve ===== -->
+          <g>
+            <rect class="d-box" x="1254" y="84" width="276" height="72" rx="4"/>
+            <text class="d-t" x="1268" y="108">C# minimal API</text>
+            <text class="d-s" x="1268" y="127">Dapper + NpgsqlDataSource</text>
+            <text class="d-s" x="1268" y="145">18 endpoints</text>
+
+            <rect class="d-box" x="1254" y="170" width="276" height="72" rx="4"/>
+            <text class="d-t" x="1268" y="194">ST_AsMVT / GeoJSON</text>
+            <text class="d-s" x="1268" y="213">vector tiles @ 4096 extent</text>
+            <text class="d-s" x="1268" y="231">NetTopologySuite features</text>
+
+            <rect class="d-box-accent" x="1254" y="256" width="276" height="72" rx="4"/>
+            <text class="d-t" x="1268" y="280">React + MapLibre</text>
+            <text class="d-s" x="1268" y="299">paint expressions, legend,</text>
+            <text class="d-s" x="1268" y="317">timelapse slider</text>
+
+            <rect class="d-box" x="1254" y="356" width="276" height="58" rx="4"/>
+            <text class="d-t" x="1268" y="380">Aspire + OTEL</text>
+            <text class="d-s" x="1268" y="399">traces, correlation IDs</text>
+          </g>
+
+          <!-- arrows col1 -> col2 -->
+          <g color="var(--muted)">
+            <!-- Planetary Computer → stac.py, and → ndvi_processor (both are Sentinel-2) -->
+            <path class="d-arrow" marker-end="url(#ah)" d="M306,77 L330,77"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M306,95 L312,95 L312,437 L330,437"/>
+            <!-- ArcGIS REST → etl_pipeline -->
+            <path class="d-arrow" marker-end="url(#ah)" d="M306,149 L318,149 L318,359 L330,359"/>
+            <!-- NRCS / MRLC → etl_pipeline -->
+            <path class="d-arrow" marker-end="url(#ah)" d="M306,221 L324,221 L324,371 L330,371"/>
+            <!-- ESA WorldCover → weak_labels -->
+            <path class="d-arrow" marker-end="url(#ah)" d="M306,293 L330,293"/>
+          </g>
+
+          <!-- col2 internal: cube → features -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M474,106 L474,114"/>
+          </g>
+
+          <!-- arrows col2 -> col3 -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M612,149 L624,149 L624,113 L636,113"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M612,293 L630,293 L630,185 L636,185"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M612,365 L624,365 L624,401 L636,401"/>
+          </g>
+
+          <!-- HAND envelope constraint (accent) -->
+          <g color="var(--accent)">
+            <path class="d-arrow-dash" marker-end="url(#ah)" d="M612,221 L622,221 L622,257 L636,257"/>
+          </g>
+
+          <!-- NMRipMap -> validate (dashed, independent truth) -->
+          <g color="var(--accent)">
+            <path class="d-arrow-dash" marker-end="url(#ah)" d="M306,378 L316,378 L316,502 L780,502 L780,292"/>
+          </g>
+          <text class="d-caption" x="330" y="520">independent reference — validation, and (opt-in) NMRipMap-trained labels</text>
+
+          <!-- arrows col3 -> col4 -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M918,113 L930,113 L930,198 L942,198"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M918,185 L936,185 L936,212 L942,212"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M918,401 L930,401 L930,292 L942,292"/>
+          </g>
+
+          <!-- bronze->silver->gold internal -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M1086,156 L1086,164"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M1086,242 L1086,250"/>
+          </g>
+
+          <!-- arrows col4 -> col5 (all three layers read by the API) -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M1224,110 L1248,110"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M1224,200 L1238,200 L1238,124 L1248,124"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M1224,292 L1232,292 L1232,138 L1248,138"/>
+          </g>
+
+          <!-- api -> mvt -> frontend -->
+          <g color="var(--muted)">
+            <path class="d-arrow" marker-end="url(#ah)" d="M1392,156 L1392,164"/>
+            <path class="d-arrow" marker-end="url(#ah)" d="M1392,242 L1392,250"/>
+          </g>
+
+          <!-- ambient river -->
+          <path class="d-river" d="M30,552 C200,526 320,578 490,552 C660,526 780,578 950,552 C1120,526 1240,578 1410,552 C1450,546 1492,548 1530,554"/>
+          <text class="d-caption" x="30" y="582">San Juan Basin · HUC8 14080101 · peak growing season, June–August</text>
+        </svg>
+        </div>
+        <figcaption class="fig-note">
+          Solid arrows are data flow. Dashed teal arrows are constraints and evidence: the HAND
+          terrain envelope clips model output, and NMRipMap enters as held-out truth.
+        </figcaption>
+      </figure>
+    </section>
+
+  <div class="body-grid">
+
+    <nav class="rail" aria-label="Sections">
+      <div class="rail-inner">
+        <div class="rail-title">Contents</div>
+        <a href="#map">System map</a>
+        <a href="#stac">1 · STAC datacube</a>
+        <a href="#features">2 · Features</a>
+        <a href="#labels">3 · Labels &amp; HAND</a>
+        <a href="#model">4 · Model + spatial CV</a>
+        <a href="#truth">5 · Validation</a>
+        <a href="#fm">6 · Foundation model</a>
+        <a href="#write">7 · Vectorize &amp; write</a>
+        <a href="#legacy">8 · NDVI &amp; scoring</a>
+        <a href="#schema">9 · Data model</a>
+        <a href="#api">10 · API</a>
+        <a href="#frontend">11 · Frontend</a>
+        <a href="#obs">12 · Observability</a>
+        <a href="#attack">Where to attack it</a>
+        <a href="#skills">Skills map</a>
+      </div>
+    </nav>
+
+    <main>
+
+      <!-- ============ 1 STAC ============ -->
+      <section id="stac">
+        <h2><span class="num">01</span>Satellite ETL: making data selection queryable</h2>
+        <p class="lede">
+          The premise of the whole project is a phenological one. In a semi-arid basin, riparian
+          phreatophytes — cottonwood, willow, and the invasive tamarisk and Russian olive — stay green
+          into the dry season because their roots reach groundwater, while the surrounding upland
+          browns out. That contrast is the signal. Capturing it requires a <em>time series</em>, not a
+          scene, which is why the entry point is a STAC query rather than a file download.
+        </p>
+        <p>
+          The searcher opens the Planetary Computer catalog with <code>planetary_computer.sign_inplace</code>
+          as a pystac-client modifier, so every asset href returned by the catalog is signed lazily at
+          access time. The consequence is that the data-selection step — area of interest, time window,
+          cloud threshold — is a declarative record in code rather than an untracked manual download.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/datacube/stac.py:117–207</span><span class="lang">python</span></figcaption>
+<pre><code>class PlanetaryComputerSearcher:
+    def __init__(self, stac_url: str = STAC_API_URL) -&gt; None:
+        self._catalog = pystac_client.Client.open(
+            stac_url, modifier=planetary_computer.sign_inplace,
+        )
+
+<span class="c"># Sentinel-2: cloud cover is a *server-side* filter, not a post-hoc drop</span>
+items = searcher.search(
+    SENTINEL_2_COLLECTION, request.bbox, request.date_range,
+    query={<span class="s">"eo:cloud_cover"</span>: {<span class="s">"lt"</span>: request.max_cloud_cover}},
+)
+cube = stac_load(
+    items, bands=bands, bbox=request.bbox, crs=STORAGE_CRS,
+    resolution=_deg_resolution(request.resolution_m, request.bbox),
+    chunks={},              <span class="c"># dask-backed, lazy until .compute()</span>
+    groupby=<span class="s">"solar_day"</span>,   <span class="c"># mosaic same-day overlapping orbits</span>
+)
+if <span class="s">"SCL"</span> in cube:
+    cube = _apply_scl_mask(cube)</code></pre>
+        </figure>
+
+        <p>
+          Two masking layers matter. The <code>eo:cloud_cover &lt; 20</code> query drops whole scenes
+          server-side; <code>_apply_scl_mask</code> then drops individual bad pixels using Sentinel-2's
+          scene classification layer, treating no-data, saturated, cloud-shadow, medium- and
+          high-probability cloud, cirrus and snow as invalid:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/datacube/stac.py:36–67, 362–365</span><span class="lang">python</span></figcaption>
+<pre><code>SCL_INVALID = frozenset({0, 1, 3, 8, 9, 10, 11})
+
+def _apply_scl_mask(reflectance, scl):
+    valid = ~scl.isin(list(SCL_INVALID))
+    return reflectance.where(valid)   <span class="c"># invalid → NaN, propagates to stats</span></code></pre>
+        </figure>
+
+        <p>
+          Sentinel-1 RTC is loaded through the same path with <code>query=None</code> — radar is
+          cloud-independent, so applying an optical cloud filter to it would be a category error. The
+          land-cover grids (ESA WorldCover, io-lulc-9-class) are loaded with <code>like=cube</code>,
+          which snaps them onto the Sentinel-2 geobox so every product shares one pixel grid. No
+          resampling bugs downstream because there is no downstream resampling.
+        </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            <code>_deg_resolution</code> converts metres to degrees with a flat
+            <code>resolution_m / 111_320.0</code>. That is the length of a degree of <em>latitude</em>;
+            a degree of longitude shrinks by <code>cos(lat)</code> — roughly 0.77 at the San Juan
+            Basin's ~37°N. Pixels are therefore not square on the ground. Everything downstream is
+            internally consistent because all products share the grid, but any area computed by
+            counting pixels × <code>resolution_m²</code> — including the minimum mapping unit filter —
+            carries that anisotropy. Areas that need to be right are computed in PostGIS with
+            <code>geom::geography</code> instead.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 2 FEATURES ============ -->
+      <section id="features">
+        <h2><span class="num">02</span>Feature engineering: 22 numbers per pixel</h2>
+        <p class="lede">
+          A single NDVI value cannot separate riparian woodland from an irrigated alfalfa field —
+          both are green in July. What separates them is behaviour over the season, canopy water
+          content, and spatial texture. The feature stack encodes all three.
+        </p>
+
+        <p>
+          Five spectral indices are computed per timestep, each chosen for a physical reason rather
+          than because it was available: NDVI for greenness and density, NDMI for canopy water using
+          the SWIR band, NDRE for chlorophyll via the red edge, EVI for a soil- and aerosol-resistant
+          greenness, and kNDVI as a kernel transform that resists saturation in dense canopy.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/datacube/features.py:88–112</span><span class="lang">python</span></figcaption>
+<pre><code>def ndvi(nir, red):        return _safe_ratio(nir - red, nir + red)
+def ndmi(nir, swir1):      return _safe_ratio(nir - swir1, nir + swir1)
+def ndre(nir, rededge):    return _safe_ratio(nir - rededge, nir + rededge)
+
+def evi(nir, red, blue):
+    denom = nir + 6.0 * red - 7.5 * blue + 1.0
+    return 2.5 * _safe_ratio(nir - red, denom)
+
+def kndvi(nir, red):       return np.tanh(ndvi(nir, red) ** 2)</code></pre>
+        </figure>
+
+        <p>
+          Each index is then collapsed over the time axis into four statistics. The
+          <strong>amplitude</strong> (p90 − p10) is the phenology term — it is what tells a
+          groundwater-fed cottonwood stand apart from a field that greens up and is then cut. The
+          p10/p90 percentiles are used instead of min/max because a single unmasked cloud edge would
+          dominate an extremum.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/datacube/features.py:161–170</span><span class="lang">python</span></figcaption>
+<pre><code>for name, da in index_cube.data_vars.items():
+    median = da.median(dim=<span class="s">"time"</span>, skipna=True)
+    p10 = da.quantile(0.10, dim=<span class="s">"time"</span>, skipna=True).drop_vars(<span class="s">"quantile"</span>)
+    p90 = da.quantile(0.90, dim=<span class="s">"time"</span>, skipna=True).drop_vars(<span class="s">"quantile"</span>)
+    out[f<span class="s">"{name}_median"</span>]    = median
+    out[f<span class="s">"{name}_p10"</span>]       = p10
+    out[f<span class="s">"{name}_p90"</span>]       = p90
+    out[f<span class="s">"{name}_amplitude"</span>] = p90 - p10   <span class="c"># seasonal swing</span></code></pre>
+        </figure>
+
+        <p>
+          That yields 5 indices × 4 statistics = 20 features, plus two texture bands computed on the
+          median NDVI with a 3×3 window (local standard deviation and local range, a cheap
+          <code>scipy.ndimage</code> proxy for GLCM texture). Riparian gallery forest is structurally
+          rough; an alfalfa pivot is smooth. Total: <strong>22 features</strong>, assembled into a
+          <code>FeatureStack</code> where a pixel is valid only if every one of its features is finite.
+        </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            The 22 features are all optical, all Sentinel-2. Sentinel-1 VV/VH is fetched by
+            <code>stac.py</code> but does not enter the feature stack — the SAR backscatter that would
+            most help with structure and moisture under cloud is loaded and unused. That is a real gap,
+            not a subtlety, and it is the first thing I would add.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 3 LABELS ============ -->
+      <section id="labels">
+        <h2><span class="num">03</span>Labels without a labeller, and a terrain prior</h2>
+        <p class="lede">
+          There is no hand-digitised training set for this basin. The pipeline manufactures one from
+          the intersection of independent global products, then constrains the model's output with a
+          physical terrain envelope so that the machine learning cannot invent riparian vegetation on
+          a hillside.
+        </p>
+
+        <h3>Weak labels: woody ∧ near-water</h3>
+        <p>
+          The operating definition — and it is worth being explicit, because it drives every number
+          that follows — is that riparian means <em>woody vegetation growing near water</em>, which is
+          not the same thing as wetland. Positives are woody cover within 100 m of water in either land
+          cover product, or a wetland class. Negatives must be upland <em>and</em> beyond 200 m from
+          water. The 100–200 m band is deliberately left unlabelled: it is exactly where the two
+          classes blur, and forcing a label there teaches the model noise.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/weak_labels.py:124–183</span><span class="lang">python</span></figcaption>
+<pre><code>def near_water_mask(water, resolution_m, dist_m):
+    dist_px = ndimage.distance_transform_edt(~water)
+    return (dist_px * resolution_m) &lt;= dist_m
+
+water = _isin(wc, WC_WATER, shape) | _isin(io, IO_WATER, shape)
+near  = near_water_mask(water, resolution_m, NEAR_WATER_M)   <span class="c"># 100 m</span>
+far   = ~near_water_mask(water, resolution_m, FAR_WATER_M)   <span class="c"># 200 m</span>
+
+wc_hit  = (_isin(wc, WC_WOODY, shape) &amp; near) | _isin(wc, WC_WETLAND, shape)
+io_hit  = (_isin(io, IO_WOODY, shape) &amp; near) | _isin(io, IO_WETLAND, shape)
+nwi_hit = nwi_mask if nwi_mask is not None else np.zeros(shape, dtype=bool)
+
+<span class="c"># agreement (0–3) doubles as a confidence score</span>
+agreement = wc_hit.astype(np.int8) + io_hit.astype(np.int8) + nwi_hit.astype(np.int8)
+positive  = agreement &gt;= 1
+upland    = _isin(wc, WC_UPLAND, shape) | _isin(io, IO_UPLAND, shape)
+negative  = (~positive) &amp; upland &amp; far
+
+label = np.full(shape, LABEL_EXCLUDE, dtype=np.int8)   <span class="c"># -1 = don't train here</span>
+label[negative] = LABEL_NEGATIVE
+label[positive] = LABEL_POSITIVE</code></pre>
+        </figure>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            <code>positive = agreement &gt;= 1</code> means a single product's opinion creates a positive
+            label. The agreement count (0–3) is computed and stored as confidence but is not used to
+            weight training. Requiring agreement ≥ 2 would produce a smaller, cleaner training set.
+            The measured consequence of this looseness appears in the next section — and it is severe.
+          </p>
+        </div>
+
+        <h3>The HAND envelope</h3>
+        <p>
+          Height Above Nearest Drainage is a terrain-derived measure: for each cell, the vertical
+          distance to the nearest cell on the drainage network, following flow direction. Low HAND means
+          hydrologically connected valley bottom. It is computed from the 3DEP/Copernicus DEM through a
+          standard pysheds conditioning chain (fill pits → fill depressions → resolve flats → flow
+          direction → accumulation), loaded with <code>like=cube</code> so it lands on the same grid.
+        </p>
+        <p>
+          This is the structural replacement for the fixed hydrology buffer the project started with.
+          Rather than asserting "riparian is 30 m from the centreline," it asks the terrain where water
+          can actually reach, and uses that as a container. Cells with <code>HAND ≤ 8 m</code> are
+          candidate corridor; the model's output is intersected with it:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/runner.py:255–282</span><span class="lang">python</span></figcaption>
+<pre><code>riparian = (prob_grid &gt;= threshold) &amp; valid_mask
+if envelope is not None:
+    riparian &amp;= envelope    <span class="c"># upland pixels the model scored high are dropped</span></code></pre>
+        </figure>
+
+        <div class="callout caveat">
+          <span class="chip">Caveat</span>
+          <p>
+            Because the envelope is a hard AND applied <em>after</em> prediction, it can only remove
+            false positives, never recover false negatives — and any real riparian vegetation sitting
+            above 8 m HAND (a perched terrace, an incised reach) is silently deleted. The threshold is a
+            single global constant, not reach-dependent. The module's own docstring also flags that edge
+            cells are approximate because drainage entering from outside the tile is truncated.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 4 MODEL ============ -->
+      <section id="model">
+        <h2><span class="num">04</span>The model, and the validation that makes it honest</h2>
+        <p class="lede">
+          The classifier is deliberately boring — a 300-tree random forest with balanced class
+          weights, because riparian is the minority class by a wide margin. The interesting engineering
+          is not the model. It is the cross-validation.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/baseline.py:45–97</span><span class="lang">python</span></figcaption>
+<pre><code>clf = RandomForestClassifier(
+    n_estimators=n_estimators, max_depth=max_depth,
+    random_state=random_state,
+    class_weight=<span class="s">"balanced"</span>,   <span class="c"># riparian is the minority class</span>
+    n_jobs=-1,
+)
+clf.fit(features, labels.astype(int))</code></pre>
+        </figure>
+
+        <h3>Why a random split would lie</h3>
+        <p>
+          Satellite pixels are spatially autocorrelated: a pixel and its neighbour are nearly the same
+          observation. Under a random train/test split, almost every test pixel has a near-duplicate in
+          the training set, and the model scores brilliantly by memorising. The fix is to hold out whole
+          spatial <em>blocks</em>. Pixels are binned into ~2 km tiles by integer-flooring their
+          coordinates, and those tile IDs become groups for <code>GroupKFold</code>:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/validate.py:51–72</span><span class="lang">python</span></figcaption>
+<pre><code>def assign_spatial_folds(lats, lons, block_deg=0.02):   <span class="c"># ~0.02 deg ≈ 2 km</span>
+    row = np.floor(lats / block_deg).astype(np.int64)
+    col = np.floor(lons / block_deg).astype(np.int64)
+    return row * 100_000 + col      <span class="c"># block id → GroupKFold group</span></code></pre>
+        </figure>
+
+        <p>
+          Every reported metric — precision, recall, F1, PR-AUC, ROC-AUC — comes from folds where an
+          entire geographic block was unseen during training. <code>_safe_auc</code> returns NaN rather
+          than a misleading number when a fold happens to contain a single class.
+        </p>
+
+        <div class="callout result">
+          <span class="chip">Why it matters</span>
+          <p>
+            This is the single most load-bearing decision in the project. Without spatial CV, the weak
+            labels plus a 300-tree forest would have produced a confident, publishable, and completely
+            fictitious accuracy figure. With it, the pipeline was able to detect that its own training
+            labels were near-worthless on one tile — see below.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 5 TRUTH ============ -->
+      <section id="truth">
+        <h2><span class="num">05</span>Independent truth: NMRipMap</h2>
+        <p class="lede">
+          Weak labels validate against weak labels, which proves nothing. The project pulls NMRipMap
+          v2.0 Plus — a professionally mapped riparian inventory from the New Mexico Natural Heritage
+          program — live from an ArcGIS MapServer, rasterises it onto the same grid, and compares
+          pixel-wise.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/validation/reference.py:144–161</span><span class="lang">python</span></figcaption>
+<pre><code>inter = int((reference &amp; prediction).sum())
+union = int((reference | prediction).sum())
+tp = inter
+fp = (prediction &amp; ~reference).sum()
+fn = (reference &amp; ~prediction).sum()
+
+iou       = inter / union
+precision = tp / (tp + fp)
+recall    = tp / (tp + fn)
+f1        = 2 * precision * recall / (precision + recall)</code></pre>
+        </figure>
+
+        <p>
+          Running that comparison exposed the weak-label problem. On the Malpais tile the weak-label
+          model reached F1 0.71; on the Animas tile — an agricultural valley where irrigated fields sit
+          within 100 m of water and satisfy "woody-near-water" — it reached approximately
+          <strong>zero</strong>. The labels were teaching the model to find farms.
+        </p>
+        <p>
+          The response was to make the label source a parameter and train directly on the reference
+          polygons where they exist, writing a distinct <code>model_version</code> so the two models are
+          never confused in the database:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/runner.py:155–207</span><span class="lang">python</span></figcaption>
+<pre><code>if label_source == <span class="s">"nmripmap"</span>:
+    grid = _nmripmap_label_grid(...)
+    model_version = <span class="s">"rf-nmripmap-v1"</span>
+
+def _nmripmap_label_grid(...):
+    ref_mask = rasterize_mask(fetch_nmripmap(bbox), ...)
+    <span class="c"># raises if the tile has no NMRipMap coverage — CO tiles fall back to weak labels</span>
+    return replace(grid, label=ref_mask.astype(np.int8))</code></pre>
+        </figure>
+
+        <div class="verdict">
+          <div class="stat win">
+            <span class="label">Malpais · spatial CV F1</span>
+            <span class="value">0.71 → 0.895</span>
+            <span class="foot">weak labels → NMRipMap-trained · ROC-AUC 0.96</span>
+          </div>
+          <div class="stat win">
+            <span class="label">Animas · spatial CV F1</span>
+            <span class="value">~0.00 → 0.924</span>
+            <span class="foot">the ag-valley tile the weak labels could not see · ROC-AUC 0.98</span>
+          </div>
+        </div>
+
+        <div class="callout caveat">
+          <span class="chip">Caveat</span>
+          <p>
+            The full-tile map product partly reproduces its own tile's NMRipMap, because the model was
+            trained on it. The number that generalises is the spatial-CV F1 — held-out blocks — and that
+            is the only one quoted. Turkey Creek in Colorado has no NMRipMap coverage and still runs on
+            weak labels, so its output should be read as unvalidated until CO-RIP is wired in. Two
+            validated tiles is a demonstration, not a basin.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 6 FM ============ -->
+      <section id="fm">
+        <h2><span class="num">06</span>The foundation model, and a negative result</h2>
+        <p class="lede">
+          OlmoEarth-v1-Nano encodes the Sentinel-2 datacube into learned embeddings, which then feed
+          the same random-forest head through the same spatial-CV harness. Identical labels, identical
+          folds — the only variable is the representation.
+        </p>
+
+        <p>
+          Getting the encoder to run required resolving a token-mask convention: the model expects a
+          per-band-set mask over a 5-D <code>(batch, H, W, T, band_sets)</code> tensor, where Sentinel-2
+          L2A is tokenised into three band sets by native resolution. Valid pixels are marked for the
+          online encoder, invalid ones as missing. Patch tokens are then averaged over time and band
+          sets to give one embedding vector per patch.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/olmoearth.py:103–187</span><span class="lang">python</span></figcaption>
+<pre><code>valid = np.isfinite(s2).all(axis=-1)                        <span class="c"># (1, H, W, T)</span>
+mask_pix = np.where(valid, MaskValue.ONLINE_ENCODER.value,
+                           MaskValue.MISSING.value)
+mask = np.repeat(mask_pix[..., np.newaxis], S2_NUM_BAND_SETS, axis=-1)
+
+output_dict = model.encoder(sample, patch_size=patch_size)
+latent, _pooled, _kwargs = unpack_encoder_output(output_dict)
+
+tokens = latent.sentinel2_l2a         <span class="c"># (B, P_H, P_W, T, Band_Sets, D)</span>
+emb = tokens.mean(dim=(3, 4)).squeeze(0)   <span class="c"># (P_H, P_W, D)</span></code></pre>
+        </figure>
+
+        <p>
+          The AOI is cropped to a square whose side is a multiple of 64, because the 2-D sincos
+          positional encoding requires it. Patch-level labels are assigned by majority vote at ≥ 0.5,
+          the block size for spatial CV shrinks to 0.004° to keep enough folds at patch resolution, and
+          <code>np.kron</code> upsamples patch probabilities back to pixels before reusing the same
+          vectorise-and-write path as the baseline.
+        </p>
+
+        <div class="verdict">
+          <div class="stat win">
+            <span class="label">Random forest</span>
+            <span class="value">F1 0.73</span>
+            <span class="foot">22 hand-designed features · 5-fold spatial CV</span>
+          </div>
+          <div class="stat lose">
+            <span class="label">OlmoEarth-Nano</span>
+            <span class="value">F1 0.46</span>
+            <span class="foot">learned embeddings · same labels, same folds</span>
+          </div>
+        </div>
+
+        <p>
+          <strong>The baseline won.</strong> On a balanced AOI, on CPU, with the smallest model in the
+          family and a truncated temporal stack, hand-designed spectral features beat foundation-model
+          embeddings by a wide margin. This is reported rather than buried, and it is the correct
+          reading of the experiment: the conditions under which foundation models earn their keep —
+          scale, GPU, full temporal depth, a larger checkpoint — are precisely the conditions that were
+          absent. It bounds what was tested, not what is true.
+        </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            An honest critic should note the comparison is not perfectly clean: the FM path operates at
+            patch resolution with majority-vote labels and a different CV block size (0.004° vs 0.02°),
+            so the two models are not scored on identical fold geometry. The direction of the result is
+            probably robust — a 0.27 F1 gap is not a fold artefact — but the exact margin should not be
+            quoted to two decimal places as a like-for-like.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 7 WRITE ============ -->
+      <section id="write">
+        <h2><span class="num">07</span>From raster to polygon</h2>
+        <p>
+          Thresholded probability becomes a mask, connected components become polygons, and two
+          cartographic filters run before anything is written: a 500 m² minimum mapping unit that
+          discards single-pixel speckle, and a topology-preserving simplify at three-quarters of a pixel.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/runner.py:285–324</span><span class="lang">python</span></figcaption>
+<pre><code>if int(region_mask.sum()) * resolution_m ** 2 &lt; MIN_MAPPING_UNIT_M2:
+    continue                                    <span class="c"># drop speckle (&lt; 500 m²)</span>
+
+mean_prob = round(float(prob_grid[region_mask].mean()), 4)
+poly = shapely_shape(geom).simplify(
+    resolution_m * _DEG_PER_M * 0.75, preserve_topology=True)</code></pre>
+        </figure>
+
+        <p>
+          The write is idempotent by construction — a delete scoped to <code>(method, model_version,
+          huc12)</code> followed by a batch insert — so re-running a tile replaces exactly that tile's
+          output for exactly that model, and never touches another model's rows.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/riparian/delineation/runner.py:327–357</span><span class="lang">sql</span></figcaption>
+<pre><code>INSERT INTO silver.riparian_extent
+    (method, model_version, is_riparian, riparian_probability,
+     cell_size_m, huc12, geom)
+VALUES (:method, :model_version, :is_riparian, :riparian_probability,
+        :cell_size_m, :huc12, ST_SetSRID(ST_GeomFromText(:wkt), 4269))</code></pre>
+        </figure>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            <code>PROBABILITY_THRESHOLD = 0.30</code> for the RF path — not 0.5. It was selected by a
+            threshold sweep against NMRipMap on the Malpais tile, trading precision for recall. That is
+            a defensible tuning choice, but it was tuned on a tile that also contributed training data,
+            and it is applied globally including to the unvalidated Colorado tile.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 8 LEGACY ============ -->
+      <section id="legacy">
+        <h2><span class="num">08</span>The ingest and scoring pipeline</h2>
+        <p class="lede">
+          Running alongside the delineation track is the original buffer-centric ETL, which still
+          supplies the vector context layers, the NDVI time series, and the condition score.
+        </p>
+
+        <h3>Paginated ArcGIS ingest</h3>
+        <p>
+          Every ArcGIS REST layer enforces <code>maxRecordCount = 2000</code>. The client paginates on
+          <code>resultOffset</code>, retries 5xx with exponential backoff, and requests
+          <code>outSR=4269</code> so nothing is reprojected client-side. The loop terminates on a short
+          page, not only an empty one — a detail that saves one wasted round trip per layer and, more
+          importantly, avoids an infinite loop when a server returns a short final page followed by an
+          empty one.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/etl_pipeline.py:718–741</span><span class="lang">python</span></figcaption>
+<pre><code>offset = 0
+while True:
+    batch = self._client.query(
+        url=url, where=where, geometry_filter=envelope,
+        result_offset=offset, result_record_count=ARCGIS_BATCH_SIZE,
+    )
+    if batch.empty:
+        break
+    batches.append(batch)
+    offset += ARCGIS_BATCH_SIZE
+    if len(batch) &lt; ARCGIS_BATCH_SIZE:
+        break        <span class="c"># short page = last page</span></code></pre>
+        </figure>
+
+        <p>
+          The pipeline order is bronze first (watershed boundary loads first because it is the spatial
+          envelope every other query filters against, then NHDPlus, parcels and NWI concurrently on a
+          three-worker pool), then silver spatial processing, then optional enrichment, then gold
+          aggregation. Buffers are generated in a single SQL statement that casts to geography — never
+          buffering in degrees:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/etl_pipeline.py:1422–1434</span><span class="lang">sql</span></figcaption>
+<pre><code>INSERT INTO silver.riparian_buffers (stream_id, buffer_distance_m, area_sq_m, geom)
+SELECT s.id, :buffer_distance,
+    ST_Area(ST_Buffer(s.geom::geography, :buffer_distance)),
+    ST_SetSRID(ST_Buffer(s.geom::geography, :buffer_distance)::geometry, 4269)
+FROM bronze.streams s</code></pre>
+        </figure>
+
+        <h3>NDVI: scene-first zonal statistics</h3>
+        <p>
+          The naive implementation opens the raster once per buffer. This one inverts the loop — read
+          each scene once, then extract every intersecting buffer's statistics from the in-memory array.
+          Writes are idempotent on <code>(buffer_id, acquisition_date, satellite)</code>.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">python-etl/ndvi_processor.py:137–145, 682–734</span><span class="lang">python</span></figcaption>
+<pre><code>mask = geometry_mask([mapping(geom)], out_shape=ndvi_array.shape,
+                     transform=transform, invert=True)
+buffer_pixels = ndvi_array[mask]
+mean_val, min_val, max_val = compute_ndvi_stats(buffer_pixels)   <span class="c"># valid ∈ [-1, 1]</span>
+
+<span class="c">-- writer</span>
+INSERT INTO silver.vegetation_health (buffer_id, acquisition_date, mean_ndvi, ...)
+VALUES (...) ON CONFLICT (buffer_id, acquisition_date, satellite) DO NOTHING</code></pre>
+        </figure>
+
+        <div class="callout caveat">
+          <span class="chip">Inconsistency</span>
+          <p>
+            Three different NDVI health thresholds exist in this repo. <code>create_schemas.sql</code>
+            comments say healthy &gt; 0.6 / degraded 0.3–0.6 / bare &lt; 0.3. <code>CLAUDE.md</code> and the
+            frontend legend say healthy &gt; 0.3 / degraded 0.15–0.3 / bare &lt; 0.15. And
+            <code>ndvi_processor.classify_health</code> uses a third pair of cutoffs (&gt; 0.25 good, ≥ 0.10
+            moderate) against a stated peak-growing median of ~0.17. The <em>code</em> is what runs, but
+            a reviewer is entitled to ask which of the three was calibrated and against what. This should
+            be one constant in one place.
+          </p>
+        </div>
+
+        <h3>Condition scoring</h3>
+        <p>
+          The SMP composite is an 80/10/10 weighting of vegetation structure, connectivity, and
+          contributing area, decomposed into ten sub-scores on a 0–10 scale (NDVI, vertical complexity,
+          species composition, shrub layer, patchiness, native regeneration, native cover) that roll up
+          into an A–F grade. It is computed in Python and materialised into
+          <code>gold.buffer_health_score</code> — the SQL migrations are pure DDL, with no spatial
+          computation hidden in them.
+        </p>
+      </section>
+
+      <!-- ============ 9 SCHEMA ============ -->
+      <section id="schema">
+        <h2><span class="num">09</span>The data model</h2>
+        <p class="lede">
+          Bronze holds raw ingest, silver holds spatial processing, gold holds aggregates. Every
+          geometry column is <code>EPSG:4269</code>, every table carries an audit timestamp, and every
+          spatial table carries a GiST index. Data flows one direction only.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Layer</th><th>Representative tables</th><th>Written by</th><th>Constraint of note</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>bronze</strong></td>
+                <td>streams, parcels, watersheds, nwi_wetlands, ssurgo_soils, riparian_training_samples</td>
+                <td>ETL ingest</td>
+                <td><code>comid</code> unique; upsert key <code>uq_parcels_parcel_id</code></td>
+              </tr>
+              <tr>
+                <td><strong>silver</strong></td>
+                <td>riparian_extent, riparian_buffers, vegetation_health, buffer_canopy, buffer_soils</td>
+                <td>Spatial + ML processing</td>
+                <td><code>CHECK (method IN ('rf','olmoearth'))</code>; probability ∈ [0,1]</td>
+              </tr>
+              <tr>
+                <td><strong>gold</strong></td>
+                <td>buffer_health_score, riparian_summary, reach_riparian</td>
+                <td>Aggregation</td>
+                <td><code>score_grade CHAR(1) CHECK IN ('A'..'F')</code>; cover_pct 0–100</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="code">
+          <figcaption><span class="path">sql/delineation_migration.sql:47–65</span><span class="lang">sql</span></figcaption>
+<pre><code>CREATE TABLE IF NOT EXISTS silver.riparian_extent (
+    id                   BIGSERIAL PRIMARY KEY,
+    method               TEXT          NOT NULL,   <span class="c">-- 'rf' | 'olmoearth'</span>
+    model_version        TEXT          NOT NULL,
+    is_riparian          BOOLEAN       NOT NULL,
+    riparian_probability NUMERIC(5, 4) NOT NULL,
+    cell_size_m          NUMERIC(6, 2) NOT NULL,
+    geom                 geometry(Polygon, 4269) NOT NULL,
+    processed_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT ck_riparian_extent_method CHECK (method IN ('rf', 'olmoearth')),
+    CONSTRAINT ck_riparian_extent_probability
+        CHECK (riparian_probability &gt;= 0 AND riparian_probability &lt;= 1)
+);
+CREATE INDEX IF NOT EXISTS idx_riparian_extent_geom
+    ON silver.riparian_extent USING GIST (geom);</code></pre>
+        </figure>
+
+        <p>
+          Storing <code>method</code> and <code>model_version</code> as columns rather than as separate
+          tables is what makes the RF-versus-foundation-model comparison a query rather than a
+          migration. The same map endpoint serves either by filtering on one column, and a disagreement
+          map between the two is a single self-join away.
+        </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            <code>TRUNCATE</code> checks foreign keys even against empty tables, so a full ETL reload
+            cannot dodge <code>CASCADE</code> by emptying dependants first — which means a full reload
+            destroys the NDVI history hanging off <code>riparian_buffers</code>. The mitigation is
+            operational (the default mode is incremental, and a full run auto-backs-up first) rather
+            than structural. A soft-delete or a versioned buffer key would be the real fix.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 10 API ============ -->
+      <section id="api">
+        <h2><span class="num">10</span>Serving: Aspire, Dapper, and vector tiles</h2>
+        <p class="lede">
+          The C# side is a thin, strictly layered read API over PostGIS. Endpoints hold no SQL,
+          services hold no data access, and the repository holds no business logic.
+        </p>
+
+        <h3>Orchestration</h3>
+        <p>
+          .NET Aspire wires the four services together and injects connection strings by service
+          discovery. Two details are load-bearing for a project living on an external drive: the
+          PostGIS container is bind-mounted rather than using a Docker volume (volumes are lost when
+          Docker restarts on removable media), and the ETL defaults to <code>incremental</code> so an
+          orchestrator restart cannot silently wipe the NDVI table.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">RiparianPoc.AppHost/Program.cs:1–36</span><span class="lang">csharp</span></figcaption>
+<pre><code>var ripariandb = builder.AddPostgres(<span class="s">"postgres"</span>)
+    .WithImage(<span class="s">"postgis/postgis"</span>).WithImageTag(<span class="s">"16-3.4"</span>)
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WithDataBindMount(<span class="s">"../pgdata"</span>)      <span class="c">// survives Docker restarts</span>
+    .AddDatabase(<span class="s">"ripariandb"</span>);
+
+var api = builder.AddProject&lt;Projects.RiparianPoc_Api&gt;(<span class="s">"api"</span>)
+    .WithReference(ripariandb).WaitFor(ripariandb)
+    .WithExternalHttpEndpoints();
+
+var etl = builder.AddDockerfile(<span class="s">"etl"</span>, <span class="s">"../python-etl"</span>)
+    .WithReference(ripariandb).WaitFor(ripariandb)
+    <span class="c">// incremental by default — a restart must not truncate NDVI</span>
+    .WithEnvironment(<span class="s">"ETL_MODE"</span>, builder.Configuration[<span class="s">"ETL_MODE"</span>] ?? <span class="s">"incremental"</span>);</code></pre>
+        </figure>
+
+        <h3>The three layers</h3>
+        <p>
+          Interfaces are segregated by return shape, not by table: <code>ISpatialQueryService</code>
+          returns GeoJSON feature collections and MVT byte arrays; <code>IComplianceDataService</code>
+          returns typed records. A handler does one thing.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">RiparianPoc.Api/Endpoints/GeoDataEndpoints.cs:100–108 · Services/GeoDataServices.cs:147–176</span><span class="lang">csharp</span></figcaption>
+<pre><code><span class="c">// endpoint: inject, call, return. No SQL here, ever.</span>
+private static async Task&lt;IResult&gt; GetBuffersWithHealth(
+    ISpatialQueryService spatialService, CancellationToken ct)
+{
+    var fc = await spatialService.GetBuffersWithHealthAsync(ct);
+    return TypedResults.Ok(fc);
+}
+
+<span class="c">// service: owns the SQL and the span</span>
+using var activity = Source.StartActivity(<span class="s">"SpatialQuery.GetBuffersWithHealth"</span>);
+const string sql = <span class="s">"""
+    SELECT rb.id, rb.stream_id, rb.buffer_distance_m, rb.area_sq_m,
+           s.gnis_name AS stream_name,
+           vh.mean_ndvi, vh.health_category, vh.acquisition_date,
+           ST_AsGeoJSON(rb.geom) AS geojson
+    FROM silver.riparian_buffers rb
+    JOIN bronze.streams s ON s.id = rb.stream_id
+    LEFT JOIN LATERAL (
+        SELECT mean_ndvi, health_category, acquisition_date
+        FROM silver.vegetation_health
+        WHERE buffer_id = rb.id AND season_context = 'peak_growing'
+        ORDER BY acquisition_date DESC
+        LIMIT 1
+    ) vh ON TRUE
+    """</span>;
+var fc = await _repository.QueryGeoJsonAsync(sql, null, ct);
+activity?.SetTag(FeatureCountTag, fc.Count);</code></pre>
+        </figure>
+
+        <p>
+          The <code>LEFT JOIN LATERAL … LIMIT 1</code> is the right tool here: it fetches the most
+          recent peak-growing reading per buffer in one pass, keeps buffers with no reading at all
+          (which render in the default colour rather than vanishing), and avoids both a correlated
+          subquery per row and a window function over the entire history table.
+        </p>
+
+        <h3>Vector tiles with an index-backed pre-filter</h3>
+        <p>
+          Every tile query follows one pattern. <code>ST_TileEnvelope</code> builds the tile bounds in
+          Web Mercator; the join condition transforms that envelope <em>back</em> to 4269 and uses the
+          <code>&amp;&amp;</code> bounding-box operator, which is what lets PostgreSQL hit the GiST index
+          before doing any expensive geometry work. Reprojection happens only on the handful of rows
+          that survive.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">RiparianPoc.Api/Services/GeoDataServices.cs:280–314</span><span class="lang">sql</span></figcaption>
+<pre><code>WITH tile AS (
+    SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
+),
+mvt_geom AS (
+    SELECT b.id,
+           ST_AsMVTGeom(ST_Transform(b.geom, 3857), tile.envelope) AS geom,
+           b.buffer_distance_m,
+           COALESCE(h.score_grade, 'Unknown') as grade,
+           h.composite_score
+    FROM silver.riparian_buffers b
+    JOIN tile ON b.geom &amp;&amp; ST_Transform(tile.envelope, 4269)  <span class="c">-- GiST pre-filter</span>
+    LEFT JOIN LATERAL (
+        SELECT score_grade, composite_score
+        FROM gold.buffer_health_score s
+        WHERE s.buffer_id = b.id ORDER BY s.id DESC LIMIT 1
+    ) h ON true
+)
+SELECT ST_AsMVT(mvt_geom.*, 'buffers', 4096, 'geom') FROM mvt_geom;</code></pre>
+        </figure>
+
+        <p>
+          That change alone made tile queries 10–40× faster. The repository returns the protobuf blob
+          straight from <code>ExecuteScalarAsync&lt;byte[]&gt;</code> — the tile is encoded in the database
+          and never materialised as .NET geometry objects.
+        </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">Scrutinize</span>
+          <p>
+            The tile SQL has no <code>z</code> guard. A request for <code>/api/tiles/0/0/0.pbf</code>
+            selects every buffer in the basin, encodes them at 4096 extent, and returns a blob nobody can
+            render. Real tile servers clamp minimum zoom, or simplify by zoom level with
+            <code>ST_Simplify</code> tied to tile resolution. There is also no HTTP caching header on the
+            tile response, so every pan refetches.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 11 FRONTEND ============ -->
+      <section id="frontend">
+        <h2><span class="num">11</span>The map</h2>
+        <p class="lede">
+          React 18 with <code>react-map-gl/maplibre</code> over MapLibre GL 3.6.2, Vite 6, Tailwind 3.
+          Layers are vector tiles wherever volume justifies it and GeoJSON where it does not. Styling is
+          pushed into MapLibre paint expressions so the GPU does the work, not React.
+        </p>
+
+        <p>
+          Categorical data uses <code>match</code>; continuous data uses <code>interpolate</code>. Model
+          probability is continuous, so riparian extent ramps rather than steps:
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">frontend/src/App.tsx:595–623</span><span class="lang">tsx</span></figcaption>
+<pre><code>&lt;Source id="riparian-extent-source" type="geojson" data={riparianExtent ?? EMPTY_FC}&gt;
+  &lt;Layer id="riparian-extent-fill" type="fill"
+    layout={{ visibility: showRiparianExtent ? 'visible' : 'none' }}
+    paint={{
+      'fill-color': [
+        'interpolate', ['linear'], ['get', 'riparian_probability'],
+        0.5,  '#a7f3d0',
+        0.75, '#34d399',
+        1.0,  '#059669',
+      ],
+      'fill-opacity': 0.6,
+      'fill-outline-color': '#047857',
+    }} /&gt;
+&lt;/Source&gt;</code></pre>
+        </figure>
+
+        <p>
+          The timelapse works by rebuilding the tile URL template when the selected date changes, and
+          keying the <code>&lt;Source&gt;</code> on that date so MapLibre remounts and refetches. Layer
+          visibility is toggled through the <code>layout.visibility</code> property rather than by
+          unmounting components — the tiles stay in MapLibre's cache, so toggling a layer back on is
+          instant.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">frontend/src/App.tsx:301–305, 720–730</span><span class="lang">tsx</span></figcaption>
+<pre><code>const ndviTileUrl = useMemo(() =&gt; {
+  if (selectedDate)
+    return `${API_URL}/api/tiles/buffers-ndvi/${selectedDate}/{z}/{x}/{y}.pbf`;
+  return `${API_URL}/api/tiles/buffers-ndvi/{z}/{x}/{y}.pbf`;
+}, [selectedDate]);
+
+<span class="c">// key forces a source remount when the date changes</span>
+&lt;Source key={`ndvi-tiles-${selectedDate ?? 'latest'}`}
+        id="buffer-ndvi-source" type="vector" tiles={[ndviTileUrl]}&gt;</code></pre>
+        </figure>
+
+        <p>
+          Session correlation is end-to-end. A UUID is minted per page load and attached to every
+          request — including MapLibre's own tile fetches, via <code>transformRequest</code>, which is
+          easy to forget and would otherwise leave the tile traffic untraceable.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">frontend/src/App.tsx:20, 172–196, 311–317</span><span class="lang">tsx</span></figcaption>
+<pre><code>const SESSION_ID = crypto.randomUUID();
+
+async function fetchJson&lt;T&gt;(url: string): Promise&lt;T&gt; {
+  const res = await fetch(url, { headers: { 'X-Session-Id': SESSION_ID } });
+  const correlationId = res.headers.get('X-Correlation-Id');
+  if (correlationId) console.debug(`[API] ${url} correlation=${correlationId}`);
+  if (!res.ok) { <span class="c">/* parse ApiErrorResponse, surface correlationId */</span> }
+  return res.json() as Promise&lt;T&gt;;
+}
+
+<span class="c">// MapLibre tile requests carry the session too</span>
+const transformRequest = useCallback((url: string) =&gt;
+  url.includes('/api/') ? { url, headers: { 'X-Session-Id': SESSION_ID } } : { url }, []);</code></pre>
+        </figure>
+      </section>
+
+      <!-- ============ 12 OBS ============ -->
+      <section id="obs">
+        <h2><span class="num">12</span>Observability and failure behaviour</h2>
+        <p>
+          Three custom <code>ActivitySource</code>s are registered additively on top of Aspire's
+          defaults, giving a trace hierarchy of HTTP request → service span → repository span → Npgsql
+          span. Every repository call tags its duration and row count; a failed query marks the span red
+          before rethrowing.
+        </p>
+
+        <figure class="code">
+          <figcaption><span class="path">RiparianPoc.Api/Program.cs · Middleware/ExceptionHandlingMiddleware.cs:55–70</span><span class="lang">csharp</span></figcaption>
+<pre><code>builder.Services.AddOpenTelemetry().WithTracing(t =&gt; t
+    .AddSource(<span class="s">"RiparianPoc.Api.Repository"</span>)
+    .AddSource(<span class="s">"RiparianPoc.Api.SpatialQuery"</span>)
+    .AddSource(<span class="s">"RiparianPoc.Api.ComplianceData"</span>));
+
+<span class="c">// one place decides how a failure becomes a status code</span>
+var (statusCode, message) = exception switch
+{
+    NpgsqlException            =&gt; (503, <span class="s">"Database temporarily unavailable"</span>),
+    _ when exception.InnerException is NpgsqlException
+                               =&gt; (503, <span class="s">"Database temporarily unavailable"</span>),
+    ArgumentException ex       =&gt; (400, ex.Message),      <span class="c">// 4xx: safe to echo</span>
+    KeyNotFoundException ex    =&gt; (404, ex.Message),
+    OperationCanceledException =&gt; (504, <span class="s">"Request timed out"</span>),
+    _                          =&gt; (500, <span class="s">"An unexpected error occurred"</span>),  <span class="c">// 5xx: never echo</span>
+};</code></pre>
+        </figure>
+
+        <p>
+          Client messages are asymmetric on purpose: 4xx responses echo the exception message because
+          the caller caused it and can fix it; 5xx responses return a generic string, with the exception
+          detail exposed only in Development. Every response carries an <code>X-Correlation-Id</code>,
+          which CORS explicitly exposes so the browser can read it — the reason a user-reported error can
+          be traced to one span in the Aspire dashboard.
+        </p>
+      </section>
+
+      <!-- ============ ATTACK ============ -->
+      <section id="attack">
+        <h2>Where a reviewer should attack this</h2>
+        <p class="lede">
+          Collected in one place, ordered by how much they should change your confidence in the
+          result. The first three are science; the rest are engineering.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th style="width:22%">Issue</th><th>Why it matters</th><th style="width:20%">Severity</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Two validated tiles</strong></td>
+                <td>Spatial CV is honest, but NMRipMap coverage exists only for New Mexico. The Colorado tile still runs on weak labels — the same weak labels that scored ~0.00 F1 on an agricultural valley. Its output is unvalidated, and the map does not say so.</td>
+                <td>Undermines the basin-scale claim</td>
+              </tr>
+              <tr>
+                <td><strong>Threshold tuned on a training tile</strong></td>
+                <td><code>PROBABILITY_THRESHOLD = 0.30</code> came from a sweep against NMRipMap on Malpais, which also contributed training pixels, then is applied globally.</td>
+                <td>Optimistic bias, unquantified</td>
+              </tr>
+              <tr>
+                <td><strong>RF vs OlmoEarth is not like-for-like</strong></td>
+                <td>Different resolution (patch vs pixel), different label aggregation (majority vote), different CV block size (0.004° vs 0.02°). The direction of the 0.73 / 0.46 result is likely robust; the margin is not a clean measurement.</td>
+                <td>Bounds the negative result</td>
+              </tr>
+              <tr>
+                <td><strong>Sentinel-1 fetched, never used</strong></td>
+                <td>SAR is loaded by <code>stac.py</code> and absent from the 22-feature stack. The multi-sensor claim is currently aspirational on the modelling side.</td>
+                <td>Missing capability</td>
+              </tr>
+              <tr>
+                <td><strong>Three NDVI threshold sets</strong></td>
+                <td>Schema comments, CLAUDE.md/legend, and <code>classify_health</code> disagree. Users read the legend; the database stores what the code decided.</td>
+                <td>Correctness / trust</td>
+              </tr>
+              <tr>
+                <td><strong>No zoom guard on MVT</strong></td>
+                <td><code>z=0</code> selects the whole basin. No <code>ST_Simplify</code> by zoom, no cache headers.</td>
+                <td>Availability under load</td>
+              </tr>
+              <tr>
+                <td><strong>Degrees-per-metre uses latitude only</strong></td>
+                <td>Pixels are ~23% narrower on the ground than tall at 37°N. Consistent across products, but pixel-count areas (including the 500 m² MMU) inherit it.</td>
+                <td>Small, systematic</td>
+              </tr>
+              <tr>
+                <td><strong>Full reload destroys NDVI history</strong></td>
+                <td>FK cascade from <code>riparian_buffers</code>. Mitigated by defaulting to incremental and auto-backup, not by schema design.</td>
+                <td>Operational</td>
+              </tr>
+              <tr>
+                <td><strong>No C#/frontend test suites</strong></td>
+                <td>Python has a pure-function pytest suite covering indices, temporal stats, weak labels and validation metrics. The API and the map have build/lint only.</td>
+                <td>Coverage gap</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Worth saying plainly: the reason this list can be written at all is that the pipeline was
+          built to produce falsifiable numbers. Spatial cross-validation against an independent reference
+          is what surfaced the weak-label failure, and it is what made the foundation model's loss
+          visible instead of flattering.
+        </p>
+      </section>
+
+      <!-- ============ SKILLS ============ -->
+      <section id="skills">
+        <h2>What building this actually required</h2>
+        <p class="lede">
+          Mapped against the four qualification bullets this document was written to test. Three hold
+          up; one does not, and two large areas are missing from the list entirely.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th style="width:30%">Claimed qualification</th><th>Verdict against the code</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Satellite-data pipelines: Sentinel-1, Sentinel-2, Landsat/HLS, DEM, STAC-based ETL</strong></td>
+                <td><strong>Accurate, with one correction.</strong> Sentinel-2 L2A, Sentinel-1 RTC and 3DEP/Copernicus DEM all come through the Planetary Computer STAC API with signing, cloud filtering and SCL masking. HLS is not used — that clause should be dropped. Sentinel-1 is ingested but not yet modelled.</td>
+              </tr>
+              <tr>
+                <td><strong>Spatial data modeling, ArcGIS Online, ArcSDE, hosted feature services, PostGIS</strong></td>
+                <td><strong>Overstated.</strong> PostGIS is genuinely central — medallion schema, geography casts, GiST indexes, <code>ST_AsMVT</code> tile generation. But the project only <em>consumes</em> public ArcGIS REST endpoints as read-only sources; nothing publishes to ArcGIS Online, and ArcSDE appears nowhere. Rephrase as "PostGIS spatial modeling and vector-tile serving; consuming ArcGIS REST feature services."</td>
+              </tr>
+              <tr>
+                <td><strong>Map-based decision-support UX with React, MapLibre, and geospatial APIs</strong></td>
+                <td><strong>Accurate.</strong> React 18, MapLibre GL via <code>react-map-gl</code>, MVT sources with paint expressions, GeoJSON overlays, layer toggles, legend, timelapse slider, basemap switching, and end-to-end session correlation through <code>transformRequest</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>Environmental monitoring</strong></td>
+                <td><strong>Accurate and central.</strong> Phenology-aware NDVI, an SMP composite condition score, invasive cover, and a change-detection stage. The domain reasoning — phreatophytes as the discriminating signal — drives the feature design, not the other way around.</td>
+              </tr>
+              <tr>
+                <td><em>Missing: geospatial machine learning</em></td>
+                <td>Weak supervision, spatial cross-validation, foundation-model benchmarking, physically-constrained post-processing. This is the most differentiating work in the repo and the list omits it entirely.</td>
+              </tr>
+              <tr>
+                <td><em>Missing: backend and platform engineering</em></td>
+                <td>C# .NET 10 minimal APIs, Dapper over <code>NpgsqlDataSource</code>, layered SOLID service architecture, .NET Aspire orchestration, OpenTelemetry tracing with correlation middleware, Docker, Azure deployment.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Read as written, the original four bullets describe someone who could build the map and wire
+          up the ETL. They would not describe the person who wrote <code>validate.py</code> — and that
+          file is the reason any of the numbers above can be believed.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          Every code excerpt is verbatim from the repository at commit <code>b79098c</code>, branch
+          <code>feat/docintel-private-split</code>. File paths and line ranges are given so each claim can
+          be checked against source.
+        </p>
+        <p>
+          Reproduce: <code>./dev.sh</code> to bring up PostGIS and Aspire · <code>cd python-etl &amp;&amp;
+          pytest</code> for the pure-function suite · <code>./dev.sh --lint</code> for SonarQube analysis.
+          Tests marked <code>@pytest.mark.live</code> hit the real STAC API and database and are skipped
+          in CI.
+        </p>
+      </footer>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>
