@@ -920,17 +920,17 @@ export default function App() {
                 <LegendItem
                   color="bg-green-600/70"
                   shape="box"
-                  label="Healthy (>0.3)"
+                  label="Healthy (>0.25)"
                 />
                 <LegendItem
                   color="bg-amber-400/70"
                   shape="box"
-                  label="Degraded (0.15-0.3)"
+                  label="Degraded (0.10-0.25)"
                 />
                 <LegendItem
                   color="bg-red-600/70"
                   shape="box"
-                  label="Bare (<0.15)"
+                  label="Bare (<0.10)"
                 />
                 <LegendItem
                   color="bg-emerald-400/50"
