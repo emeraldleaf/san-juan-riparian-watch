@@ -276,312 +276,162 @@ public sealed class SpatialQueryService : ISpatialQueryService
         return fc;
     }
 
-    /// <inheritdoc />
-    public async Task<byte[]> GetBufferTilesAsync(int z, int x, int y, CancellationToken ct)
+    /// <summary>
+    /// Shared execution path for every MVT tile endpoint: opens the SpatialQuery span,
+    /// tags the tile coordinates, runs the query, and normalizes a null result to an
+    /// empty tile. Only the SQL (built by <see cref="MvtTileSql"/>) and parameters vary.
+    /// </summary>
+    private async Task<byte[]> RenderTileAsync(
+        string activityName, int z, int x, int y, string sql, object parameters,
+        CancellationToken ct, (string Key, string Value)? extraTag = null)
     {
-        using var activity = Source.StartActivity("SpatialQuery.GetBufferTiles");
+        using var activity = Source.StartActivity(activityName);
         activity?.SetTag("tile.z", z);
         activity?.SetTag("tile.x", x);
         activity?.SetTag("tile.y", y);
+        if (extraTag is { } t)
+        {
+            activity?.SetTag(t.Key, t.Value);
+        }
 
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    b.id,
-                    ST_AsMVTGeom(ST_Transform(b.geom, 3857), tile.envelope) AS geom,
-                    b.buffer_distance_m,
-                    COALESCE(h.score_grade, 'Unknown') as grade,
-                    h.composite_score
-                FROM silver.riparian_buffers b
-                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
-                LEFT JOIN LATERAL (
-                    SELECT score_grade, composite_score
-                    FROM gold.buffer_health_score s
-                    WHERE s.buffer_id = b.id
-                    ORDER BY s.id DESC
-                    LIMIT 1
-                ) h ON true
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'buffers', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
+        var result = await _repository.QueryMvtAsync(sql, parameters, ct);
+        activity?.SetTag("result.byte_count", result?.Length ?? 0);
         return result ?? [];
     }
 
     /// <inheritdoc />
-    public async Task<byte[]> GetVegetationTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetVegetationTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    b.id,
-                    ST_AsMVTGeom(ST_Transform(b.geom, 3857), tile.envelope) AS geom,
-                    COALESCE(v.dominant_lifeform, 'Unknown') AS lifeform,
-                    COALESCE(v.evt_name, 'Unknown') AS evt_name
-                FROM silver.riparian_buffers b
-                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
-                LEFT JOIN silver.buffer_vegetation_structure v ON b.id = v.buffer_id
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'vegetation', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetBufferTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetBufferTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "buffers",
+                geom: "b.geom",
+                columns: "b.id, b.buffer_distance_m, COALESCE(h.score_grade, 'Unknown') as grade, h.composite_score",
+                from: "silver.riparian_buffers b",
+                extraJoins: """
+                    LEFT JOIN LATERAL (
+                        SELECT score_grade, composite_score
+                        FROM gold.buffer_health_score s
+                        WHERE s.buffer_id = b.id
+                        ORDER BY s.id DESC
+                        LIMIT 1
+                    ) h ON true
+                    """),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetWetlandTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetWetlandTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    w.id,
-                    w.wetland_type,
-                    ST_AsMVTGeom(ST_Transform(w.geom, 3857), tile.envelope) AS geom
-                FROM bronze.nwi_wetlands w
-                JOIN tile ON w.geom && ST_Transform(tile.envelope, 4269)
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'wetlands', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetVegetationTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetVegetationTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "vegetation",
+                geom: "b.geom",
+                columns: "b.id, COALESCE(v.dominant_lifeform, 'Unknown') AS lifeform, COALESCE(v.evt_name, 'Unknown') AS evt_name",
+                from: "silver.riparian_buffers b",
+                extraJoins: "LEFT JOIN silver.buffer_vegetation_structure v ON b.id = v.buffer_id"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetSoilTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetSoilTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    s.id,
-                    s.musym,
-                    s.hydric_rating,
-                    ST_AsMVTGeom(ST_Transform(s.geom, 3857), tile.envelope) AS geom
-                FROM bronze.ssurgo_soils s
-                JOIN tile ON s.geom && ST_Transform(tile.envelope, 4269)
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'soils', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetWetlandTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetWetlandTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "wetlands",
+                geom: "w.geom",
+                columns: "w.id, w.wetland_type",
+                from: "bronze.nwi_wetlands w"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetStreamTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetStreamTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    s.id,
-                    ST_AsMVTGeom(ST_Transform(s.geom, 3857), tile.envelope) AS geom,
-                    s.comid,
-                    s.gnis_name,
-                    s.stream_order,
-                    s.length_km
-                FROM bronze.streams s
-                JOIN tile ON s.geom && ST_Transform(tile.envelope, 4269)
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'streams', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetSoilTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetSoilTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "soils",
+                geom: "s.geom",
+                columns: "s.id, s.musym, s.hydric_rating",
+                from: "bronze.ssurgo_soils s"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetParcelTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetParcelTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    p.id,
-                    ST_AsMVTGeom(ST_Transform(p.geom, 3857), tile.envelope) AS geom,
-                    p.parcel_id,
-                    p.land_use_desc,
-                    p.owner_name,
-                    p.land_acres,
-                    COALESCE(pc.is_focus_area, FALSE) AS is_focus_area,
-                    pc.overlap_pct,
-                    pc.focus_area_reason
-                FROM bronze.parcels p
-                JOIN tile ON p.geom && ST_Transform(tile.envelope, 4269)
-                LEFT JOIN silver.parcel_compliance pc ON pc.parcel_id = p.id
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'parcels', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetStreamTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetStreamTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "streams",
+                geom: "s.geom",
+                columns: "s.id, s.comid, s.gnis_name, s.stream_order, s.length_km",
+                from: "bronze.streams s"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetBufferNdviTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetBufferNdviTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    b.id,
-                    ST_AsMVTGeom(ST_Transform(b.geom, 3857), tile.envelope) AS geom,
-                    b.buffer_distance_m,
-                    b.area_sq_m,
-                    COALESCE(s.gnis_name, 'Unknown') AS stream_name,
-                    vh.mean_ndvi,
-                    vh.health_category,
-                    vh.acquisition_date::text AS acquisition_date
-                FROM silver.riparian_buffers b
-                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
-                JOIN bronze.streams s ON s.id = b.stream_id
-                LEFT JOIN LATERAL (
-                    SELECT mean_ndvi, health_category, acquisition_date
-                    FROM silver.vegetation_health
-                    WHERE buffer_id = b.id AND season_context = 'peak_growing'
-                    ORDER BY acquisition_date DESC
-                    LIMIT 1
-                ) vh ON TRUE
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'buffers', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetParcelTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetParcelTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "parcels",
+                geom: "p.geom",
+                columns: "p.id, p.parcel_id, p.land_use_desc, p.owner_name, p.land_acres, COALESCE(pc.is_focus_area, FALSE) AS is_focus_area, pc.overlap_pct, pc.focus_area_reason",
+                from: "bronze.parcels p",
+                extraJoins: "LEFT JOIN silver.parcel_compliance pc ON pc.parcel_id = p.id"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
-    public async Task<byte[]> GetBufferNdviTilesByDateAsync(
+    public Task<byte[]> GetBufferNdviTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetBufferNdviTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "buffers",
+                geom: "b.geom",
+                columns: "b.id, b.buffer_distance_m, b.area_sq_m, COALESCE(s.gnis_name, 'Unknown') AS stream_name, vh.mean_ndvi, vh.health_category, vh.acquisition_date::text AS acquisition_date",
+                from: "silver.riparian_buffers b",
+                extraJoins: """
+                    JOIN bronze.streams s ON s.id = b.stream_id
+                    LEFT JOIN LATERAL (
+                        SELECT mean_ndvi, health_category, acquisition_date
+                        FROM silver.vegetation_health
+                        WHERE buffer_id = b.id AND season_context = 'peak_growing'
+                        ORDER BY acquisition_date DESC
+                        LIMIT 1
+                    ) vh ON TRUE
+                    """),
+            new { z, x, y }, ct);
+
+    /// <inheritdoc />
+    public Task<byte[]> GetBufferNdviTilesByDateAsync(
         int z, int x, int y, DateOnly date, CancellationToken ct)
     {
-        using var activity = Source.StartActivity("SpatialQuery.GetBufferNdviTilesByDate");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-        activity?.SetTag("filter.date", date.ToString("yyyy-MM-dd"));
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    b.id,
-                    ST_AsMVTGeom(ST_Transform(b.geom, 3857), tile.envelope) AS geom,
-                    b.buffer_distance_m,
-                    b.area_sq_m,
-                    COALESCE(s.gnis_name, 'Unknown') AS stream_name,
-                    vh.mean_ndvi,
-                    vh.health_category,
-                    vh.acquisition_date::text AS acquisition_date
-                FROM silver.riparian_buffers b
-                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
+        var sql = MvtTileSql.Build(
+            layer: "buffers",
+            geom: "b.geom",
+            columns: "b.id, b.buffer_distance_m, b.area_sq_m, COALESCE(s.gnis_name, 'Unknown') AS stream_name, vh.mean_ndvi, vh.health_category, vh.acquisition_date::text AS acquisition_date",
+            from: "silver.riparian_buffers b",
+            extraJoins: """
                 JOIN bronze.streams s ON s.id = b.stream_id
                 LEFT JOIN silver.vegetation_health vh
                     ON vh.buffer_id = b.id
                     AND vh.season_context = 'peak_growing'
                     AND vh.acquisition_date = @date
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'buffers', 4096, 'geom')
-            FROM mvt_geom;
-            """;
+                """);
 
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y, date }, ct);
-        return result ?? [];
+        return RenderTileAsync("SpatialQuery.GetBufferNdviTilesByDate", z, x, y,
+            sql, new { z, x, y, date }, ct,
+            extraTag: ("filter.date", date.ToString("yyyy-MM-dd")));
     }
 
     /// <inheritdoc />
-    public async Task<byte[]> GetBufferCentroidTilesAsync(int z, int x, int y, CancellationToken ct)
-    {
-        using var activity = Source.StartActivity("SpatialQuery.GetBufferCentroidTiles");
-        activity?.SetTag("tile.z", z);
-        activity?.SetTag("tile.x", x);
-        activity?.SetTag("tile.y", y);
-
-        const string sql = """
-            WITH tile AS (
-                SELECT ST_TileEnvelope(@z, @x, @y) AS envelope
-            ),
-            mvt_geom AS (
-                SELECT
-                    b.id,
-                    ST_AsMVTGeom(ST_Transform(ST_Centroid(b.geom), 3857), tile.envelope) AS geom,
-                    vh.mean_ndvi
-                FROM silver.riparian_buffers b
-                JOIN tile ON b.geom && ST_Transform(tile.envelope, 4269)
-                LEFT JOIN LATERAL (
-                    SELECT mean_ndvi
-                    FROM silver.vegetation_health
-                    WHERE buffer_id = b.id AND season_context = 'peak_growing'
-                    ORDER BY acquisition_date DESC
-                    LIMIT 1
-                ) vh ON TRUE
-                WHERE vh.mean_ndvi IS NOT NULL
-            )
-            SELECT ST_AsMVT(mvt_geom.*, 'centroids', 4096, 'geom')
-            FROM mvt_geom;
-            """;
-
-        var result = await _repository.QueryMvtAsync(sql, new { z, x, y }, ct);
-        return result ?? [];
-    }
+    public Task<byte[]> GetBufferCentroidTilesAsync(int z, int x, int y, CancellationToken ct) =>
+        RenderTileAsync("SpatialQuery.GetBufferCentroidTiles", z, x, y,
+            MvtTileSql.Build(
+                layer: "centroids",
+                geom: "b.geom",
+                renderGeom: "ST_Centroid(b.geom)",
+                columns: "b.id, vh.mean_ndvi",
+                from: "silver.riparian_buffers b",
+                extraJoins: """
+                    LEFT JOIN LATERAL (
+                        SELECT mean_ndvi
+                        FROM silver.vegetation_health
+                        WHERE buffer_id = b.id AND season_context = 'peak_growing'
+                        ORDER BY acquisition_date DESC
+                        LIMIT 1
+                    ) vh ON TRUE
+                    """,
+                where: "WHERE vh.mean_ndvi IS NOT NULL"),
+            new { z, x, y }, ct);
 
     /// <inheritdoc />
     public async Task<FeatureCollection> GetBufferHealthCentroidsAsync(CancellationToken ct)
