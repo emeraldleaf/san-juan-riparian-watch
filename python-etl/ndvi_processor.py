@@ -197,9 +197,9 @@ def classify_health(mean_ndvi: float, season: str) -> str:
     Thresholds calibrated for the semi-arid San Juan Basin (HUC8 14080101)
     where peak-growing median NDVI is ~0.17:
 
-    - **healthy** (>0.3): Actual riparian vegetation with measurable canopy.
-    - **degraded** (0.15–0.3): Sparse cover, grasses, or stressed vegetation.
-    - **bare** (<0.15): Exposed soil, rock, or water with minimal vegetation.
+    - **healthy** (>0.25): Actual riparian vegetation with measurable canopy.
+    - **degraded** (0.10–0.25): Sparse cover, grasses, or stressed vegetation.
+    - **bare** (<0.10): Exposed soil, rock, or water with minimal vegetation.
 
     Dormant-season readings are always classified as ``'dormant'``,
     never ``'bare'``.
@@ -214,9 +214,9 @@ def classify_health(mean_ndvi: float, season: str) -> str:
     """
     if season == "dormant":
         return "dormant"
-    if mean_ndvi > 0.3:
+    if mean_ndvi > 0.25:
         return "healthy"
-    if mean_ndvi >= 0.15:
+    if mean_ndvi >= 0.10:
         return "degraded"
     return "bare"
 
@@ -804,7 +804,12 @@ class NdviProcessor:
         if last_date:
             start = last_date + timedelta(days=1)
         else:
-            start = date(datetime.now().year, 6, 1)
+            now = date.today()
+            start = date(now.year, 6, 1)
+            # If we are before the start of the current growing season,
+            # fall back to the previous year's season.
+            if start > now:
+                start = date(now.year - 1, 6, 1)
 
         end = date.today()
         if start > end:
@@ -834,7 +839,7 @@ class NdviProcessor:
             return 0
         logger.info("Found %d scenes for incremental processing", len(items))
 
-        all_readings: list[NdviReading] = []
+        total_count = 0
         for scene_idx, item in enumerate(items, start=1):
             parsed = _parse_stac_item(item)
             if parsed is None:
@@ -851,7 +856,9 @@ class NdviProcessor:
                     nir_href, red_href, acq_date, item,
                     buffers, watershed_bbox, processed,
                 )
-                all_readings.extend(readings)
+                if readings:
+                    c = self._writer.write_readings(readings)
+                    total_count += c
             except (rasterio.RasterioIOError, ValueError) as exc:
                 logger.warning(
                     "Failed to process scene %s: %s", item.id, exc,
@@ -862,6 +869,5 @@ class NdviProcessor:
                 "  Scene %s: %d new readings", item.id, len(readings),
             )
 
-        count = self._writer.write_readings(all_readings)
-        logger.info("Wrote %d new NDVI readings", count)
-        return count
+        logger.info("Wrote %d new NDVI readings", total_count)
+        return total_count

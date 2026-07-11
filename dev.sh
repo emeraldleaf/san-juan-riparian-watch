@@ -150,10 +150,8 @@ apply_schema() {
 # ---------------------------------------------------------------------------
 
 ensure_frontend_deps() {
-    if [ ! -d "$SCRIPT_DIR/frontend/node_modules" ]; then
-        info "Installing frontend dependencies..."
-        (cd "$SCRIPT_DIR/frontend" && npm install)
-    fi
+    info "Syncing frontend dependencies..."
+    (cd "$SCRIPT_DIR/frontend" && npm install)
 }
 
 # ---------------------------------------------------------------------------
@@ -399,6 +397,16 @@ cmd_reconnect() {
 
 cmd_update() {
     local update_type="${1:-all}"
+    local force_flag=""
+    # Check if --force was passed as $2 or $3
+    shift || true
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force) force_flag="--force" ;;
+            *) ;;
+        esac
+        shift
+    done
     local valid_types="full incremental ndvi all"
     if [[ ! " $valid_types " =~ " $update_type " ]]; then
         error "Invalid update type: $update_type"
@@ -445,7 +453,7 @@ cmd_update() {
 
     if [ -n "$etl_cid" ]; then
         info "Using existing ETL container ($etl_cid)"
-        docker exec "$etl_cid" python entrypoint.py --mode "$update_type"
+        docker exec "$etl_cid" python entrypoint.py --mode "$update_type" $force_flag
     else
         # Build ETL image and run one-shot on the same network as PostGIS
         info "Building ETL image..."
@@ -462,7 +470,7 @@ cmd_update() {
         docker run --rm \
             --network="$network" \
             -e "DATABASE_URL=postgresql://postgres:${pg_pass}@${pg_host}:5432/ripariandb" \
-            riparian-etl python entrypoint.py --mode "$update_type"
+            riparian-etl python entrypoint.py --mode "$update_type" $force_flag
     fi
 
     info "Update complete."
@@ -721,7 +729,7 @@ case "${1:-}" in
     --stop)         cmd_stop ;;
     --restart)      cmd_restart ;;
     --reconnect)    cmd_reconnect ;;
-    --update)       cmd_update "${2:-all}" ;;
+    --update)       cmd_update "${2:-all}" "${@:3}" ;;
     --backup)       cmd_backup ;;
     --restore)      cmd_restore "${2:-}" ;;
     --sonar)        cmd_sonar_start ;;
@@ -736,7 +744,7 @@ case "${1:-}" in
         echo "  --restart          Restart all services"
         echo "  --stop             Stop Aspire (PostGIS container persists)"
         echo "  --reconnect        Recover after external drive disconnect/reconnect"
-        echo "  --update [type]    Run incremental update (full|incremental|ndvi|all)"
+        echo "  --update [type]    Run ETL update (full|incremental|ndvi|all) [--force]"
         echo ""
         echo "  Database:"
         echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"
