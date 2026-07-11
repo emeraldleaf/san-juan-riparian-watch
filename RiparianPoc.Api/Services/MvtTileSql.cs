@@ -32,6 +32,15 @@ internal static class MvtTileSql
         string where = "",
         string? renderGeom = null)
     {
+        // Defense in depth: the layer name is interpolated into a single-quoted SQL literal.
+        // All callers pass compile-time constants, but validate anyway so a future caller can't
+        // introduce an injection through it. Every real layer is a lowercase identifier.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(layer, "^[a-z_]+$"))
+        {
+            throw new ArgumentException(
+                $"Layer name must be a lowercase identifier, got '{layer}'", nameof(layer));
+        }
+
         var render = renderGeom ?? geom;
         return $"""
             WITH tile AS (
