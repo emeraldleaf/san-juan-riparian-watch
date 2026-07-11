@@ -1,9 +1,71 @@
 # Project Status
 
-**Last updated:** 2026-07-04
+**Last updated:** 2026-07-11
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
+
+## Current state — git, PRs, and WHY things are where they are (2026-07-11)
+
+**READ THIS FIRST if you are a coding agent picking up the repo.** This section explains an
+intentionally unusual git state so you don't "helpfully" re-commit things or close issues early.
+
+### Branches
+- Working branch **`feat/docintel-private-split`** @ `3b824f0` (pushed to origin).
+  - `ad89b67` — ETL enrichment/scoring WIP **+ review-driven bug fixes** (see below).
+  - `3b824f0` — untracked build artifacts (`.sonarqube/`, `__pycache__`, `.DS_Store` now gitignored).
+- **This branch is BEHIND `main`.** `main` has PRs #3 and #4 merged; this branch predates them.
+  That is WHY ~10 files show as "uncommitted" here but must **NOT** be committed on this branch:
+  `RiparianPoc.Api/Services/{GeoDataServices,MvtTileSql}.cs`, the C# tests, `RiparianPoc.Api.csproj`,
+  `frontend/src/{App.tsx,components/NDVILayer.tsx}`, `docs/{engineering-review.html,index.html,.nojekyll}`
+  are the **content of PRs #3/#4/#5**. Committing them here duplicates the PRs and will conflict.
+  They reconcile when this branch is synced with `main` (rebase/merge) after PR #5 lands.
+- Genuinely uncommitted + left alone: 5 misc config files (`.vscode`, `.claude/settings.json`,
+  `aspire.config.json`, `README_SONAR.md`, deleted `.codacy/codacy.yaml`) — user's call.
+
+### PRs (base = `main`)
+- **#3 MERGED** — GitHub Pages: `docs/engineering-review.html` walkthrough (live at
+  `https://emeraldleaf.github.io/san-juan-riparian-watch/engineering-review.html`) + root redirect.
+- **#4 MERGED** — MVT tile SQL unified into `MvtTileSql.Build` + `RenderTileAsync`; C# xUnit tests
+  (`RiparianPoc.Api.Tests`); `result.byte_count` span tag; stale-test-doc fixes.
+- **#5 OPEN** — map-UI fixes (DEBUG colors removed, 3-way legend, stale-response guard, heatmap
+  weight clamp, default recenter) + soil/wetland tile popup enrichment + `MvtTileSql` layer-name
+  validation + NDVI legend/CLAUDE.md threshold reconciliation. Labeled `coderabbit`.
+
+### Open issues (base = `main`)
+- **#6 / #7 / #8** — the 3 HIGH ETL bugs from the ultracode review. Their FIXES are committed on
+  `feat/docintel-private-split` (`ad89b67`) but **NOT on `main`**, so the issues stay OPEN until this
+  branch's ETL work merges. Do not close them against `main` yet.
+
+### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
+All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt
+on full run (was wiped by CASCADE); ArcGIS HTTP-200 error bodies now raise + paginator stops at first
+gap (no gapped bronze); LANDFIRE EVH `32767` fill filtered from continuous stats; NLCD wired via EROS
+ImageServer + GeoServer WMS fallback in `main()`; `health_scorer` aligned height/lifeform pairs +
+continuous NDVI curve + **per-watershed** summary aggregation; LiDAR CHM resamples DTM onto the DSM
+grid before differencing. Verified: `py_compile`, 32 pytest, live per-watershed SQL.
+
+### NDVI health thresholds (CANONICAL)
+`classify_health()` in `ndvi_processor.py` is the single source of truth:
+**healthy >0.25 / degraded 0.10–0.25 / bare <0.10** (peak-growing median ~0.17). Frontend legend +
+CLAUDE.md now match — do not reintroduce the old >0.3 / 0.15 values.
+
+### "Empty views" — the 3 buffer view-mode buttons (NDVI / SMP / Vegetation)
+`silver.vegetation_health`, `gold.buffer_health_score`, `silver.buffer_vegetation_structure` are all
+**0 rows** in the current DB snapshot, so all three buttons render the buffer polygons in a uniform
+"no-data" color (geometry draws; the *differentiating* color does not). Populating them needs the
+NDVI/health/scoring ETL run — deferred until the (now-fixed) ETL bugs are validated end-to-end. Do
+NOT run the ETL just to fill these before the fixes are confirmed, or you bake wrong data into the demo.
+
+### Local runtime / DB (external-drive hazard)
+- Live render verified via the **internal-disk stable PG** (data on `~/riparian-pgdata-stable`, OFF the
+  flaky external drive): `docker run -d --name riparian-pg-stable -p 55432:5432 -v
+  ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`; C# API on :5237; frontend
+  `VITE_API_URL=http://localhost:5237 npm run dev` (:3000). Layers with data draw (streams, buffers,
+  parcels, wetlands, riparian-extent RF + NMRipMap); parcels sit east of the old center (recenter fixed).
+- **Docker zombie:** the `riparian-pg-stable` container can get stuck (external-drive containerd
+  `meta.db: input/output error` → `docker stop/rm` no-op). Fix = restart Docker Desktop. Do NOT keep
+  hammering docker against the failing store, and NEVER start the external-drive Aspire/Docker stack.
 
 ## Where we are
 
