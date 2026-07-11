@@ -295,6 +295,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
         }
 
         var result = await _repository.QueryMvtAsync(sql, parameters, ct);
+        activity?.SetTag("result.byte_count", result?.Length ?? 0);
         return result ?? [];
     }
 
