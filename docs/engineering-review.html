@@ -1745,8 +1745,8 @@ var (statusCode, message) = exception switch
                 <td>Operational</td>
               </tr>
               <tr>
-                <td><strong>No C#/frontend test suites</strong></td>
-                <td>Python has a pure-function pytest suite covering indices, temporal stats, weak labels and validation metrics. The API and the map have build/lint only.</td>
+                <td><strong>Thin C# / no frontend tests</strong></td>
+                <td>Python has a pure-function pytest suite (indices, temporal stats, weak labels, validation metrics). The C# API now has xUnit + NSubstitute unit tests over the service layer with the repository mocked — but no live-DB integration test, so the actual SQL is never executed against PostGIS. The frontend still has lint/tsc only.</td>
                 <td>Coverage gap</td>
               </tr>
             </tbody>
@@ -1818,9 +1818,10 @@ var (statusCode, message) = exception switch
         </p>
         <p>
           Reproduce: <code>./dev.sh</code> to bring up PostGIS and Aspire · <code>cd python-etl &amp;&amp;
-          pytest</code> for the pure-function suite · <code>./dev.sh --lint</code> for SonarQube analysis.
-          Tests marked <code>@pytest.mark.live</code> hit the real STAC API and database and are skipped
-          in CI.
+          pytest</code> for the Python pure-function suite · <code>dotnet test RiparianPoc.Api.Tests</code>
+          for the C# service-layer + tile-SQL unit tests · <code>./dev.sh --lint</code> for SonarQube
+          analysis. Tests marked <code>@pytest.mark.live</code> hit the real STAC API and database and are
+          skipped in CI.
         </p>
       </footer>
 

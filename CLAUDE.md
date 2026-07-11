@@ -84,7 +84,10 @@ Drive disconnect recovery: reconnect + wait for mount → `./dev.sh --reconnect`
   `riparian/` package: spectral indices + texture, temporal stats, grid/`spatial_dims`, weak-label
   `near_water_mask`, `is_invasive`, validation metrics (`compare_masks`, `assign_spatial_folds`).
   Tests marked `@pytest.mark.live` hit real STAC/DB — skipped in CI, run manually.
-- **C# / Frontend**: no automated test suites yet (planned — build/lint run in CI meanwhile).
+- **C# unit tests**: `dotnet test RiparianPoc.Api.Tests` — xUnit + NSubstitute over the service
+  layer (spatial + compliance: input validation, repository delegation, GeoJSON/MVT query shape)
+  with `IPostGisRepository` mocked, plus `MvtTileSql` tile-SQL invariants. No live-DB integration
+  test yet. **Frontend**: no test runner yet — `npm run lint` (tsc) only.
 - Lint C#: `dotnet format` · Lint frontend: `cd frontend && npm run lint`
 
 ### Code Quality
