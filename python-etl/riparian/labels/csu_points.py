@@ -228,6 +228,36 @@ def beetle_affected(points: list[LabeledPoint]) -> list[LabeledPoint]:
     return [p for p in points if p.is_beetle_affected]
 
 
+# --- Training pool selection -------------------------------------------------------------
+#
+# The beetle's 2017 impact was NOT uniform across the basin — it was ecoregionally split. Escalante
+# (Colorado Plateau, UT) was 21.6% live tamarisk / 31.5% defoliated; Arizona (Sonoran/Mojave, 32-35N)
+# was 87% live. Training defoliation on Arizona and applying it to the San Juan is a transfer ACROSS
+# an ecoregion boundary — a different desert, a different phenological calendar, and a different stage
+# of biocontrol.
+#
+# That is what CO-RIP warns about (kappa 0.42-0.90 ACROSS its 12 ecoregions), and this project already
+# committed to the consequence in STATUS.md: performance is ecoregion-dependent, so results must be
+# reported per region. Excluding the lower basin is therefore principled, not convenient.
+#
+# See docs/decisions/2026-07-12-beetle-training-pool-ecoregion-matched.md.
+COLORADO_PLATEAU_TRIPS: Final[frozenset[str]] = frozenset({"Escalante", "SouthWest_CO"})
+LOWER_BASIN_TRIPS: Final[frozenset[str]] = frozenset({"Arizona", "Virgin_River"})
+
+
+def colorado_plateau(points: list[LabeledPoint]) -> list[LabeledPoint]:
+    """The ecoregion-matched training pool for the San Juan (lat 36.5-37.8, Colorado Plateau).
+
+    Yields ~1,096 records: 610 invasive, **305 beetle-affected** (117 defoliated / 145 mixed /
+    43 dead) — enough to train defoliation as a state.
+
+    Deliberately EXCLUDES Arizona and the Virgin River: different desert, different beetle regime
+    (87% of Arizona's tamarisk was still live in 2017). Pooling them would inflate the training set
+    by importing exactly the domain shift the model must not learn.
+    """
+    return [p for p in points if p.trip in COLORADO_PLATEAU_TRIPS]
+
+
 def negatives(points: list[LabeledPoint]) -> list[LabeledPoint]:
     """Real absences: explicit absence points, non-vegetation, agriculture and upland.
 

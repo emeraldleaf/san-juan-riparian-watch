@@ -13,7 +13,10 @@
 > — of extent *or* of species.**
 >
 > So the two products this stage emits are both novel:
-> 1. **Riparian extent over time** — the movie, not the frame.
+> 1. **Riparian extent over time** — **annual, automated, wall-to-wall, satellite-derived.** The
+>    movie, not the frame. *(The qualifiers are load-bearing: Perkins et al. 2025 mapped riparian
+>    vegetated **area** in Canyonlands 1940–2022 from aerial imagery over discrete dates, 152 km of
+>    one park. Extent-over-time as such is not novel; **this** is.)*
 > 2. **Native-vs-invasive cover over time** — spread and retreat at reach scale, the product CSU
 >    explicitly say does not exist.
 >
