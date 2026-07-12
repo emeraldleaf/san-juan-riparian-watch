@@ -23,3 +23,9 @@ docs/RETRACTIONS.md
 docs/STATUS.md
 docs/code-review.md
 docs/_config.yml
+
+# Records the migration AWAY from Leaflet ("Migrated from Leaflet; ..."), i.e. past tense.
+README.md
+
+# Instructs reviewers "this is MapLibre GL, NOT Leaflet" — the mention is the instruction.
+.coderabbit.yaml

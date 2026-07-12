@@ -123,21 +123,16 @@ conventions. Quick: `./dev.sh --sonar` (start server), `./dev.sh --lint` (scan p
 **docs/sonarqube.md**. When asking for a quality check, say "run SonarQube" — not Codacy.
 
 ### Merge gate — CodeRabbit must be GREEN before merging
-**Never merge a PR until CodeRabbit's *review* is green on the PR's current head.** Not the
-check — the **review**. The check going green only means CodeRabbit *ran*; it can run clean and
-still have left blocking findings, and it can be stale against the commit you are about to
-merge. Verify with `./dev.sh --review-status <PR>` (or `/check-rules`), which fails unless
-CodeRabbit reviewed **this exact head** and left no unaddressed findings.
+**Never merge until CodeRabbit's *review* is green on the PR's current head.** Not the check — the
+**review**. A green check only means CodeRabbit *ran*: it is compatible with unaddressed findings,
+and with an approval on an **older commit than the one you are merging** (a reviewer that never saw
+your last push has not reviewed your PR). Verify with `./dev.sh --review-status <PR>`; `main` is a
+protected branch and the server enforces it.
 
-This is not ceremony. CodeRabbit's review on #5 caught a live SQL-injection weakening that
-every other gate — CI, SonarQube, 20 unit tests, and me — had passed: `MvtTileSql` validated
-layer names with `^[a-z_]+$`, but in **.NET `$` also matches immediately before a trailing
-newline**, so `"wetlands\n"` satisfied it and went into the interpolated SQL literal. The guard
-is now `\A[a-z_]+\z`. A regression test pins it (`Build_RejectsLayerWithTrailingNewline`).
-
-When CodeRabbit does leave findings: fix them, push, and let it **re-review the fix commit**.
-Merging on a green check while findings sit unaddressed is the exact failure this gate exists
-to prevent. See `docs/code-review.md`.
+Not ceremony: CodeRabbit's review on #5 caught a live SQL-injection weakening that CI, SonarQube, 20
+unit tests and a careful human all passed — `MvtTileSql` validated layer names with `^[a-z_]+$`, but
+in **.NET `$` also matches before a trailing newline**, so `"wetlands\n"` reached the interpolated
+SQL literal. Now `\A[a-z_]+\z`. See `docs/code-review.md`.
 
 ### Database
 - **Persistence**: PostgreSQL data is bind-mounted to `./pgdata/` (`.WithDataBindMount("../pgdata")`
@@ -182,7 +177,12 @@ riparian-poc/
 ├── python-etl/                   # Python geospatial ETL pipeline
 │   ├── riparian/                 # riparian AI package (domain-organized)
 │   │   ├── datacube/             #   stac.py, features.py — STAC access + feature engineering
-│   │   ├── delineation/          #   hand, weak_labels, baseline, validate, olmoearth, runner (Stage 1)
+│   │   ├── delineation/          #   hand, weak_labels, baseline, validate, runner (Stage 1)
+│   │   │                         #   olmoearth.py + pooling.py — FM track; pooling is torch-only
+│   │   │                         #   (no FM wheel) so CI can verify the phenology contract
+│   │   ├── labels/               #   nmripmap.py + crosswalk.csv — L2_Code → normalized label.
+│   │   │                         #   THE label source. Never fetch NMRipMap raw: unfiltered,
+│   │   │                         #   ~45% of "riparian" polygons are urban/ag/upland/water.
 │   │   ├── health/               #   invasive.py (+ condition scoring, Stage 2)
 │   │   ├── reaches/              #   processor.py — per-reach network product
 │   │   └── validation/           #   reference.py — NMRipMap/CO-RIP validation
@@ -191,7 +191,7 @@ riparian-poc/
 │   │   lidar_processor.py, raster_processor.py  # legacy source ingest (flat, still wired to entrypoint)
 │   ├── health_scorer.py          # SMP 80/10/10 composite health scoring model
 │   ├── run_tracker.py, entrypoint.py, scheduler.py, requirements.txt, Dockerfile
-├── frontend/                     # React 18 + Leaflet + Tailwind (src/App.tsx, components/)
+├── frontend/                     # React 18 + MapLibre GL + Tailwind (src/App.tsx, components/)
 ├── sql/                          # create_schemas.sql (source of truth) + *_migration.sql
 ├── docs/                         # STATUS.md, sonarqube.md, specs/, decisions/ (+ diagrams)
 ├── .claude/                      # agents/, commands/, skills/, scripts/ (encoding-loop tooling)
@@ -212,15 +212,19 @@ Data flows one direction: bronze → silver → gold. **Never write back upstrea
 ### Services and How They Connect
 - **Aspire AppHost** orchestrates all services with automatic service discovery
 - **PostgreSQL + PostGIS** is the shared data store (connection strings injected by Aspire)
-- **C# API** reads from all three schemas, returns GeoJSON via NetTopologySuite (18 endpoints)
+- **C# API** reads from all three schemas, returns GeoJSON via NetTopologySuite + MVT tiles (29 routes)
 - **Python ETL** writes to bronze, silver, and gold (concurrent bronze + silver processing)
-- **React frontend** calls the C# API, renders on Leaflet map with timelapse slider
+- **React frontend** calls the C# API, renders on a MapLibre GL map (MVT vector tiles) with timelapse slider
 - External data (Python ETL, all free / no API key): **Microsoft Planetary Computer** (Sentinel-2,
   Sentinel-1, 3DEP LiDAR — a STAC API), **FWS NWI MapServer** (wetlands), **NRCS Soil Data
   Access** (SSURGO soils + hydric ratings), **LANDFIRE LF250 ImageServer** (EVT/EVH), **MRLC
   NLCD ImageServer** (land cover).
 
-### API Endpoints (18 total)
+### API Endpoints (29 routes)
+**GeoJSON** routes below, plus **9 MVT tile routes** — `/api/tiles/{z}/{x}/{y}.pbf` (buffers) and
+`/api/tiles/{streams|parcels|wetlands|soils|vegetation|centroids|buffers-ndvi[/{date}]}/{z}/{x}/{y}.pbf`.
+Every tile route goes through `MvtTileSql.Build` — one canonical shape, so the index-backed bbox
+pre-filter cannot drift per-layer. Also `GET /api/riparian/extent`.
 - `GET /api/streams` — stream centerlines from bronze (GeoJSON)
 - `GET /api/buffers` — riparian buffer polygons from silver (GeoJSON)
 - `GET /api/buffers/health` — buffers with latest NDVI health (LEFT JOIN LATERAL to vegetation_health)
@@ -383,12 +387,15 @@ config), `.coderabbit.yaml` (Tier-2 AI-review path rules), `.vscode/settings.jso
 → 3. Add popup via `onEachFeature` → 4. Add to the legend
 
 ## Data Sources
-- NHDPlus V2.1: https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/NHDPlusV21/FeatureServer
-- Colorado Parcels: https://gis.colorado.gov/public/rest/services/Address_and_Parcel/Colorado_Public_Parcels/FeatureServer/0
-- USDA Watersheds: https://apps.fs.usda.gov/ArcX/rest/services/EDW/EDW_Watersheds_01/MapServer
-- Sentinel-2 / Sentinel-1 / 3DEP LiDAR via Planetary Computer (STAC): https://planetarycomputer.microsoft.com/api/stac/v1
-- NWI Wetlands: https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/0
-- SSURGO Soils: https://SDMDataAccess.sc.egov.usda.gov/ (spatial WFS + tabular REST)
-- LANDFIRE EVT/EVH LF250: https://lfps.usgs.gov/arcgis/rest/services/Landfire_LF250/
-- MRLC NLCD: https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/ows
-- Study area: San Juan Basin, HUC8 code 14080101
+All free, no API key. Study area: **San Juan Basin, HUC8 `14080101`**. Full list, endpoints and
+the traps in each: **docs/data-sources.md**.
+
+The three that decide whether the science is right:
+- **NMRipMap v2.0 Plus** — *the* label source (delineation + invasives). It is **classified**:
+  filter on `L2_Code` via `riparian/labels/nmripmap.py`, **never fetch it raw** — unfiltered, ~45%
+  of "riparian" polygons are urban/ag/upland/water. `IC` = free tamarisk/Russian-olive truth.
+  🔴 **Label vintage 2020** (NAIP 2020) — **fit on 2020 imagery, predict any year.** NM only.
+- **CO-RIP** (Woodward 2018, κ 0.80, basin-wide) — a baseline to beat and the label source for
+  Colorado, not something to re-derive.
+- **Planetary Computer STAC** — Sentinel-2 (10 m, 2015→), **Landsat (30 m, 1984→ — the only sensor
+  reaching the pre-beetle era)**, Sentinel-1, 3DEP, NAIP.
