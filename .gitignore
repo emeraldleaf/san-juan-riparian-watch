@@ -28,3 +28,9 @@ backups/
 # Python bytecode (general)
 __pycache__/
 *.pyc
+
+# SonarQube scanner output (regenerated each scan)
+.sonarqube/
+
+# macOS
+.DS_Store

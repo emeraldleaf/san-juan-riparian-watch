@@ -1,0 +1,22 @@
+source,source_class,source_name,normalized_label,phase1_label,confidence,notes
+NMRipMap,IA,Montane Riparian Forest and Woodlands,riparian_woody_native,riparian_vegetation,0.95,Cottonwood/willow montane gallery forest
+NMRipMap,IB,Lowland Riparian Forest and Woodlands,riparian_woody_native,riparian_vegetation,0.95,Lowland cottonwood/willow gallery forest
+NMRipMap,IC,Lowland Introduced Riparian Woodland and Scrub,riparian_woody_introduced,riparian_vegetation,0.90,"TAMARIX / RUSSIAN OLIVE — the Stage-2 invasive class. Introduced woody riparian; does not separate saltcedar from Russian olive (that is a later Level-4 split)."
+NMRipMap,IE,Semi-Natural Riparian Woodland and Scrub,riparian_woody_native,riparian_vegetation,0.85,Semi-natural; may contain mixed native/non-native stands
+NMRipMap,IIA,Montane Riparian Shrubland,riparian_woody_native,riparian_vegetation,0.95,Willow/alder shrubland
+NMRipMap,IIB,Lowland Riparian Shrubland,riparian_woody_native,riparian_vegetation,0.95,Lowland riparian shrubland
+NMRipMap,IIIA,Montane Marshes and Wet Meadows,riparian_herbaceous,riparian_vegetation,0.90,"Herbaceous wetland — riparian but NOT woody. Excluded from the woody target by our own definition (weak_labels.py); include only if the target is 'riparian_vegetation' broadly."
+NMRipMap,IIIB,Lowland Marshes and Wet Meadows,riparian_herbaceous,riparian_vegetation,0.90,As IIIA
+NMRipMap,IIIE,Semi-natural Herbaceous Vegetation,uncertain,other,0.40,Ambiguous — may be riparian or upland; low confidence, prefer to exclude
+NMRipMap,IVB,Water/Channel,water,water,0.95,Active channel and open water
+NMRipMap,IVD,Agriculture,agriculture,agriculture_or_irrigated_pasture,0.90,"MAJOR confusion class — irrigated fields are spectrally similar to riparian in the growing season. This is what the weak labels got wrong (~0.00 F1 on the Animas ag valley)."
+NMRipMap,IVA,Bare Unvegetated,bare_channel_or_sandbar,other,0.70,Gravel/sand bars and exposed channel within the corridor
+NMRipMap,IVE,Urban/Built-Up,developed,other,0.90,Built environment
+NMRipMap,IVF,Roads,developed,other,0.90,Roads
+NMRipMap,ID,Upland Forest and Woodland,upland,other,0.90,Non-riparian upland forest
+NMRipMap,IIC,Upland Shrubland,upland,other,0.90,Non-riparian upland shrub
+NMRipMap,IIIC,Montane Dry Meadow and Grassland,upland,other,0.85,Dry meadow — not riparian
+NMRipMap,IIID,Lowland Dry Meadow and Grassland,upland,other,0.85,Dry meadow — not riparian
+NMRipMap,IIIF,Upland Grassland,upland,other,0.90,Non-riparian upland grassland
+NMRipMap,IVG,Upland Non-Veg,upland,other,0.90,Bare upland/rock
+NMRipMap,IVC,Shadow,invalid,invalid,0.00,Terrain/canopy shadow — mapping artifact; must be EXCLUDED from training (masked, not labelled 'other')

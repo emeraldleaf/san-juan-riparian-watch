@@ -70,22 +70,52 @@ class ValidationReport:
 
 
 def fetch_nmripmap(
-    bbox: tuple[float, float, float, float], page: int = 500, timeout: int = 60,
+    bbox: tuple[float, float, float, float],
+    page: int = 500,
+    timeout: int = 60,
+    woody_only: bool = True,
 ) -> list:
-    """Fetch NMRipMap San Juan riparian polygons intersecting a bbox.
+    """Fetch NMRipMap San Juan **woody riparian** polygons intersecting a bbox.
 
-    Paginates the ArcGIS ``query`` endpoint with ``resultOffset`` until a short
-    page is returned. All returned polygons are riparian (NMRipMap maps riparian
-    habitat), so no attribute filtering is needed.
+    .. warning::
+       This function previously returned *every* polygon on the assumption that
+       "all returned polygons are riparian". **That was false.** NMRipMap classifies
+       its mapping units (``L1_Code``/``L2_Code``): of ~10,300 polygons in the San Juan
+       AOI only ~5,700 are woody riparian — the rest include 1,271 Urban, 781
+       Agriculture, 351 Water/Channel and 283 Roads. Rasterizing them all as
+       ``riparian = 1`` taught the model *corridor membership* rather than riparian
+       vegetation, and taught agriculture — the class the weak labels already failed
+       on — as positive.
+
+    It now filters to the woody riparian classes (``IA``, ``IB``, ``IC``, ``IE``,
+    ``IIA``, ``IIB``), matching the project's own definition in ``weak_labels.py``
+    ("riparian is woody vegetation (tree/shrub) growing near water, not wetland").
+
+    For multi-class labels (water / agriculture / other), or the tamarisk-vs-native
+    split, use :mod:`riparian.labels.nmripmap` directly.
 
     Args:
         bbox: ``(minx, miny, maxx, maxy)`` in EPSG:4326/4269 (treated as WGS84).
         page: Records per request.
         timeout: Per-request timeout (seconds).
+        woody_only: Keep only woody riparian classes. Set False to get every mapped
+            polygon (the old, incorrect behaviour) — only for corridor-extent analysis.
 
     Returns:
         List of shapely geometries (EPSG:4326).
     """
+    from riparian.labels.nmripmap import fetch_labeled, woody_riparian
+
+    polys = fetch_labeled(bbox, page=page, timeout=timeout)
+    if woody_only:
+        return woody_riparian(polys)
+    return [p.geometry for p in polys]
+
+
+def _fetch_nmripmap_unfiltered(
+    bbox: tuple[float, float, float, float], page: int = 500, timeout: int = 60,
+) -> list:
+    """Original unfiltered fetch — retained only for the corridor-extent comparison."""
     env = {
         "xmin": bbox[0], "ymin": bbox[1], "xmax": bbox[2], "ymax": bbox[3],
         "spatialReference": {"wkid": 4326},
