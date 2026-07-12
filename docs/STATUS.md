@@ -44,6 +44,17 @@ the whole build, serving the `.md` files as raw text).
   which a frozen embedding is good at). What is still untested is OlmoEarth **as Ai2 uses it**:
   fine-tuned Base + SegmentationPoolingDecoder, not a frozen Nano + sklearn RF head. That needs
   a GPU. See `docs/olmoearth-vs-rf-baseline.md`.
+  - **Plan of record (ADR 2026-07-12):** fine-tune **invasives**, with **extent as a calibration
+    control run first**. Extent alone re-derives CO-RIP; invasives is the real gap. But a bad
+    invasives number *run alone* is uninterpretable — broken pipeline, 332-polygon label scarcity,
+    and the beetle confound all predict the same failure. The control has none of those, so it
+    isolates "does our fine-tuning pipeline work at all?". **Gate: if extent lands well below the
+    pixel-level RF baseline, STOP and debug — do not proceed to Step 2.**
+  - ⚠️ **Two RF baselines exist and they are NOT interchangeable.** Stage-1 delineation is
+    **pixel-level (10 m): F1 0.90–0.92**. The fair-test number is **patch-level (80 m): F1 0.701**
+    and belongs to the frozen-embedding + RF-head experiment. The fine-tune predicts at
+    pixel/segment level, so **compare it to 0.90–0.92** — scoring it against 0.701 would flatter
+    it by ~0.2 F1 and manufacture a win.
 
 ### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
 All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt

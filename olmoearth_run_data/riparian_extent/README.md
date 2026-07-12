@@ -1,5 +1,27 @@
 # Riparian extent — OlmoEarth fine-tune (scaffold)
 
+> ## This is STEP 1 of 2, and it is a **control** — not the deliverable
+>
+> Extent is already solved: CO-RIP mapped the whole Colorado Basin, San Juan included, at
+> κ 0.80. Shipping only this reproduces published work. Its job here is to answer one narrow
+> question — **does our fine-tuning pipeline work at all?** — before we spend a GPU on the task
+> we actually care about (**Step 2: Tamarix vs native**, where no wall-to-wall map exists and
+> phenology is the discriminator).
+>
+> Without this control, a bad invasives number is uninterpretable: broken pipeline, too few
+> labels, and the *Diorhabda* beetle confound all predict the same failure. That is exactly the
+> trap the first OlmoEarth attempt fell into.
+>
+> **Compare the result against the PIXEL-level RF baseline (spatial-CV F1 0.90–0.92)** — *not*
+> the 0.701 patch-level number in `docs/olmoearth-vs-rf-baseline.md`, which belongs to the
+> frozen-embedding + RF-head experiment. `SegmentationPoolingDecoder` predicts at pixel/segment
+> level; scoring it against 0.701 would flatter it by ~0.2 F1 and manufacture a win.
+>
+> **Gate:** if extent lands well below 0.90, **stop and debug** — do not proceed to Step 2.
+>
+> Full rationale + decision table:
+> [`docs/decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md`](../../docs/decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md) · tracked in issue #9.
+
 Configs in the [`allenai/olmoearth_projects`](https://github.com/allenai/olmoearth_projects)
 shape, so they can be dropped into an `olmoearth_projects` checkout at
 `olmoearth_run_data/riparian_extent/` and run with `rslearn` + `olmoearth_run`.
