@@ -34,3 +34,53 @@ All free, no API key. Study area: **San Juan Basin, HUC8 `14080101`**. See CLAUD
   wired via EROS ImageServer with the MRLC GeoServer WMS as **fallback** (`FallbackRasterSource`).
 - **RAG corpus** (doc-intelligence): 25 seed sources in `docintel/corpus/seed_sources.yaml`
   (watershed plans, SJRIP reports, riparian/invasives science). Not fetched by the ETL.
+
+## Label sources unlocked by the prior-art audits (2026-07-12)
+
+The audits surfaced **usable data**, not just claims. See `docs/audits/`.
+
+### CSU/NREL field points — `TabletData_2017.csv` ⭐ the beetle labels
+[Vorster et al. 2018, *Data* 3(4):42](https://doi.org/10.3390/data3040042) ·
+**[direct CSV](https://mountainscholar.org/bitstreams/133b91bb-f416-4a18-aac8-1062d7d884dd/download)**
+(326 KB, CSU Research Data Terms of Use) · **3,491 records, collected 2017**
+
+Columns: `OBJECTID, PlotID, Species, GlobalID, x, y, TripName`. ~7 m radius plots — a good match to
+**Sentinel-2's 10 m**, and far better than Landsat 30 m (which is exactly what CSU said defeated them).
+
+It solves three problems NMRipMap cannot:
+
+| Class | n | Why it matters |
+|---|---|---|
+| `tamarisk` | 1,374 | live tamarisk |
+| **`red tam`** | **283** | **red foliage from beetle attack — DEFOLIATION LABELS** |
+| **`live dead tam mix`** | **193** | partial defoliation |
+| `dead tam` | 71 | dead |
+| `Russian olive` / `Russian Olive` | **191** | **separates the species NMRipMap's `IC` conflates** |
+| cottonwood, willow, mesquite, box elder … | ~630 | native negatives |
+| water, bare ground, ag, road, `absent_point` | ~530 | **real absences** (we currently use random background) |
+
+**547 beetle-affected tamarisk points.** Our "defoliation as a state, not absence" claim had **no
+labels at all** before this.
+
+🔴 **Two constraints, verified by downloading and counting — do not skip these:**
+1. **Only ~148 points fall inside the San Juan basin** (45 Russian olive, 37 tamarisk, 4 live/dead
+   mix). Enough to **split the species locally** and to validate — **not** enough to train alone.
+2. **No `red tam` points in our AOI.** All 283 are in Arizona / Escalante. Defoliation must be learned
+   basin-wide and **transferred**, or the AOI widened. We cannot locally validate it from this dataset.
+3. 🐛 **The `Virgin_River` trip has x/y TRANSPOSED** in the source file (`x` holds 35.8–38.6, `y` holds
+   −114…−108). A naive loader puts 119 points in the wrong hemisphere. Also normalize the casing —
+   `Russian olive` / `Russian Olive` / `tamarisk` / `Tamarisk` are all present. Crosswalk it like
+   NMRipMap; never trust a raw `Species` string.
+
+**Label vintage: 2017** → fit against **2017** imagery. See CLAUDE.md.
+
+### CO-RIP — the Colorado label source we lack
+[Dryad, 1.25 GB](https://doi.org/10.5061/dryad.3g55sv8) — riparian vegetation raster (`0` absence /
+`100` presence) + valley-bottom polygons, **whole basin, per-ecoregion**.
+
+NMRipMap is **New Mexico only**, which is why the Turkey Creek (CO) tile has no reference map and
+stays on weak labels. **CO-RIP covers it.**
+
+🔴 **Its imagery epoch is not stated on the Dryad page.** Our own vintage rule makes that
+**blocking**: read the bundled README / the paper and record the year *before* fitting anything
+against it.

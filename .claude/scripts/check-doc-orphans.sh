@@ -20,14 +20,24 @@ else RED=""; GREEN=""; NC=""; fi
 
 orphans=0
 checked=0
-for f in docs/specs/*.md docs/decisions/*.md; do
+for f in docs/specs/*.md docs/decisions/*.md docs/audits/*.md; do
     [[ -f "$f" ]] || continue
-    checked=$((checked + 1))
     base="$(basename "$f")"
-    # Jekyll rewrites .md -> .html, so accept either spelling in the hub's links.
-    if ! grep -qF "${base}" "$HUB" && ! grep -qF "${base%.md}.html" "$HUB"; then
+    # An audit is reachable via the falsification log (docs/audits/README.md), which is itself
+    # linked from the hub — so check audits against the log, and everything else against the hub.
+    # An unreachable audit is the same failure as an unreachable ADR: written, then invisible.
+    index="$HUB"
+    case "$f" in
+        docs/audits/*)
+            [[ "$base" == "README.md" ]] && continue   # the log itself; it is linked from the hub
+            index="docs/audits/README.md"
+            ;;
+    esac
+    checked=$((checked + 1))
+    # Jekyll rewrites .md -> .html, so accept either spelling.
+    if ! grep -qF "${base}" "$index" && ! grep -qF "${base%.md}.html" "$index"; then
         echo "${RED}✗${NC} orphan: ${f}"
-        echo "    published to Pages but not linked from ${HUB} — reachable only by guessing the URL."
+        echo "    published to Pages but not linked from ${index} — reachable only by guessing the URL."
         orphans=$((orphans + 1))
     fi
 done
