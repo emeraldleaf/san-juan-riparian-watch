@@ -80,11 +80,31 @@ labels at all** before this.
 
 ### CO-RIP — the Colorado label source we lack
 [Dryad, 1.25 GB](https://doi.org/10.5061/dryad.3g55sv8) — riparian vegetation raster (`0` absence /
-`100` presence) + valley-bottom polygons, **whole basin, per-ecoregion**.
+`100` presence) + valley-bottom polygons, **whole basin, per EPA Level III ecoregion**, **30 m**.
 
 NMRipMap is **New Mexico only**, which is why the Turkey Creek (CO) tile has no reference map and
-stays on weak labels. **CO-RIP covers it.**
+stays on weak labels. **CO-RIP covers it.** Loader: `riparian/labels/corip.py`.
 
-🔴 **Its imagery epoch is not stated on the Dryad page.** Our own vintage rule makes that
-**blocking**: read the bundled README / the paper and record the year *before* fitting anything
-against it.
+✅ **Vintage resolved: 2006 and 2016.** The Dryad page never states it and the README sits behind an
+auth token, so it came from the source team's own report (Evangelista et al. 2018, §Goal 1):
+*"We used **Landsat** cloud free growing season composites … random forest models of riparian
+vegetation for each ecoregion in **2006 and 2016** … at a **30 m** resolution."*
+**Fit against imagery from whichever year you load.**
+
+🔴 **CO-RIP is WEAKEST exactly where we need it — and it OVER-PREDICTS there.** In the authors' words:
+*"OOB errors ranging from **2% – 35%, depending on the ecoregion** … ecoregions further north and
+encompassing **mountainous regions had lower accuracy**"* and *"our map may likely **over predict
+riparian vegetation in high elevation environments**."*
+
+**Turkey Creek — the very tile we want CO-RIP for — is northern, mountainous, high-elevation Southern
+Rockies.** So CO-RIP is **not ground truth in Colorado**: it is a confidence-weighted weak label
+(`confidence 0.55` for Southern Rockies vs `0.95` arid lowland), per the
+[confidence-weighted label ADR](decisions/2026-07-11-confidence-weighted-label-crosswalk.md). An
+over-predicting label is worse than a missing one — it teaches the model that **upland is riparian**,
+which is precisely the failure the NMRipMap crosswalk exists to prevent.
+
+Also, for Stage 3: the authors warn their own change product may show *"changes … due to **model
+errors when comparing the two years**"* rather than real change.
+
+**Download is manual** — Dryad blocks automated fetches (401/403). `corip.download_instructions()`
+prints the steps rather than failing with a 403.
