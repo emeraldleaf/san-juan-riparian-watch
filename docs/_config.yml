@@ -1,0 +1,36 @@
+# GitHub Pages config — renders docs/*.md as pages.
+#
+# Previously docs/ carried a .nojekyll marker, which disabled Jekyll entirely and made
+# every .md file serve as RAW TEXT (it downloaded instead of displaying). That was fine
+# when the only published artifact was a standalone HTML file; it is not fine now that
+# the specs, ADRs and literature review are the documentation.
+#
+# engineering-review.html has no front matter, so Jekyll copies it through verbatim —
+# its self-contained styling is untouched.
+
+title: San Juan Riparian Watch
+description: >-
+  Basin-scale riparian delineation, invasive (Tamarix) cover, and change monitoring for
+  the San Juan River watershed — Earth-observation ML, PostGIS, and a MapLibre map.
+theme: jekyll-theme-cayman
+
+# These three matter. Jekyll normally treats a .md file WITHOUT YAML front matter as a
+# static file and serves it raw — which would silently break every spec and ADR, and
+# would make "remember to add front matter" a permanent drift trap for future docs.
+#
+#   jekyll-optional-front-matter  renders .md files that have no front matter
+#   jekyll-relative-links         rewrites [x](foo.md) -> foo.html so in-repo links work
+#                                 both on GitHub and on the site
+#   jekyll-titles-from-headings   derives each page title from its first H1
+#
+# All three are in the github-pages gem's supported set, so they run on Pages as-is.
+plugins:
+  - jekyll-optional-front-matter
+  - jekyll-relative-links
+  - jekyll-titles-from-headings
+
+# STATUS.md is an internal working file (git/PR bookkeeping for coding agents), not
+# documentation for a reader. Keep it in the repo; keep it off the site.
+exclude:
+  - STATUS.md
+  - riparian-pipeline.excalidraw
