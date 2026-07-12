@@ -123,11 +123,30 @@ Listing these is the point. A quality story that only lists its strengths is mar
 | **No live-DB integration test** | Every C# test mocks `IPostGisRepository`. The SQL itself — the PostGIS operators, the index pre-filter — is never executed in CI. | **Open.** Testcontainers is the fix. |
 | **No coverage measurement** | 80 tests sounds like a lot. Nobody knows what fraction of the ETL they touch, and defects 2–7 suggest the answer is "not the important part". | **Open.** |
 | **No performance regression gate** | The 10–40× tile speedup could silently regress; nothing would notice. | **Open.** |
-| **ETL has no live smoke test in CI** | `@pytest.mark.live` tests hit real STAC/DB and are **skipped in CI**. The pipeline that produced defects 2–7 is exercised only by pure-function tests. | **Open — this is the highest-value gap**, given that six of ten defects above were ETL data corruption. |
+| ~~**ETL has no live smoke test in CI**~~ | ~~The pipeline that produced defects 2–7 is exercised only by pure-function tests.~~ | ✅ **CLOSED.** `tests/test_etl_regressions.py` pins defects 3, 4 and 5 (11 tests, no network); a **live `postgis/postgis` service container** in CI now executes the SQL for defects 2 and 6. **Every one of the six had been *fixed* and *none* had been pinned by a test** — they could all have regressed in silence. |
 
-The last row deserves emphasis. **The subsystem with the worst defect record is the one with the
-weakest gate.** That is not an accident of history — it is what happens when tests are written where
-they are easy (pure functions) rather than where the defects are (I/O against messy external services).
+**The gate went where the defects were.** The subsystem with the worst record (ETL, 6 of 10) had the
+weakest gate; it now has the newest one. Two things are worth stating plainly:
+
+1. **All six ETL defects had been fixed, and not one was pinned by a test.** Every one could have
+   regressed in silence. A fix without a regression test is a fix with a shelf life.
+2. **The two worst were unreachable by any mock.** Every C# test mocks `IPostGisRepository` and every
+   Python test was a pure function — so **the SQL was never executed by any gate, anywhere.** A mock
+   returns whatever you told it to; it cannot tell you that `TRUNCATE ... CASCADE` silently took your
+   dependent table with it. That needed a real database, and now CI runs one.
+
+   **It proved itself on its first run, at my expense.** The new live-DB test hard-coded
+   `buffer_id = 1` when rebuilding after the wipe — and PostgreSQL rejected it with a
+   `ForeignKeyViolation`, because `TRUNCATE` does **not** reset the `SERIAL` sequence: the rebuilt row
+   lands on a fresh id. **A mock would have accepted `buffer_id = 1` without complaint.** The gate
+   caught a false assumption in the very test written to demonstrate it. That is the argument for
+   running the SQL for real, made better than any paragraph could.
+
+**What this did NOT fix:** the frontend still has no test runner, there is still no coverage
+measurement, and `BannedApiAnalyzers` is still unwired — deliberately, because sync-over-async has
+**never once been violated** in this repo, and the method's own rule is *do not mechanize a rule that
+has never been broken*. The gate budget went to the six defects that actually happened rather than the
+zero that haven't.
 
 ---
 

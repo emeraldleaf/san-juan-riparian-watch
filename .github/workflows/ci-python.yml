@@ -52,3 +52,46 @@ jobs:
 
       - name: Pytest (unit tests; skip live) — gate
         run: pytest -m "not live"
+
+  postgis:
+    name: Live PostGIS (the SQL actually executes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: python-etl
+    services:
+      # A real PostGIS. Until now the SQL was never executed by ANY gate: every C# test mocks
+      # IPostGisRepository, and every Python test was a pure function. Two of the six ETL defects
+      # lived exactly there — the FK cascade that silently emptied buffer_wetlands, and the gold
+      # summary that aggregated basin-wide instead of per watershed. A mock returns whatever you
+      # told it to; it cannot tell you that TRUNCATE CASCADE took your dependent table with it.
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ripariandb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install pytest sqlalchemy psycopg2-binary
+      - name: Run the live-DB tests
+        env:
+          RIPARIANDB_TEST_URI: postgresql+psycopg2://postgres:postgres@localhost:5432/ripariandb_test
+        run: pytest tests/test_postgis_live.py -v -m live_db
