@@ -10,6 +10,30 @@ docs, READMEs, inline comments, skills, and `.coderabbit.yaml`. Convention: any 
 ends with `See CLAUDE.md` so it's findable. This command audits every paraphrase against
 the canonical rule and flags drift.
 
+## Step 0 — run the mechanical gates FIRST (do not skip)
+
+```bash
+./dev.sh --check-encoding
+```
+
+Runs the three deterministic drift gates — tombstones, retracted claims, doc orphans. They are
+mechanical: no judgement, same answer here and on CI. **If any fails, fix that before reading a
+single paraphrase** — a machine already found real drift and there is no point hunting for it by
+eye.
+
+## Step 1 — actually run the architecture-reviewer
+
+Launch the **`architecture-reviewer`** agent (via the Agent tool, `subagent_type:
+"architecture-reviewer"`) on the working diff:
+
+> Review `git diff main...HEAD` against this project's CLAUDE.md conventions. Return findings as
+> "must fix" / "should consider" / "aligned".
+
+**This step is why this command exists.** The agent was defined, described in CLAUDE.md, CONTEXT.md,
+the README, STATUS and `.coderabbit.yaml` as a live Tier-2 enforcement surface — and was invoked by
+absolutely nothing for the whole life of the repo. A reviewer nobody runs is documentation, not
+enforcement. If you skip this step you have re-created that hole.
+
 ## What to do
 
 1. **List the paraphrases.** Grep the repo for `See CLAUDE.md` (case-sensitive), excluding

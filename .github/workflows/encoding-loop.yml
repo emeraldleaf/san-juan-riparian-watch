@@ -63,3 +63,22 @@ jobs:
             exit 1
           fi
           echo "All diagrams paired (or none present)."
+
+  drift-gates:
+    name: Drift gates (tombstones · retracted claims · doc orphans)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run the deterministic drift gates
+        run: |
+          set -euo pipefail
+          # These three catch SEMANTIC drift, which every other check in this repo is blind to.
+          # The loop already enforced file *shape* (canon budget, diagram pairing, stale refs after
+          # a git mv) — and none of that could catch the public engineering-review page still
+          # presenting a retracted result as fact, an ADR nothing linked to, or retired NDVI
+          # thresholds living on in a component docstring. All three actually happened.
+          ./.claude/scripts/check-tombstones.sh
+          ./.claude/scripts/check-retracted-claims.sh
+          ./.claude/scripts/check-doc-orphans.sh
