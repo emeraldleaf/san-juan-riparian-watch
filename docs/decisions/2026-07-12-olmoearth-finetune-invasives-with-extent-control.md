@@ -135,6 +135,45 @@ like**, and it isolates the pipeline from every confound above:
 
 It answers exactly one narrow question: **does our fine-tuning pipeline work at all?**
 
+> ### 🔴 EXCLUDE Turkey Creek from the control (added 2026-07-12, after the CO-RIP loader)
+>
+> **Run the control on the two NM tiles only — Animas and Malpais. Hold Turkey Creek (CO) out.**
+>
+> Turkey Creek has **no NMRipMap coverage** (New Mexico only), so its only reference is **CO-RIP** —
+> and CO-RIP is **worst precisely there**. In the authors' own words: *"OOB errors ranging from
+> **2%–35%, depending on the ecoregion** … ecoregions further north and encompassing **mountainous
+> regions had lower accuracy**"*, and *"our map may likely **over predict riparian vegetation in high
+> elevation environments**."* Turkey Creek is northern, mountainous, high-elevation **Southern
+> Rockies** — the worst cell in that table (`corip.py` confidence **0.55** vs **0.95** arid lowland).
+>
+> **A control has exactly one job: tell us whether the pipeline works.** Feeding it labels that are
+> both **weak and biased toward over-prediction** destroys that job — a poor score would be
+> uninterpretable (bad pipeline? bad labels?) and, worse, a *good* score might mean the model
+> faithfully learned CO-RIP's over-prediction. **Both outcomes would be worthless**, which is exactly
+> the four-way ambiguity this ADR exists to prevent. Do not re-create it inside the control itself.
+>
+> **Bring Turkey Creek in only after the pipeline is trusted**, and then as a *test of transfer to
+> weak labels* — a separate question, reported separately, with its 0.55 confidence carried into the
+> sample weighting. Never fold it into the headline control number.
+>
+> Per-ecoregion reporting is mandatory anyway (CO-RIP's κ spans 0.42–0.90 across ecoregions, and
+> STATUS.md already commits us to it), so a Turkey Creek number must never be blended into an
+> AOI-wide average.
+
+> ### 📅 Fit each label source against ITS OWN year
+>
+> Three label sources, three vintages. This is not pedantry — we have already fitted 2020 labels
+> against 2024 imagery once and injected label noise we made ourselves.
+>
+> | Source | Vintage | Fit imagery | Covers |
+> |---|---|---|---|
+> | **NMRipMap** v2.0 Plus | **2020** (NAIP 2020) | Sentinel-2 **2020** | NM only — Animas, Malpais |
+> | **CSU field points** | **2017** | Sentinel-2 **2017** | Colorado Plateau pool; 167 pts in the San Juan |
+> | **CO-RIP** | **2006 / 2016** (Landsat 30 m) | imagery of **the year you load** | Colorado — incl. Turkey Creek |
+>
+> `corip.label_from_pixel()` **raises** on an unmodelled year, and `csu_points` records
+> `LABEL_YEAR = 2017`. The rule is enforced in code, not just written down here.
+
 > ### ⚠️ Compare against the PIXEL-level RF number, not the patch-level one
 >
 > There are two RF baselines in this repo and they are **not interchangeable**:
@@ -186,6 +225,9 @@ for reach). Do not commit to Landsat before we know the model works at 10 m.
 
 ### The decision table
 
+The control runs on **Animas + Malpais only** (NM, NMRipMap-labelled, 2020 imagery). Turkey Creek is
+held out; see above.
+
 | Extent (control) | Invasives | Reading |
 |---|---|---|
 | **fails** (≪ 0.90 pixel F1) | — | **Stop.** Our pipeline is broken; any invasives number is noise. Debug before spending more GPU. |
@@ -195,6 +237,18 @@ for reach). Do not commit to Landsat before we know the model works at 10 m.
 That bottom-right cell is the entire justification for the control. Without it, a weak invasives
 result is an embarrassing shrug. With it, it is a defensible negative result — and given the
 beetle geography, a genuinely interesting one.
+
+### Then, and only then — the two follow-on questions
+
+Both are **separate experiments with separate numbers**. Neither may be blended into the headline.
+
+| # | Question | Why it is not the control |
+|---|---|---|
+| A | **Turkey Creek (CO):** does the pipeline survive **weak, over-predicting** labels (CO-RIP, confidence 0.55)? | This tests **label robustness**, not whether the pipeline works. Running it *as* the control would mean a bad score is uninterpretable and a *good* score might just mean the model faithfully learned CO-RIP's over-prediction. |
+| B | **San Juan invasives:** does an Escalante-trained defoliation head **transfer** to the San Juan? | This tests **transfer across a prevalence gap** (Escalante 21.6% live tamarisk vs San Juan 74.1%), out-of-sample by construction. See the [beetle-pool ADR](2026-07-12-beetle-training-pool-ecoregion-matched.md). |
+
+Reporting either as if it came from the same distribution as the control would be dishonest, and both
+are interesting *precisely because* they might fail.
 
 ## Consequences
 
@@ -221,6 +275,13 @@ beetle geography, a genuinely interesting one.
   the frozen-Nano + RF-head configuration we *did* test is one Ai2 endorses nowhere. Rejected.
 
 ## Known risks (record them now, not after the run)
+
+- 🔴 **Turkey Creek's only reference is CO-RIP, and CO-RIP over-predicts there.** Northern,
+  mountainous, high-elevation Southern Rockies is the worst cell in CO-RIP's own 2–35% OOB range, and
+  the authors warn the map *"may likely over predict riparian vegetation in high elevation
+  environments."* Confidence 0.55 (`corip.py`). **Excluded from the control** (above); admitted later
+  only as a separate label-robustness experiment, with its confidence carried into sample weighting.
+  If we ever report a blended AOI-wide extent number that includes it, we are hiding this.
 
 - **332 invasive polygons is thin.** Overfit risk is real. Mitigating framing: "better accuracy
   from scarce labels" is the FM's central claim, so this is a fair test of that claim, not a
