@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(dotnet new:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(open \"/Volumes/Mac OS Extended 1/riparian-poc/docs/engineering-review.html\")",
+      "Bash(git log *)",
+      "Bash(git grep *)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -v ':0$')",
+      "Bash(ls -la RiparianPoc.Api.Tests/)",
+      "Bash(cat RiparianPoc.Api.Tests/RiparianPoc.Api.Tests.csproj)"
     ]
   },
   "hooks": {
