@@ -1037,10 +1037,20 @@ export default function App() {
             )}
             {showSoils && (
               <>
+                {/* Keep in sync with the soil fill `match` on hydric_rating above:
+                    Yes -> #8b5cf6 (violet-500), Partial -> #c084fc (purple-400),
+                    everything else -> #d1d5db (gray-300). SSURGO rates map units as
+                    partially hydric when only some components are, and those polygons
+                    were being drawn with no legend key at all. */}
                 <LegendItem
                   color="bg-violet-500/50"
                   shape="box"
                   label="Hydric Soils"
+                />
+                <LegendItem
+                  color="bg-purple-400/40"
+                  shape="box"
+                  label="Partially Hydric Soils"
                 />
                 <LegendItem
                   color="bg-gray-300/50"

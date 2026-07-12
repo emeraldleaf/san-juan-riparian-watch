@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace RiparianPoc.Api.Services;
 
 /// <summary>
@@ -14,8 +16,18 @@ namespace RiparianPoc.Api.Services;
 /// join clauses defined in code). Tile coordinates and dates are always bound as
 /// <c>@z/@x/@y/@date</c> parameters by the caller — never interpolated.
 /// </summary>
-internal static class MvtTileSql
+internal static partial class MvtTileSql
 {
+    /// <summary>
+    /// A valid layer name: a lowercase identifier, anchored with <c>\A</c>/<c>\z</c> so no
+    /// trailing newline is admitted. Source-generated, so it is compiled once rather than
+    /// re-parsed on every tile request.
+    /// </summary>
+    [GeneratedRegex(@"\A[a-z_]+\z")]
+    private static partial Regex LayerName();
+
+    private static Regex LayerNamePattern => LayerName();
+
     /// <summary>
     /// Assemble the tile query. <paramref name="geom"/> is the source geometry column
     /// used for the index pre-filter; <paramref name="renderGeom"/> overrides the geometry
@@ -35,7 +47,11 @@ internal static class MvtTileSql
         // Defense in depth: the layer name is interpolated into a single-quoted SQL literal.
         // All callers pass compile-time constants, but validate anyway so a future caller can't
         // introduce an injection through it. Every real layer is a lowercase identifier.
-        if (!System.Text.RegularExpressions.Regex.IsMatch(layer, "^[a-z_]+$"))
+        //
+        // \A and \z, NOT ^ and $: in .NET `$` also matches immediately BEFORE a trailing newline,
+        // so "wetlands\n" — and anything smuggled in on a line after it — would satisfy `^[a-z_]+$`.
+        // \z anchors to the absolute end of the input and admits no trailing newline.
+        if (!LayerNamePattern.IsMatch(layer))
         {
             throw new ArgumentException(
                 $"Layer name must be a lowercase identifier, got '{layer}'", nameof(layer));
