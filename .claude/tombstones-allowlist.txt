@@ -1,0 +1,25 @@
+# Files exempt from the tombstone audit — each entry earns its place by containing a
+# LEGITIMATE mention of a retired identifier (telling you NOT to use it, or recording that it
+# was removed).
+#
+# Keep this list SHORT. An allowlisted file can re-drift invisibly on every other tombstone,
+# so prefer fixing the file over adding it here. Each entry states why it earns exemption.
+
+# Instructs the reader to use SonarQube *instead of* Codacy — the mention is the instruction.
+CLAUDE.md
+docs/sonarqube.md
+
+# Ignores a Codacy config path so the tool's leftovers stay untracked.
+.gitignore
+
+# The registries themselves necessarily quote every pattern they police.
+.claude/tombstones.txt
+.claude/tombstones-allowlist.txt
+.claude/scripts/check-tombstones.sh
+docs/RETRACTIONS.md
+.claude/scripts/check-retracted-claims.sh
+
+# Records WHY the retired NDVI thresholds and .nojekyll are dangerous — past tense by nature.
+docs/STATUS.md
+docs/code-review.md
+docs/_config.yml

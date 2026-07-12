@@ -44,6 +44,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Volumes/Mac OS Extended 1/riparian-poc/.claude/scripts/block-sync-over-async.sh"
+          }
+        ]
+      }
     ]
   }
 }
