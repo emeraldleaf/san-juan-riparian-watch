@@ -1147,13 +1147,32 @@ def _nmripmap_label_grid(...):
         </div>
 
         <div class="callout caveat">
-          <span class="chip">Caveat</span>
+          <span class="chip">Correction</span>
           <p>
-            The full-tile map product partly reproduces its own tile's NMRipMap, because the model was
-            trained on it. The number that generalises is the spatial-CV F1 — held-out blocks — and that
-            is the only one quoted. Turkey Creek in Colorado has no NMRipMap coverage and still runs on
-            weak labels, so its output should be read as unvalidated until CO-RIP is wired in. Two
-            validated tiles is a demonstration, not a basin.
+            <strong>These F1 numbers are measuring the wrong thing, and the fix is known.</strong>
+            NMRipMap polygons are richly classified — an <code>L1_Code</code>/<code>L2_Code</code>
+            hierarchy — but <code>fetch_nmripmap()</code> rasterises <em>every</em> returned polygon as
+            <code>riparian = 1</code> with no attribute filter. Of ~10,300 polygons in the San Juan AOI,
+            only ~5,700 are actually woody riparian (<code>IA/IB/IC/IE</code> forest &amp; woodland,
+            <code>IIA/IIB</code> shrubland). The rest are being taught as riparian: <strong>1,271
+            Urban/Built-Up</strong>, <strong>781 Agriculture</strong>, 351 Water/Channel, 283 Roads, plus
+            uplands (<code>ID</code>, <code>IIC</code>, <code>IIIF</code>). So the model is learning
+            <em>“is this pixel inside the mapped corridor”</em> — corridor extent, not riparian
+            vegetation — which is exactly why the full-tile product “reproduces its own tile's NMRipMap”.
+            Worse, <strong>agriculture is the very class the weak labels failed on</strong>, and it is now
+            being labelled positive. The spatial-CV F1 is still the right <em>metric</em>, but the
+            <em>target</em> is wrong; expect these numbers to move once the class filter lands.
+          </p>
+        </div>
+
+        <div class="callout scrutiny">
+          <span class="chip">Also true</span>
+          <p>
+            Turkey Creek (CO) has no NMRipMap coverage and still runs on weak labels — read it as
+            unvalidated until CO-RIP is wired in. Two validated tiles is a demonstration, not a basin.
+            One upside from the same discovery: <code>IC</code> — “Lowland <em>Introduced</em> Riparian
+            Woodland and Scrub” (1,223 polygons) — is an authoritative <strong>tamarisk / Russian-olive
+            label</strong>, handed to the Stage-2 invasives track for free.
           </p>
         </div>
       </section>
@@ -1211,12 +1230,40 @@ emb = tokens.mean(dim=(3, 4)).squeeze(0)   <span class="c"># (P_H, P_W, D)</span
         </div>
 
         <p>
-          <strong>The baseline won.</strong> On a balanced AOI, on CPU, with the smallest model in the
-          family and a truncated temporal stack, hand-designed spectral features beat foundation-model
-          embeddings by a wide margin. This is reported rather than buried, and it is the correct
-          reading of the experiment: the conditions under which foundation models earn their keep —
-          scale, GPU, full temporal depth, a larger checkpoint — are precisely the conditions that were
-          absent. It bounds what was tested, not what is true.
+          <strong>The baseline won — but this is not a fair test, and comparing against Ai2's own
+          published recipe shows why.</strong> Ai2's
+          <a href="https://github.com/allenai/olmoearth_projects">olmoearth_projects</a> ships a
+          <strong>mangrove</strong> project that is a near-exact analog of this task — segment a woody
+          vegetation class near water from a Sentinel-2 time series, validated against an authoritative
+          reference map (Global Mangrove Watch there, NMRipMap here). It reports <strong>97.6%
+          accuracy</strong>. Its config differs from the run above in four load-bearing ways:
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>&nbsp;</th><th>Ai2 <code>mangrove</code> recipe</th><th>This run</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Checkpoint</strong></td><td><code>OLMOEARTH_V1_BASE</code></td><td>Nano (smallest)</td></tr>
+              <tr><td><strong>Backbone</strong></td><td><strong>fine-tuned</strong> — <code>FreezeUnfreeze</code>, unfreeze @ epoch 20 at <strong>10× LR</strong></td><td><strong>frozen</strong></td></tr>
+              <tr><td><strong>Head</strong></td><td><code>SegmentationPoolingDecoder</code> + <code>SegmentationHead</code></td><td>sklearn <strong>RandomForest</strong> on pooled tokens</td></tr>
+              <tr><td><strong>Time series</strong></td><td><strong>12 monthly S2 mosaics</strong></td><td><code>max_timesteps = 5</code></td></tr>
+              <tr><td><strong>Pooling</strong></td><td>decoder consumes patch tokens</td><td><strong>mean-pooled over time AND band-sets</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          That last row is the one that matters. Mean-pooling across the time axis <strong>discards the
+          phenology signal</strong> — and phenology is the entire thesis of this project (phreatophytes
+          stay green into the dry season because their roots reach groundwater, while the uplands brown
+          out). The foundation model was denied the one thing it exists to exploit, and then judged for
+          failing. So “RF 0.73 beat OlmoEarth 0.46” most likely reads as <em>“a random forest beat a
+          crippled Nano.”</em> The honest verdict is that this <strong>measured the harness, not the
+          model</strong>. A re-run under the published recipe is scaffolded at
+          <code>olmoearth_run_data/riparian_extent/</code>; either outcome is publishable, but the
+          current comparison should not be cited as evidence about foundation models.
         </p>
 
         <div class="callout scrutiny">
@@ -1704,6 +1751,16 @@ var (statusCode, message) = exception switch
               <tr><th style="width:22%">Issue</th><th>Why it matters</th><th style="width:20%">Severity</th></tr>
             </thead>
             <tbody>
+              <tr>
+                <td><strong>NMRipMap labels are unfiltered — ~45% of positives are not riparian</strong></td>
+                <td><code>fetch_nmripmap()</code> rasterises every polygon as <code>riparian = 1</code>, ignoring the <code>L1/L2</code> class hierarchy. Of ~10,300 polygons in the AOI only ~5,700 are woody riparian; the rest include <strong>1,271 Urban</strong>, <strong>781 Agriculture</strong>, 351 Water, 283 Roads and uplands. The model is learning <em>corridor membership</em>, not riparian vegetation — and agriculture, the class the weak labels failed on, is now taught as positive. <strong>The headline F1 0.895 / 0.924 measure the wrong target.</strong></td>
+                <td>Invalidates the headline result until fixed</td>
+              </tr>
+              <tr>
+                <td><strong>The OlmoEarth comparison is not a fair test</strong></td>
+                <td>Ai2's own <code>olmoearth_projects/mangrove</code> recipe — a near-exact analog — fine-tunes <code>BASE</code> over 12 monthly mosaics with a segmentation decoder (97.6% acc). This run froze a <em>Nano</em> encoder, mean-pooled tokens <em>over time</em>, and fitted a RandomForest on 5 timesteps. Mean-pooling destroys the phenology signal that is the project's whole thesis. "RF beat the FM" is measuring the harness, not the model.</td>
+                <td>The negative result is not evidence</td>
+              </tr>
               <tr>
                 <td><strong>Two validated tiles</strong></td>
                 <td>Spatial CV is honest, but NMRipMap coverage exists only for New Mexico. The Colorado tile still runs on weak labels — the same weak labels that scored ~0.00 F1 on an agricultural valley. Its output is unvalidated, and the map does not say so.</td>
