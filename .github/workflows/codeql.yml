@@ -20,8 +20,12 @@ on:
     # forever. A rule that only runs once is a rule that expires silently.
     - cron: "0 6 * * 1"
 
+# NB: no `matrix` in a workflow-level concurrency group — that context only exists inside a job, and
+# GitHub rejects the whole file for it ("this run likely failed because of a workflow file issue"),
+# which is a parse error the YAML itself is perfectly happy with. Keep the group per-ref; the matrix
+# legs are distinguished by the job-level group below.
 concurrency:
-  group: codeql-${{ github.ref }}-${{ matrix.language }}
+  group: codeql-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,6 +33,9 @@ jobs:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    concurrency:
+      group: codeql-${{ github.ref }}-${{ matrix.language }}
+      cancel-in-progress: true
     permissions:
       contents: read
       security-events: write
