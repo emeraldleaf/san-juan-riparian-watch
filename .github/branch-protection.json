@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "Branch protection for `main`, checked in so it is reviewable and restorable.",
+    "Apply:  gh api -X PUT repos/{owner}/{repo}/branches/main/protection --input .github/branch-protection.json",
+    "",
+    "Only checks that run on EVERY pull request may be listed in contexts. ci-dotnet, ci-frontend",
+    "and ci-python are path-filtered: on a docs-only PR they never start, so their check context",
+    "never reports, and a PR requiring them would block forever waiting on a job that will never",
+    "run. They still gate every PR that touches their paths — they just cannot be required here.",
+    "",
+    "required_pull_request_reviews is null on purpose. GitHub does not count an App's review",
+    "(CodeRabbit's) toward the approving-review quota, and nobody can approve their own PR, so",
+    "requiring one approval on a solo-maintained repo deadlocks every PR.",
+    "",
+    "enforce_admins is true: the gate applies to the owner too, otherwise it is just advice.",
+    "If CodeRabbit is down, main is frozen — see docs/code-review.md for the escape hatch."
+  ],
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "CodeRabbit",
+      "CLAUDE.md size budget (soft 400 / hard 500)",
+      "Every .excalidraw has a sibling .svg"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
