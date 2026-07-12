@@ -736,6 +736,7 @@ case "${1:-}" in
     --sonar-stop)   cmd_sonar_stop ;;
     --lint)         cmd_lint ;;
     --lint-dotnet)  cmd_lint_dotnet ;;
+    --review-status) .claude/scripts/check-coderabbit.sh "${2:-}" ;;
     --help|-h)
         echo "Usage: ./dev.sh [OPTION]"
         echo ""
@@ -745,6 +746,7 @@ case "${1:-}" in
         echo "  --stop             Stop Aspire (PostGIS container persists)"
         echo "  --reconnect        Recover after external drive disconnect/reconnect"
         echo "  --update [type]    Run ETL update (full|incremental|ndvi|all) [--force]"
+        echo "  --review-status N  Merge gate: is CodeRabbit GREEN on PR N's current head?"
         echo ""
         echo "  Database:"
         echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"

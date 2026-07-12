@@ -1,7 +1,11 @@
 # Dependencies needed to import the `riparian` package + run the unit-test suite in CI.
-# Deliberately excludes the heavy/unused-at-test-time deps (torch, olmoearth-pretrain-minimal,
+# Deliberately excludes the heavy/unused-at-test-time deps (olmoearth-pretrain-minimal,
 # geopandas, geoalchemy2, apscheduler) so CI stays fast. The `live`-marked tests (STAC/DB)
 # are skipped in CI, so their runtime deps aren't required here.
+#
+# torch is NOT listed here, but CI does install it — from the CPU-only index, in ci-python.yml.
+# Pinning it here would pull the default wheel with ~2 GB of unusable CUDA. It is needed because
+# tests/test_olmoearth_pooling.py exercises pool_tokens on real encoder-shaped tensors.
 numpy>=1.26.0
 xarray>=2024.1.0
 scipy>=1.11.0
