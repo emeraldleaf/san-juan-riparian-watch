@@ -1,0 +1,44 @@
+# Scans diffs (PR + push) for hardcoded secrets that GitHub's native secret
+# scanning might miss — custom patterns, accidentally committed .env files,
+# private keys, etc. Belt-and-suspenders alongside GitHub's built-in scanning
+# + push protection (configured in Settings → Code security).
+#
+# Free for public OSS repos. No token required for public repos.
+# Surfaces findings as a check run on the PR; blocks merge if anything found.
+name: SECRET_SCAN
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: secret-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so gitleaks can scan the diff context, not just the surface.
+          fetch-depth: 0
+          # This job only scans the diff; no later step needs the GITHUB_TOKEN
+          # checkout left in .git/config. Drop it to avoid the artipacked finding.
+          persist-credentials: false
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          # GITLEAKS_LICENSE only required for private/org repos; public OSS is free.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No project-level gitleaks config. Default ruleset is sufficient; fake
+          # credentials in integration test factories are suppressed by inline
+          # `// gitleaks:allow` markers on the literal lines. See CLAUDE.md
+          # "Testing → fake credentials in test fixtures."

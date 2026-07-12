@@ -1,0 +1,80 @@
+name: CodeQL
+
+# SAST across all three languages in the repo. Ported from NovaCraft (C#-only there) and widened:
+# our attack surface is not just the API. The Python ETL builds SQL and fetches remote data, and the
+# frontend renders untrusted feature properties into map popups.
+#
+# Why this exists: CodeRabbit caught a SQL-injection weakening in MvtTileSql that CI, SonarQube, 20
+# unit tests and a human review all passed — `^[a-z_]+$` looks strict, but in .NET `$` also matches
+# immediately before a trailing newline, so "wetlands\n" reached the interpolated SQL literal. That is
+# precisely the class of defect a dataflow engine finds mechanically, and we were relying on a
+# reviewer happening to notice. See docs/engineering.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly: CodeQL's query packs improve over time, so a scan that is clean today is not clean
+    # forever. A rule that only runs once is a rule that expires silently.
+    - cron: "0 6 * * 1"
+
+# NB: no `matrix` in a workflow-level concurrency group — that context only exists inside a job, and
+# GitHub rejects the whole file for it ("this run likely failed because of a workflow file issue"),
+# which is a parse error the YAML itself is perfectly happy with. Keep the group per-ref; the matrix
+# legs are distinguished by the job-level group below.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: codeql-${{ github.ref }}-${{ matrix.language }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build: true # C# needs a real build for dataflow analysis
+          - language: python
+            build: false # interpreted — CodeQL extracts without a build
+          - language: javascript-typescript
+            build: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        if: matrix.build
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-and-quality is a superset of the default security suite. We would rather see the
+          # maintainability findings too than curate a query list nobody will revisit.
+          queries: security-and-quality
+
+      - name: Autobuild
+        if: matrix.build
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

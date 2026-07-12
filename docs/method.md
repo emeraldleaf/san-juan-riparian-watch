@@ -6,6 +6,28 @@ caught — and every one of those failures is named, with receipts. See CLAUDE.m
 
 ---
 
+## Origin — and the gap this repo tries to close
+
+The method comes from the **NextAurora / NovaCraft** encoding loop: rules encoded across five
+surfaces, ordered by enforcement strength, promoted down a tier as they *earn* it
+([public write-up](https://www.linkedin.com/posts/joshua-dell_aiengineering-agenticai-claudecode-share-7469449311131566080-eQRL/)).
+Its author names the open problem himself:
+
+> *"improvement is observable but **not yet quantified**."*
+
+This repo is an attempt to quantify it — **not** with a controlled trial (that needs a second team
+building the same system without the gates), but with **receipts**: every rule, the dated defect it
+caught, and the defects that escaped the tiers where no gate existed.
+
+**Honest bound: N = 1 project; receipts, not a randomized study.** What the evidence *does* support is
+narrower and unusually clean:
+
+> **Zero mechanized rules drifted. Three documentation-only surfaces did** — including one described as
+> a live "enforcement surface" in six documents while being **invoked by nothing, ever**.
+
+For the engineering counterpart — specs, QA, CI gates, review, and the honest list of what is still
+**not** covered — see **[the engineering method](engineering.md)**.
+
 ## The thesis
 
 > **AI-assisted research fails by producing work that is fast, fluent, plausible, and wrong — and

@@ -1,0 +1,93 @@
+name: VULNERABLE_PACKAGES
+
+# Dependency vulnerability scan across all three ecosystems. Ported from NovaCraft (NuGet-only there)
+# and widened — most of this repo's dependency surface is Python (torch, geopandas, rasterio, the
+# OlmoEarth wheel) and npm, not NuGet.
+#
+# Scheduled rather than per-PR: a dependency does not become vulnerable when you touch it, it becomes
+# vulnerable when someone publishes the CVE. A gate that only runs on PRs would never fire on a repo
+# that is not being edited — which is exactly when nobody is looking. See docs/engineering.md.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC
+  workflow_dispatch:
+  pull_request:
+    # Also run when the dependency manifests themselves change.
+    paths:
+      - "**/*.csproj"
+      - "python-etl/requirements*.txt"
+      - "frontend/package*.json"
+
+concurrency:
+  group: vulnerable-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nuget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet restore RiparianPoc.sln
+      - name: List vulnerable NuGet packages
+        run: |
+          set -euo pipefail
+          dotnet list RiparianPoc.sln package --vulnerable --include-transitive
+          json=$(dotnet list RiparianPoc.sln package --vulnerable --include-transitive --format json)
+          n=$(echo "$json" | jq '[.. | objects | select(has("vulnerabilities")) | .vulnerabilities[]?] | length')
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "::error::${n} vulnerable NuGet package record(s). Bump, replace, or document accepted risk."
+            exit 1
+          fi
+          echo "No vulnerable NuGet packages reported."
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: pip-audit
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip pip-audit
+          # Audit the declared requirements rather than a resolved venv: we want to know that what we
+          # ASK for is safe, not merely what happened to resolve on this runner today.
+          pip-audit --strict -r python-etl/requirements.txt
+
+  npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: npm audit
+        # `high` is the gate; moderate findings are reported but do not block, because the frontend
+        # renders no untrusted input beyond map feature properties. Revisit if that changes.
+        run: npm audit --audit-level=high

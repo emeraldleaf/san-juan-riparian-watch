@@ -91,6 +91,12 @@ That is what this project is for — and their recommendation is, in effect, its
   and **disproved**. Also records what *didn't* work: **every documentation-only surface drifted**, and
   a broken gate is worse than no gate because it reports "clean".
 
+- [**The engineering method**](engineering.md) — the counterpart: specs → rules → **gates** → review →
+  correction. 10 engineering defects and what caught each (a SQL-injection weakening that CI,
+  SonarQube, 20 unit tests and a human review all passed; six ETL bugs that silently corrupted data
+  without crashing). Ends with **the gaps**, which is the useful part: **the subsystem with the worst
+  defect record is the one with the weakest gate.**
+
 ## Prior-art audits — the falsification log
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim
