@@ -1,0 +1,45 @@
+# Inference / windowing config for the riparian-extent OlmoEarth fine-tune.
+# Mirrors allenai/olmoearth_projects `mangrove/olmoearth_run.yaml`.
+#
+# The prediction request geometry's start timestamp should be set 12 months BEFORE the
+# date you want riparian extent for (the model consumes a 12-month Sentinel-2 series).
+
+partition_request_geometry:
+  class_path: olmoearth_run.partitioners.grid.GridPartitioner
+  init_args:
+    grid_size: 0.1          # degrees
+    projection: EPSG:3857
+    resolution: 10          # metres/pixel — Sentinel-2 native
+    use_utm: true
+
+prepare_window_geometries:
+  class_path: olmoearth_run.partitioners.grid.GridPartitioner
+  init_args:
+    grid_size: 32           # window size in pixels
+    projection: EPSG:3857
+    resolution: 10
+    use_utm: true
+
+postprocess:
+  process_dataset:
+    class_path: olmoearth_run.postprocessors.combine_geotiff.CombineGeotiff
+  process_partition:
+    class_path: olmoearth_run.postprocessors.combine_geotiff.CombineGeotiff
+  process_window:
+    class_path: olmoearth_run.postprocessors.noop.NoopRaster
+
+output:
+  type: raster
+  classification_fields:
+  - property: riparian_class
+    classes:
+    # 0 = invalid (zero_is_invalid: true in model.yaml)
+    - value: 1
+      name: riparian
+      color: "#228B22"
+    - value: 2
+      name: water
+      color: "#00BFFF"
+    - value: 3
+      name: other
+      color: "#D2B48C"

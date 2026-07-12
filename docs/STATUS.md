@@ -165,8 +165,26 @@ later behind the existing provider seam. Landed this session:
    quality flags.
 4. **Reference-layer validation** — NMRipMap (NM) + CO-RIP (CO), IoU/F1 stratified by stream
    order; validate NM vs CO separately.
-5. **OlmoEarth-everywhere** on the **Hyperstack GPU VM** — embedding store, head training,
-   baseline-vs-OlmoEarth disagreement maps.
+5. **OlmoEarth — re-run via Ai2's own `olmoearth_projects` recipe (HIGH VALUE, 2026-07-11).**
+   Our "RF 0.73 beat OlmoEarth-Nano 0.46" result is very likely measuring **our harness, not
+   the model**. Ai2's published [`mangrove`](https://github.com/allenai/olmoearth_projects)
+   project is a near-exact analog of Stage 1 (segment woody vegetation near water from an S2
+   time series, validated against an authoritative reference map — GMW there, **NMRipMap**
+   here) and it does four things we did not:
+   - `OLMOEARTH_V1_BASE`, not Nano;
+   - **fine-tunes the backbone** (`FreezeUnfreeze`, unfreeze @ epoch 20 at 10× LR) instead of
+     freezing it behind a **sklearn RandomForest head**;
+   - **12 monthly S2 mosaics** (`period_duration: 30d`, `min_matches: 12`) vs our
+     `max_timesteps=5`;
+   - a real `SegmentationPoolingDecoder`, instead of **mean-pooling tokens over time AND
+     band-sets** — which discards the phenology signal that *is* the riparian discriminator.
+   Reported mangrove accuracy: 97.6%. **Scaffold committed at
+   `olmoearth_run_data/riparian_extent/`** (`dataset.json` / `model.yaml` / `olmoearth_run.yaml`,
+   transcribed from `mangrove`, NMRipMap as label source, spatial split). Needs a GPU +
+   `olmoearth_projects` checkout to run. Note **v1.1 cuts compute ~3×** (band-merged tokens)
+   and **v1.2 adds RoPE** — re-check whether a smaller variant is viable first.
+   Either outcome is publishable; the current comparison is not a fair test. Tracked as an issue.
+   Then: baseline-vs-OlmoEarth disagreement maps.
 6. **Web app** — frontend map layer for extent (endpoint exists) + reach summaries.
 
 ## Environment notes
