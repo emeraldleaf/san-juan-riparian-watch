@@ -1,17 +1,17 @@
 ---
-description: Scaffold a new React/Leaflet map layer following the fetchJson + GeoJSON + legend pattern
+description: Scaffold a new React/MapLibre map layer following the fetchJson + Source/Layer + legend pattern
 argument-hint: <layer + source endpoint, e.g. "riparian extent from /api/riparian/extent">
 disable-model-invocation: true
 ---
 
 # /add-map-layer
 
-Scaffold a new map layer in the React + Leaflet frontend. See CLAUDE.md "Frontend" +
+Scaffold a new map layer in the React + **MapLibre GL** frontend. See CLAUDE.md "Frontend" +
 "Common Patterns".
 
 `$ARGUMENTS` names the layer + its source API endpoint. If empty, ask.
 
-This is a **MapLibre GL** map (`react-map-gl/maplibre`), not Leaflet. Layers are
+This is a **MapLibre GL** map (`react-map-gl/maplibre`). Layers are
 `<Source>` + `<Layer>`; visibility is toggled via the `layout.visibility` paint prop.
 
 ## Steps

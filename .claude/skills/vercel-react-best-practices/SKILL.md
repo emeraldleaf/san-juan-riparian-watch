@@ -135,7 +135,7 @@ Reference these guidelines when:
 > [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices)
 > (MIT). The individual `rules/*.md` files were NOT vendored — every rule is expanded in
 > `AGENTS.md` in this directory (read the relevant section by rule prefix). Riparian POC
-> caveat: the frontend is a **Vite CSR SPA** (React 18 + react-leaflet), so `server-*` rules
+> caveat: the frontend is a **Vite CSR SPA** (React 18 + react-map-gl/maplibre), so `server-*` rules
 > (RSC/SSR) don't apply; `async-*`, `bundle-*`, `client-*`, `rerender-*`, `rendering-*`, and
 > `js-*` all do. The canonical frontend rules live in CLAUDE.md "Frontend".
 >
