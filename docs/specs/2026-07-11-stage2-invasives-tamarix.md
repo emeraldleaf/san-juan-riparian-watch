@@ -124,9 +124,27 @@ No published work applies an EO foundation model to **riparian native-vs-invasiv
 Given §2, the contribution is **not** "map riparian vegetation" and **not** "detect tamarisk."
 Both are done. The gap is precise:
 
-> **Nobody has produced a wall-to-wall, time-series, native-vs-invasive riparian *cover and
-> change* product at reach scale for the basin.** CO-RIP gives extent (no species). The CSU
-> occurrence dataset gives species (no map). They were never joined.
+> 🔴 **This gap was overstated. Corrected 2026-07-12 by `/paper-audit`.** We claimed *"nobody has
+> produced a native-vs-invasive cover and change product; CO-RIP gives extent, CSU gives species
+> points, they were never joined."* **False.** **Evangelista et al. (2018)** (CSU/NREL + USGS +
+> NASA DEVELOP) shipped a riparian-vegetation Mapbook atlas for **2006, 2016 and the change between
+> them**, a 2016 tamarisk atlas for *select* areas, and Russian-olive maps **on the San Juan for
+> 2006 and 2016**. We had read their occurrence-points web page and never the report.
+>
+> **The gap survives, narrower and far better grounded — in the incumbent's own stated limits:**
+>
+> - *"The signature between tamarisk and other riparian vegetation **did not show to be very
+>   different when using Landsat imagery** … **without a different sensor with greater spectral or
+>   grain resolution this is a difficult constraint to overcome.**"* → a specification for
+>   **Sentinel-2 (10 m, red-edge) + a dense temporal stack**, which is this project.
+> - *"Areas that had active beetle activity were **difficult to accurately map** … the live-dead
+>   tamarisk mix added confusion to model results."* → **the biocontrol confound is unhandled by the
+>   incumbent.** Treating defoliation as a *state* rather than as absence is still novel.
+> - Theirs is **2 epochs (2006/2016)** — and across **two different sensors** (LS5 TM → LS8 OLI),
+>   which they warn may *"result in change maps that show differences between sensors in addition to
+>   changes in the distribution of a species."* An **annual** series is still not done.
+>
+> **What does not exist: an ANNUAL, 10 m, beetle-aware, wall-to-wall native-vs-invasive product.**
 
 Our contribution, stated honestly:
 

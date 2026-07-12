@@ -356,6 +356,24 @@ sources:
     geo_focus: false
     topics: [foundation-model, earthpt, fine-tuning, canopy]
 
+  - id: evangelista-2018-mapping-native-nonnative-riparian-crb
+    title: >-
+      Mapping Native and Non-Native Riparian Vegetation in the Colorado River Watershed
+    agency: CSU/NREL + USGS + NASA DEVELOP (Walton Family Foundation)
+    url: https://static.waltonfamilyfoundation.org/67/93/2f16c8d64dcab074c02f0c6f1857/mapping-riparian-vegetation-co-river.PDF
+    year: 2018
+    doc_type: report
+    format: pdf
+    license: verify
+    geo_focus: true
+    fetch: auto
+    topics: [tamarisk, russian-olive, invasives, change-detection, landsat, sentinel-2, beetle]
+    # THE incumbent. Found 2026-07-12 by /paper-audit; it falsified our "CSU produced no map" claim.
+    # They mapped riparian vegetation for 2006/2016 + change, and Russian olive on the SAN JUAN for
+    # both years. Load-bearing: they state Landsat CANNOT resolve the tamarisk phenological
+    # signature, and that beetle defoliation confounded their models. Both limits are the spec for
+    # this project. Ingest so the RAG answers from the primary source, not our summary of it.
+
 # ---------------------------------------------------------------------------
 # Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
 # 1 hop), then re-listed above with concrete ids before ingest for reproducibility.
