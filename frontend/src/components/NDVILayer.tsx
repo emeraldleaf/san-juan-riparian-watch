@@ -29,7 +29,9 @@ export default function NDVILayer() {
         type="heatmap"
         source-layer="centroids"
         paint={{
-          'heatmap-weight': ['coalesce', ['get', 'mean_ndvi'], 0],
+          // NDVI ranges -1..1, but heatmap weight must be >= 0 — clamp negatives
+          // (water / bare soil) to 0 so they don't produce invalid negative weights.
+          'heatmap-weight': ['max', 0, ['coalesce', ['get', 'mean_ndvi'], 0]],
           'heatmap-intensity': [
             'interpolate', ['linear'], ['zoom'],
             8, 1,
