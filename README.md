@@ -1,5 +1,7 @@
 # San Juan Riparian Watch
 
+> 📄 **[Engineering & methodology walkthrough](https://emeraldleaf.github.io/san-juan-riparian-watch/engineering-review.html)** — how the pipeline works end to end, with verbatim code and the weak points to scrutinize.
+
 Basin-scale **riparian vegetation delineation, health scoring, and change monitoring** for
 the San Juan River watershed (Colorado + New Mexico). It learns *where riparian vegetation
 actually is* from satellite time series — instead of assuming a fixed distance from a

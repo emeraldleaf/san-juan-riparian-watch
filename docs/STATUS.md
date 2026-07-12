@@ -1,41 +1,47 @@
 # Project Status
 
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-12
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## Current state — git, PRs, and WHY things are where they are (2026-07-11)
+## Current state — git, PRs, and WHY things are where they are (2026-07-12)
 
-**READ THIS FIRST if you are a coding agent picking up the repo.** This section explains an
-intentionally unusual git state so you don't "helpfully" re-commit things or close issues early.
+**READ THIS FIRST if you are a coding agent picking up the repo.**
 
 ### Branches
-- Working branch **`feat/docintel-private-split`** @ `3b824f0` (pushed to origin).
-  - `ad89b67` — ETL enrichment/scoring WIP **+ review-driven bug fixes** (see below).
-  - `3b824f0` — untracked build artifacts (`.sonarqube/`, `__pycache__`, `.DS_Store` now gitignored).
-- **This branch is BEHIND `main`.** `main` has PRs #3 and #4 merged; this branch predates them.
-  That is WHY ~10 files show as "uncommitted" here but must **NOT** be committed on this branch:
-  `RiparianPoc.Api/Services/{GeoDataServices,MvtTileSql}.cs`, the C# tests, `RiparianPoc.Api.csproj`,
-  `frontend/src/{App.tsx,components/NDVILayer.tsx}`, `docs/{engineering-review.html,index.html,.nojekyll}`
-  are the **content of PRs #3/#4/#5**. Committing them here duplicates the PRs and will conflict.
-  They reconcile when this branch is synced with `main` (rebase/merge) after PR #5 lands.
-- Genuinely uncommitted + left alone: 5 misc config files (`.vscode`, `.claude/settings.json`,
-  `aspire.config.json`, `README_SONAR.md`, deleted `.codacy/codacy.yaml`) — user's call.
+- **`feat/etl-fixes-and-labels`** — the ETL/label work, now **merged up to date with `main`**.
+  Carries `ad89b67` (ETL enrichment + SMP scoring + the review-driven bug fixes), the NMRipMap
+  class crosswalk, the OlmoEarth task scaffold, and the corpus/lit-review work.
+- `feat/docintel-private-split` — the **old** name for the same work, left in place because it is
+  checked out in the primary working tree. `feat/etl-fixes-and-labels` supersedes it.
+- The docs (literature review, Stage-2 spec, both 2026-07-11 ADRs) are **already on `main`** via
+  PR #12 with content identical to the branch, so they merged clean. `docintel/corpus/
+  seed_sources.yaml` (25 sources) exists **only on the branch** — `main` still has the original 11.
+
+### GitHub Pages — LIVE
+Built from `main`/`docs` (legacy Jekyll). Hub at
+`https://emeraldleaf.github.io/san-juan-riparian-watch/` links the engineering review, literature
+review, all specs and ADRs. `docs/_config.yml` declares **`jekyll-optional-front-matter`** — this is
+load-bearing: none of the specs/ADRs have YAML front matter, and without that plugin Jekyll skips
+them and every link 404s. Do not remove it, and do not re-add `docs/.nojekyll` (it makes Jekyll skip
+the whole build, serving the `.md` files as raw text).
 
 ### PRs (base = `main`)
-- **#3 MERGED** — GitHub Pages: `docs/engineering-review.html` walkthrough (live at
-  `https://emeraldleaf.github.io/san-juan-riparian-watch/engineering-review.html`) + root redirect.
-- **#4 MERGED** — MVT tile SQL unified into `MvtTileSql.Build` + `RenderTileAsync`; C# xUnit tests
-  (`RiparianPoc.Api.Tests`); `result.byte_count` span tag; stale-test-doc fixes.
+- **#3 / #4 / #10 / #12 MERGED** — Pages walkthrough; MVT tile SQL unified into `MvtTileSql.Build`
+  + C# xUnit tests; engineering-review corrections (NMRipMap label bug, OlmoEarth fair-test);
+  the published docs hub.
 - **#5 OPEN** — map-UI fixes (DEBUG colors removed, 3-way legend, stale-response guard, heatmap
-  weight clamp, default recenter) + soil/wetland tile popup enrichment + `MvtTileSql` layer-name
+  weight clamp, default recenter) + soil/wetland popup enrichment + `MvtTileSql` layer-name
   validation + NDVI legend/CLAUDE.md threshold reconciliation. Labeled `coderabbit`.
+- The primary working tree still shows ~15 dirty files. Most are the **content of PR #5** and must
+  not be committed elsewhere; the rest are misc local config (`.vscode`, `.claude/settings.json`,
+  `aspire.config.json`, `README_SONAR.md`, deleted `.codacy/codacy.yaml`) — user's call.
 
 ### Open issues (base = `main`)
-- **#6 / #7 / #8** — the 3 HIGH ETL bugs from the ultracode review. Their FIXES are committed on
-  `feat/docintel-private-split` (`ad89b67`) but **NOT on `main`**, so the issues stay OPEN until this
-  branch's ETL work merges. Do not close them against `main` yet.
+- **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — fixes ride on
+  `feat/etl-fixes-and-labels`. They close when that branch merges, not before.
+- **#9** (OlmoEarth re-run without mean-pooling over time) — open, not started.
 
 ### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
 All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt
@@ -91,10 +97,47 @@ NOT run the ETL just to fill these before the fixes are confirmed, or you bake w
 
 ## Where we are
 
-Pivoting the riparian POC into a portfolio piece for the Ai2 "AI for the Planet" Senior SWE
-role. Renamed → **san-juan-riparian-watch** (GitHub repo renamed by user; local remote update
-+ branch push still PENDING). README fully rewritten to the delineation/health/change framing.
-Three tracks now.
+Portfolio piece for the Ai2 "AI for the Planet" Senior SWE role — **san-juan-riparian-watch**
+(public). All work merged to `main` (PR #2, CodeRabbit-reviewed). Three tracks + the app run
+end-to-end locally.
+
+### Working now (verified end-to-end)
+- **Delineation (Stage 1):** RF baseline → **NMRipMap-trained** on the 2 NM tiles (spatial-CV F1
+  0.90–0.92, vs weak-label 0.00–0.71); HAND envelope; MMU+simplify in `_vectorize`. On the map +
+  NMRipMap reference overlay toggle.
+- **Doc-intelligence (Track 3):** RAG (Qdrant + CRAG + citations, local Ollama) → geo-resolver
+  (rivers/reaches/HUCs) → `/docs/ask` → frontend Q&A panel that highlights answers on the map.
+  Harness is PRIVATE (`riparian-rag-harness`); public repo holds the geo delta + API contract.
+- **Perf:** index-backed bbox pre-filter on all MVT tile queries (10–40× faster); extent de-noised.
+
+### Runtime (local) — how to bring it up
+- **Stable DB** (off the flaky external-drive Docker): `docker run -d --name riparian-pg-stable
+  -p 55432:5432 -v ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`
+  (trust auth, max_connections=200).
+- **C# API** (Release): `ConnectionStrings__ripariandb="Host=localhost;Port=55432;Database=ripariandb;Username=postgres;Maximum Pool Size=40"
+  ASPNETCORE_URLS=http://localhost:5237 dotnet run -c Release --project RiparianPoc.Api`.
+- **docintel** (in riparian-rag-harness): `RIPARIAN_DB_URL=postgresql+psycopg2://postgres@localhost:55432/ripariandb
+  LLM_MODEL=llama3.2:3b uv run uvicorn docintel_server:app --port 8100` + Qdrant :6333 + Ollama.
+- **Frontend:** `cd frontend && npm run dev` → http://localhost:3000.
+
+### Roadmap (priority)
+1. **Shareable** — deploy a demo link (Cloudflare per docintel spec) or a demo video + write-up.
+   Right now it only runs on the local machine → a reviewer can't see it (the #1 practical gap).
+2. **OlmoEarth flagship — DONE (CPU, 2026-07-06).** Token-mask + square-grid blocker resolved →
+   OlmoEarth-v1-Nano encodes end-to-end on CPU. `run_delineation_olmoearth` (FM contender to the
+   RF runner) + `docs/olmoearth-vs-rf-baseline.md`: honest 5-fold spatial-CV on a balanced AOI —
+   **RF F1 0.73 vs OlmoEarth-Nano F1 0.46** (RF wins in this CPU/Nano/small-AOI setup; FM strengths
+   need scale/GPU). Next: basin-scale OlmoEarth on the GPU VM (larger model, full temporal,
+   embedding store) + RF-vs-OlmoEarth disagreement maps.
+3. **Invasives + change** — tamarisk/Russian-olive cover within the extent (`health/invasive.py`)
+   → spread over time (Stage-3 spec). Manager-relevant, on-thesis.
+4. **Empty views** — NDVI Health / SMP Score / Vegetation are empty (0 rows); need the NDVI/health
+   ETL (heavy; back up first — buffers truncation cascades).
+5. **MVT for extent + NMRipMap** — the last GeoJSON layers; the fully-correct serving path.
+
+### Original framing (retained below)
+Renamed → **san-juan-riparian-watch**. README rewritten to the delineation/health/change framing.
+Three tracks.
 
 ### Track 1 — Encoding-loop method port (DONE, verified)
 All three loops from the NextAurora repo are ported and dogfooded: 5 surfaces × 3 tiers,

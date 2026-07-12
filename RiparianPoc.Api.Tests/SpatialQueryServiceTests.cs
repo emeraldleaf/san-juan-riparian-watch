@@ -79,4 +79,56 @@ public sealed class SpatialQueryServiceTests
         await _repo.Received(1).QueryGeoJsonAsync(
             Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task GetBufferTilesAsync_QueriesMvtForBuffersLayer()
+    {
+        // ARRANGE
+        _repo.QueryMvtAsync(Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        // ACT
+        await CreateSut().GetBufferTilesAsync(3, 1, 2, CancellationToken.None);
+
+        // ASSERT — the buffers method emits the canonical tile shape for the 'buffers' layer
+        await _repo.Received(1).QueryMvtAsync(
+            Arg.Is<string>(sql =>
+                sql.Contains("ST_AsMVT(mvt_geom.*, 'buffers', 4096, 'geom')")
+                && sql.Contains("ST_TileEnvelope(@z, @x, @y)")),
+            Arg.Any<object?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetSoilTilesAsync_QueriesMvtForSoilsLayerFromBronze()
+    {
+        // ARRANGE — guards against a copy-paste slip wiring the wrong layer/table
+        _repo.QueryMvtAsync(Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        // ACT
+        await CreateSut().GetSoilTilesAsync(5, 4, 6, CancellationToken.None);
+
+        // ASSERT
+        await _repo.Received(1).QueryMvtAsync(
+            Arg.Is<string>(sql =>
+                sql.Contains("ST_AsMVT(mvt_geom.*, 'soils', 4096, 'geom')")
+                && sql.Contains("bronze.ssurgo_soils s")),
+            Arg.Any<object?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TileMethods_ReturnEmptyArray_WhenRepositoryReturnsNull()
+    {
+        // ARRANGE — repository yields null (no rows); the endpoint must not NRE
+        _repo.QueryMvtAsync(Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
+            .Returns((byte[])null!);
+
+        // ACT
+        var tile = await CreateSut().GetStreamTilesAsync(0, 0, 0, CancellationToken.None);
+
+        // ASSERT
+        Assert.Empty(tile);
+    }
 }
