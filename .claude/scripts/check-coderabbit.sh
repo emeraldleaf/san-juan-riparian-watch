@@ -80,8 +80,21 @@ read -r MERGEABLE STATE < <(gh pr view "$PR" --json mergeable,mergeStateStatus \
     --jq '"\(.mergeable) \(.mergeStateStatus)"')
 [[ "$MERGEABLE" == "MERGEABLE" ]] || fail "PR is ${MERGEABLE} (conflicts?)"
 
-FAILED=$(gh pr view "$PR" --json statusCheckRollup \
-    --jq '[.statusCheckRollup[]? | select(.conclusion != null and .conclusion != "SUCCESS" and .conclusion != "NEUTRAL" and .conclusion != "SKIPPED") | .name] | join(", ")')
+# A check that has not COMPLETED is pending, not failing. Judging it by `conclusion` alone
+# reports an in-flight job as a failure — which is worse than useless: a gate that cries wolf
+# is a gate people learn to bypass. (Observed on #18: `python` was still resolving and the gate
+# said "failing checks: python"; it went green moments later.) Distinguish the two, and say
+# "wait" rather than "do not merge".
+ROLLUP=$(gh pr view "$PR" --json statusCheckRollup --jq '.statusCheckRollup')
+
+PENDING=$(jq -r '[.[]? | select((.status // "COMPLETED") != "COMPLETED") | (.name // .context)] | join(", ")' <<<"$ROLLUP")
+if [[ -n "$PENDING" ]]; then
+    echo "  ${YELLOW}…${NC} still running: ${PENDING}"
+    echo "${YELLOW}⧗ NOT YET${NC} — checks have not finished on ${SHORT}. Re-run when they do."
+    exit 1
+fi
+
+FAILED=$(jq -r '[.[]? | select(.conclusion != null and .conclusion != "SUCCESS" and .conclusion != "NEUTRAL" and .conclusion != "SKIPPED") | (.name // .context)] | join(", ")' <<<"$ROLLUP")
 [[ -z "$FAILED" ]] || fail "failing checks: ${FAILED}"
 
 echo "  ${GREEN}✓${NC} mergeable, all checks green"
