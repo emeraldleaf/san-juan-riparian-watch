@@ -89,6 +89,22 @@ identifies as *the* discriminator. It is not a coincidence that the run underper
 > Riparian Woodland and Scrub"* — it conflates **Tamarix and Russian olive** and cannot separate
 > them (§5). These occurrence points can.
 
+> ### 🔴 LABEL VINTAGE — fit on 2020, predict any year
+>
+> **NMRipMap v2.0 Plus** (Muldavin et al., 2023) was **photo-interpreted from NAIP 2020** (1 m
+> ortho), per the service's own layer metadata. The labels describe the corridor **as it was in
+> 2020**.
+>
+> **Fit and validate on Sentinel-2 from the 2020 growing season.** This is not pedantry: the
+> 2026-07-12 fair test fitted these 2020 labels against **2024** imagery — a 4-year gap — and fed
+> every model label noise we introduced ourselves. It matters **more here than anywhere else in the
+> project**: riparian *extent* is fairly stable over four years, but **Tamarix cover is precisely
+> what the beetle has been changing since 2004.** A stale label on an invasive-cover task is not
+> noise, it is a moving target.
+>
+> Predict any year you like. **Fit on the label's year.** See
+> [the fine-tune ADR](../decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md).
+
 ### 2.4 EO foundation models — applied to adjacent tasks, not to this one
 
 - **OlmoEarth** (Ai2): the [`mangrove`](https://github.com/allenai/olmoearth_projects) project
