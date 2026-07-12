@@ -25,7 +25,7 @@ import torch
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 
-from riparian.delineation.olmoearth import (
+from riparian.delineation.pooling import (
     MAX_MODEL_TIMESTEPS,
     POOLINGS,
     pool_tokens,
