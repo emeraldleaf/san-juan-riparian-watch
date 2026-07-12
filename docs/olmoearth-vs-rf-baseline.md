@@ -54,6 +54,26 @@ Checkpoint control (same AOI, same folds):
 | OlmoEarth-v1-Nano | 0.017 / 0.618 | 0.048 / 0.648 |
 | OlmoEarth-v1.1-Nano | 0.021 / 0.609 | 0.065 / 0.634 |
 
+> ### ⚠️ Known defect in this run: the labels and the imagery are 4 years apart
+>
+> Found after publishing. NMRipMap's service metadata says **v2.0 Plus (Muldavin et al. 2023)** was
+> photo-interpreted from **NAIP 2020** — so the labels are **2020-vintage**. This run used
+> **Sentinel-2 from 2024**.
+>
+> Riparian corridors move over four years (beetle defoliation, floods, channel migration,
+> restoration), so we fed every arm label noise we introduced ourselves.
+>
+> - The **relative** comparison **still stands** — RF and OlmoEarth ate the *same* mismatch.
+> - The **absolute** numbers are **pessimistic for every arm**. RF's 0.701 and OlmoEarth's 0.065
+>   are both depressed.
+> - It would hurt an **invasives** task far more than this extent task: riparian extent is fairly
+>   stable over four years, but *Tamarix cover* is precisely what has been changing since the
+>   beetle arrived.
+>
+> **The fix, for any future run: fit on imagery contemporaneous with the label vintage** — i.e.
+> Sentinel-2 **2020**. See
+> [the fine-tune ADR](decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md).
+
 ## What this actually shows
 
 **1. The pooling bug is real — and it is *not* the explanation.**
