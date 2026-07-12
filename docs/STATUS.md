@@ -35,10 +35,14 @@ the whole build, serving the `.md` files as raw text).
 
 ### Open issues (base = `main`)
 - **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — **CLOSED** by PR #13.
-- **#9** (OlmoEarth re-run without mean-pooling over time) — **the only open issue.** The
-  RF-beats-foundation-model result is very likely a harness artifact: `olmoearth.py` mean-pools
-  tokens over time *and* over band-sets, destroying the late-season senescence signal that the
-  entire Tamarix-detection literature depends on.
+- **#9** (OlmoEarth) — **the only open issue, and its premise was tested and DISPROVED.** The
+  mean-pooling defect is real (pinned by a unit test), but fixing it moves OlmoEarth-Nano only
+  from F1 0.021 -> 0.065 against RF's 0.701. **Pooling does not explain the gap.** The old
+  RF 0.73 / OE 0.46 numbers are RETRACTED — they were scored against the ~45%-wrong labels, and
+  the corrupted labels were *flattering* the FM (they rewarded predicting corridor membership,
+  which a frozen embedding is good at). What is still untested is OlmoEarth **as Ai2 uses it**:
+  fine-tuned Base + SegmentationPoolingDecoder, not a frozen Nano + sklearn RF head. That needs
+  a GPU. See `docs/olmoearth-vs-rf-baseline.md`.
 
 ### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
 All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt
@@ -58,8 +62,10 @@ Two of our components **substantially reproduce published work**. Say so; do not
   beat and a label source*, not something to re-derive.
 - **Tamarisk detection is established** (S2+RF **87.8% OA**; Landsat 80–91%), and the literature
   is explicit that **phenology — specifically late-season senescence — is the discriminator**
-  (Tamarix stays green after natives brown). This *indicts our OlmoEarth harness*: it mean-pools
-  tokens over time, destroying exactly that signal (#9).
+  (Tamarix stays green after natives brown). Our OlmoEarth harness *was* mean-pooling that signal
+  away — a real defect, now fixed and unit-tested. **But the 2026-07-12 re-run showed it explains
+  only a small part of the RF-vs-FM gap** (F1 0.021 → 0.065 vs RF 0.701), so do not repeat the
+  claim that the FM result is "just" a pooling artifact (#9).
 - **The real gap:** CO-RIP gives extent-without-species; CSU/NREL's 2018 dataset gives **3,000+
   tamarisk/Russian-olive occurrence points** but no map — CSU call them *"complementary products
   rather than a single integrated map of invasive versus native species."* **Nobody has produced
