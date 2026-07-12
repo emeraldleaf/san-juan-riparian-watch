@@ -40,10 +40,25 @@ public sealed partial class CorrelationMiddleware
     /// legitimate claim to have it preserved, and a fresh GUID keeps the trace usable.
     /// </para>
     /// </remarks>
-    private static string SanitizeId(string? value, string fallback) =>
-        !string.IsNullOrEmpty(value) && value.Length <= MaxIdLength && SafeId().IsMatch(value)
-            ? value
-            : fallback;
+    private static string SanitizeId(string? value, string fallback)
+    {
+        // REJECT the raw value; do not launder it. Stripping the newline out of "s\nX" and keeping
+        // "sX" would be *repairing* a request no legitimate client sends — and a repaired identifier
+        // is worse than a replaced one, because two different sessions can collapse onto the same id
+        // and an attacker's probe is silently made to look well-formed.
+        if (string.IsNullOrEmpty(value) || value.Length > MaxIdLength || !SafeId().IsMatch(value))
+        {
+            return fallback;
+        }
+
+        // A no-op for anything that survived the allow-list above (which admits no CR or LF), but it
+        // is the sanitiser CodeQL's log-forging query recognises. A guarantee the analyser cannot see
+        // is a guarantee the next reader will not trust either — so make it explicit rather than
+        // suppressing the alert.
+        return value
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Replace("\n", string.Empty, StringComparison.Ordinal);
+    }
 
     private readonly RequestDelegate _next;
     private readonly ILogger<CorrelationMiddleware> _logger;

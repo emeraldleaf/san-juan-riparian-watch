@@ -71,9 +71,21 @@ class _HttpRangeFile(io.RawIOBase):
     answers **416 Range Not Satisfiable**, which surfaces as a baffling ``BadZipFile``.
     """
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, size: int | None = None) -> None:
+        """
+        Args:
+            url: The remote file.
+            size: Total length in bytes. If omitted, a HEAD request discovers it. Injectable so the
+                class can be exercised without a network — a subclass that skipped ``__init__`` to
+                avoid the HEAD would leave the base uninitialised, which CodeQL flags (correctly)
+                as a missing superclass call.
+        """
+        super().__init__()
         self.url = url
         self.pos = 0
+        if size is not None:
+            self.size = size
+            return
         req = urllib.request.Request(url, method="HEAD", headers=_UA)
         with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 — fixed https URL
             self.size = int(resp.headers["Content-Length"])

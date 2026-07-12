@@ -63,13 +63,16 @@ class TestItIsAPriorNotALabel:
 
 
 class _FakeRange(_HttpRangeFile):
-    """Exercises the range logic against an in-memory buffer — no network."""
+    """Exercises the range logic against an in-memory buffer — no network.
 
-    def __init__(self, payload: bytes) -> None:  # noqa: D107 - test double
+    Calls ``super().__init__`` with an injected ``size`` rather than skipping the base constructor.
+    Skipping it left the base half-initialised — CodeQL flagged that (correctly) as a missing
+    superclass call, and the fix is a better-designed base class, not a suppression.
+    """
+
+    def __init__(self, payload: bytes) -> None:
+        super().__init__("memory://", size=len(payload))
         self.payload = payload
-        self.size = len(payload)
-        self.pos = 0
-        self.url = "memory://"
 
     def read(self, size: int = -1) -> bytes:
         # Same guards as the real reader; if these are wrong the server answers 416 and zipfile
