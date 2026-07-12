@@ -10,14 +10,11 @@ Cross-session entry point. Surfaced automatically at session start by the
 **READ THIS FIRST if you are a coding agent picking up the repo.**
 
 ### Branches
-- **`feat/etl-fixes-and-labels`** — the ETL/label work, now **merged up to date with `main`**.
-  Carries `ad89b67` (ETL enrichment + SMP scoring + the review-driven bug fixes), the NMRipMap
-  class crosswalk, the OlmoEarth task scaffold, and the corpus/lit-review work.
-- `feat/docintel-private-split` — the **old** name for the same work, left in place because it is
-  checked out in the primary working tree. `feat/etl-fixes-and-labels` supersedes it.
-- The docs (literature review, Stage-2 spec, both 2026-07-11 ADRs) are **already on `main`** via
-  PR #12 with content identical to the branch, so they merged clean. `docintel/corpus/
-  seed_sources.yaml` (25 sources) exists **only on the branch** — `main` still has the original 11.
+- Working tree is on **`main`**. The ETL/label work merged via **PR #13** (`a0bb842`): the 3 HIGH
+  ETL fixes, the NMRipMap class crosswalk, SMP scoring, the OlmoEarth task scaffold, and the
+  25-source corpus (`docintel/corpus/seed_sources.yaml`).
+- `feat/docintel-private-split` and `feat/etl-fixes-and-labels` are both **fully merged into
+  `main`** and superseded. Do not build on them.
 
 ### GitHub Pages — LIVE
 Built from `main`/`docs` (legacy Jekyll). Hub at
@@ -28,20 +25,20 @@ them and every link 404s. Do not remove it, and do not re-add `docs/.nojekyll` (
 the whole build, serving the `.md` files as raw text).
 
 ### PRs (base = `main`)
-- **#3 / #4 / #10 / #12 MERGED** — Pages walkthrough; MVT tile SQL unified into `MvtTileSql.Build`
-  + C# xUnit tests; engineering-review corrections (NMRipMap label bug, OlmoEarth fair-test);
-  the published docs hub.
+- **#3 / #4 / #10 / #12 / #13 MERGED** — Pages walkthrough; MVT tile SQL unified into
+  `MvtTileSql.Build` + C# xUnit tests; engineering-review corrections (NMRipMap label bug,
+  OlmoEarth fair-test); the published docs hub; the ETL/label fixes.
 - **#5 OPEN** — map-UI fixes (DEBUG colors removed, 3-way legend, stale-response guard, heatmap
   weight clamp, default recenter) + soil/wetland popup enrichment + `MvtTileSql` layer-name
   validation + NDVI legend/CLAUDE.md threshold reconciliation. Labeled `coderabbit`.
-- The primary working tree still shows ~15 dirty files. Most are the **content of PR #5** and must
-  not be committed elsewhere; the rest are misc local config (`.vscode`, `.claude/settings.json`,
-  `aspire.config.json`, `README_SONAR.md`, deleted `.codacy/codacy.yaml`) — user's call.
+  Its content lives on `feat/map-ui-and-tile-popups` — do **not** re-create it in the working tree.
 
 ### Open issues (base = `main`)
-- **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — fixes ride on
-  `feat/etl-fixes-and-labels`. They close when that branch merges, not before.
-- **#9** (OlmoEarth re-run without mean-pooling over time) — open, not started.
+- **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — **CLOSED** by PR #13.
+- **#9** (OlmoEarth re-run without mean-pooling over time) — **the only open issue.** The
+  RF-beats-foundation-model result is very likely a harness artifact: `olmoearth.py` mean-pools
+  tokens over time *and* over band-sets, destroying the late-season senescence signal that the
+  entire Tamarix-detection literature depends on.
 
 ### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
 All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt

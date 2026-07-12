@@ -9,4 +9,9 @@
   "files.associations": {
     "*.sql": "sql"
   }
+
+  // Deliberately NO "chat.tools.terminal.autoApprove" entry for `dev.sh --update full`.
+  // A full reload truncates silver.riparian_buffers, and the FK cascade takes
+  // silver.vegetation_health with it — i.e. it deletes the NDVI record. It auto-backs
+  // up first, but it must never run without an explicit human confirmation.
 }
