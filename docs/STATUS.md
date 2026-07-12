@@ -93,12 +93,20 @@ Two of our components **substantially reproduce published work**. Say so; do not
   away — a real defect, now fixed and unit-tested. **But the 2026-07-12 re-run showed it explains
   only a small part of the RF-vs-FM gap** (F1 0.021 → 0.065 vs RF 0.701), so do not repeat the
   claim that the FM result is "just" a pooling artifact (#9).
-- **The real gap:** CO-RIP gives extent-without-species; CSU/NREL's 2018 dataset gives **3,000+
-  tamarisk/Russian-olive occurrence points** but no map — CSU call them *"complementary products
-  rather than a single integrated map of invasive versus native species."* **Nobody has produced
-  a wall-to-wall, time-series, native-vs-invasive cover + change product at reach scale.** That,
-  plus mining weak labels from existing authoritative GIS and an EO-foundation-model fine-tune,
-  is the contribution. See `docs/specs/2026-07-11-stage2-invasives-tamarix.md`.
+- 🔴 **The "nobody made a map" claim was FALSE — corrected 2026-07-12 by `/paper-audit`.**
+  **Evangelista et al. (2018)** (CSU/NREL + USGS + NASA DEVELOP, Walton Family Foundation) shipped a
+  riparian-vegetation Mapbook atlas for **2006, 2016 and the change between them**, a 2016 tamarisk
+  atlas for *select* areas, and Russian-olive maps **on the San Juan for 2006 and 2016**. We had been
+  citing only their occurrence-points web page and asserting they produced no map. Do not repeat it.
+- **The real gap, restated — and now grounded in the incumbent's own limits.** They report that
+  **Landsat cannot resolve the tamarisk phenological signature** (*"without a different sensor with
+  greater spectral or grain resolution this is a difficult constraint to overcome"*) and that
+  **beetle defoliation confounded their models** (*"areas that had active beetle activity were
+  difficult to accurately map"*). What does not exist is an **annual** (theirs is **2-epoch**),
+  **10 m** (theirs is **30 m Landsat**), **beetle-aware**, wall-to-wall native-vs-invasive product.
+  That — plus weak labels mined from authoritative GIS and an EO-foundation-model fine-tune — is the
+  contribution. Their own recommendation is, in effect, a specification for it.
+  See `docs/literature-review.md` and `docs/specs/2026-07-11-stage2-invasives-tamarix.md`.
 - Free ground truth found: NMRipMap `L2 = IC` ("Lowland **Introduced** Riparian Woodland and
   Scrub") = **332 tamarisk/Russian-olive polygons on the Animas alone** — but it *conflates* the
   two species; the CSU points can split them.

@@ -18,10 +18,13 @@ a .NET Aspire-orchestrated C# REST API, and a React + MapLibre map frontend.
 > whole Colorado Basin, San Juan included, at median κ 0.80. Building another RF extent classifier
 > is not a contribution, and this repo says so.
 >
-> **But every existing product is a single frozen epoch.** CO-RIP is one raster; NMRipMap is one
-> 2020 map; CSU's 3,000+ tamarisk points are occurrences, not a map — CSU themselves call these
-> *"complementary products rather than a single integrated map of invasive versus native species."*
-> **Nobody has an annual riparian product for this basin — of extent *or* of species.**
+> **But nothing existing is annual.** CO-RIP is one raster; NMRipMap is one 2020 map. CSU/NREL
+> (Evangelista et al. 2018) went furthest — riparian-vegetation maps for **2006, 2016 and the change
+> between them**, and Russian-olive maps **on the San Juan for those two years** — but that is **two
+> epochs, at 30 m, on two different sensors**, and they report that **Landsat cannot resolve the
+> tamarisk phenological signature** and that **beetle defoliation confounded their models**.
+> **Nobody has an annual, 10 m, beetle-aware riparian product for this basin — of extent *or* of
+> species.**
 >
 > So the goal is the **time axis**: match the authoritative reference for one epoch as
 > *calibration*, then run the model across the Earth-observation record to produce

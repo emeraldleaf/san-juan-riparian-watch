@@ -203,15 +203,55 @@ See ADR `2026-07-11-confidence-weighted-label-crosswalk.md`.
 - Tamarix **detectability** from multi-temporal optical imagery — 87–91% OA, phenology-driven (§3).
 - Defoliation **detectability** in VI time series — USGS Landsat work (§4).
 
-**Open (the real gaps):**
-1. **No wall-to-wall, time-series, native-vs-invasive riparian *cover + change* product.** CO-RIP gives
-   extent without species; the CSU/NREL 2018 dataset gives **3,000+ tamarisk/Russian-olive occurrence
-   and absence points** but no map — CSU describe these as *"complementary products rather than a
-   single integrated map of invasive versus native species."*
-   [CSU/NREL](https://www.nrel.colostate.edu/improved-rip-maps-crb/) **They were never joined.**
+> ### ⚠️ CLAIM 1 WAS PARTLY FALSIFIED — 2026-07-12, by `/paper-audit`
+>
+> This review previously said the CSU/NREL work produced **"3,000+ occurrence points *but no map*"**
+> and that **"nobody has produced a native-vs-invasive cover + change product."** **That was wrong,
+> and we found it by auditing the source report instead of the project's web page.**
+>
+> **Evangelista, P., N. Young, A. Vorster, A. West, E. Hatcher, B. Woodward, R. Anderson, R. Girma
+> (2018).** *Mapping Native and Non-Native Riparian Vegetation in the Colorado River Watershed.*
+> CSU/NREL + USGS + NASA DEVELOP, for the Walton Family Foundation.
+> [Report](https://static.waltonfamilyfoundation.org/67/93/2f16c8d64dcab074c02f0c6f1857/mapping-riparian-vegetation-co-river.PDF)
+>
+> Their own Products table lists **maps, and change maps**:
+> - *"Riparian vegetation digital Mapbook atlas — riparian vegetation for **2006, 2016 and the change
+>   between years** for the Colorado River Basin"*
+> - *"Tamarisk occurrence for 2016 digital Mapbook atlas — **Select** tamarisk modeling results"*
+> - Russian-olive binary maps for 2016 (Landsat 8 vs Sentinel-2), and via NASA DEVELOP,
+>   *"mapping Russian olive distribution along the **San Juan River in 2006 and 2016**"* — **our river,
+>   two epochs.**
+>
+> Claim 1, as originally written, does not survive. It is rewritten below. **The self-set
+> falsification condition was "someone shows an existing integrated product for the basin"; this is
+> close enough to count, and the project honours its own test.**
+
+**What the incumbent could NOT do — in their own words, and this is where the contribution now lives:**
+
+- **Landsat cannot separate tamarisk phenologically.** *"Differences in seasonal phenology … were
+  found to be significant, but the signature between tamarisk and other riparian vegetation **did not
+  show to be very different when using Landsat imagery**. **Without a different sensor with greater
+  spectral or grain resolution this is a difficult constraint to overcome.**"* That sentence is a
+  specification for Sentinel-2 (10 m, red-edge) + a dense temporal stack — i.e. exactly this project.
+- **The beetle defeated their models.** *"Areas that had active beetle activity were difficult to
+  accurately map … the live-dead tamarisk mix added confusion to model results."* The biocontrol
+  confound is **still unhandled by the incumbent** — gap 3 below is *confirmed*, not weakened.
+- **Two epochs, not a time series.** 2006 vs 2016 — and with **two different sensors** (LS5 TM vs LS8
+  OLI), which they flag may *"result in change maps that show differences between sensors in addition
+  to changes in the distribution of a species."*
+- **The tamarisk map is "select" areas**, not wall-to-wall.
+- Their field database *"cannot be shared entirely due to data use agreements"* — so label scarcity
+  persists for anyone downstream.
+
+**Open (the real gaps, restated after the audit):**
+1. **No ANNUAL, 10 m, wall-to-wall, beetle-aware native-vs-invasive product.** CSU/NREL produced
+   **2-epoch (2006/2016) 30 m Landsat** maps — basin-wide for riparian vegetation, *select areas* for
+   tamarisk — and reported that **Landsat cannot resolve the phenological signature** and that
+   **beetle defoliation confounded their models**. Both limits are addressable with a different sensor
+   and an explicit defoliation state. That, not "nobody made a map", is the gap.
 2. **No EO foundation model applied to riparian invasives** (§6).
 3. **The biocontrol confound is not handled** in any operational riparian classifier we found (§4) —
-   despite the beetle being established across the upper basin, i.e. *our* basin.
+   **including the incumbent, who documents it defeating them.** Gap confirmed, not merely asserted.
 4. **Labels remain the bottleneck** — the literature annotates; nobody systematically mines the
    existing authoritative GIS as confidence-weighted weak labels (§7).
 
@@ -219,7 +259,7 @@ See ADR `2026-07-11-confidence-weighted-label-crosswalk.md`.
 
 | # | Claim | Falsified if… |
 |---|---|---|
-| 1 | Native-vs-invasive riparian **cover + change**, wall-to-wall, at reach scale | someone shows an existing integrated product for the basin |
+| 1 | **Annual** (not 2-epoch), **10 m** (not 30 m), **beetle-aware** native-vs-invasive cover + change at reach scale | someone shows an annual, species-level, defoliation-aware product for the basin — CSU/NREL 2018 is 2-epoch, 30 m, and beetle-confounded, and does **not** qualify |
 | 2 | Weak labels **mined from existing authoritative GIS** with confidence weighting | hand-annotation proves necessary for usable accuracy |
 | 3 | **EO foundation-model** fine-tune (OlmoEarth, 12-month S2) for this task | a properly fine-tuned Base fails to beat CO-RIP (κ 0.80) / the S2-RF bar (87.8%) |
 | 4 | **Biocontrol-aware** phenology — defoliation as a state, not as absence | defoliation proves spectrally unimportant in this basin |
