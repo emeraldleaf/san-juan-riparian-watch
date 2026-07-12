@@ -97,6 +97,23 @@ conventions. Quick: `./dev.sh --sonar` (start server), `./dev.sh --lint` (scan p
 `./dev.sh --lint-dotnet` (scan C#). Full setup, commands, and replication guide:
 **docs/sonarqube.md**. When asking for a quality check, say "run SonarQube" — not Codacy.
 
+### Merge gate — CodeRabbit must be GREEN before merging
+**Never merge a PR until CodeRabbit's *review* is green on the PR's current head.** Not the
+check — the **review**. The check going green only means CodeRabbit *ran*; it can run clean and
+still have left blocking findings, and it can be stale against the commit you are about to
+merge. Verify with `./dev.sh --review-status <PR>` (or `/check-rules`), which fails unless
+CodeRabbit reviewed **this exact head** and left no unaddressed findings.
+
+This is not ceremony. CodeRabbit's review on #5 caught a live SQL-injection weakening that
+every other gate — CI, SonarQube, 20 unit tests, and me — had passed: `MvtTileSql` validated
+layer names with `^[a-z_]+$`, but in **.NET `$` also matches immediately before a trailing
+newline**, so `"wetlands\n"` satisfied it and went into the interpolated SQL literal. The guard
+is now `\A[a-z_]+\z`. A regression test pins it (`Build_RejectsLayerWithTrailingNewline`).
+
+When CodeRabbit does leave findings: fix them, push, and let it **re-review the fix commit**.
+Merging on a green check while findings sit unaddressed is the exact failure this gate exists
+to prevent. See `docs/code-review.md`.
+
 ### Database
 - **Persistence**: PostgreSQL data is bind-mounted to `./pgdata/` (`.WithDataBindMount("../pgdata")`
   in AppHost) — survives the frequent Docker restarts on the external drive. `pgdata/` is gitignored.

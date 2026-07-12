@@ -20,9 +20,10 @@ const DOCINTEL_URL = import.meta.env.VITE_DOCINTEL_URL || 'http://localhost:8100
 // Unique session ID for this browser tab — sent with every API call for telemetry correlation.
 const SESSION_ID = crypto.randomUUID();
 
-// San Juan Basin center (HUC8 14080101)
-const MAP_CENTER = { longitude: -107.8, latitude: 37.3 };
-const DEFAULT_ZOOM = 10;
+// Centered on the loaded data extent (buffers −108.4→−106.5, parcels −107.5→−106.5)
+// so streams, buffers, parcels and wetlands are all visible on first load.
+const MAP_CENTER = { longitude: -107.4, latitude: 37.15 };
+const DEFAULT_ZOOM = 9;
 
 // ---------------------------------------------------------------------------
 // Basemap styles
@@ -202,7 +203,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export default function App() {
   const mapRef = useRef<MapRef>(null);
   const [docGeo, setDocGeo] = useState<FeatureCollection | null>(null);
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(true);
 
   // Fit the map to the geometries a doc-intelligence answer resolved.
   useEffect(() => {
@@ -324,8 +325,12 @@ export default function App() {
     setTimeout(() => setBufferLoading(false), 400);
   }, []);
 
+  /** Monotonic token so a slow buffer-detail response can't overwrite a newer click's popup. */
+  const bufferDetailReq = useRef(0);
+
   /** Load buffer detail data on popup open. */
   const loadBufferDetail = useCallback(async (bufferId: number) => {
+    const reqId = ++bufferDetailReq.current;
     setBufferDetail(null);
     setBufferDetailLoading(true);
 
@@ -344,6 +349,9 @@ export default function App() {
       ),
       fetchJson<ScoreDetail[]>(`${API_URL}/api/buffers/${bufferId}/score`),
     ]);
+
+    // A newer buffer was clicked while these requests were in flight — discard this result.
+    if (bufferDetailReq.current !== reqId) return;
 
     setBufferDetail({
       landCover: lcR.status === 'fulfilled' ? lcR.value : [],
@@ -702,14 +710,13 @@ export default function App() {
               paint={{
                 'fill-color': [
                   'match',
-                  ['coalesce', ['get', 'lifeform'], 'Unknown'], // Add coalesce just in case
-                  'Agriculture', '#eab308', // Yellow
-                  'Water/Barren', '#cbd5e1', // Light Gray
-                  'Tree', '#15803d', // Green
-                  'Shrub', '#84cc16', // Light Green
-                  'Herb', '#facc15', // Yellowish
-                  'Unknown', '#ff00ff', // DEBUG: Hot Pink
-                  '#ff0000', // DEBUG: Red (Fallthrough)
+                  ['coalesce', ['get', 'lifeform'], 'Unknown'],
+                  'Tree', '#15803d', // dark green — closed canopy
+                  'Shrub', '#84cc16', // light green — shrubland
+                  'Herb', '#facc15', // gold — herbaceous
+                  'Agriculture', '#eab308', // amber — cropland
+                  'Water/Barren', '#94a3b8', // slate — water / barren
+                  '#cbd5e1', // muted gray — Unknown / other
                 ],
                 'fill-opacity': 0.8,
                 'fill-outline-color': '#475569',
@@ -895,7 +902,9 @@ export default function App() {
           </button>
           {legendOpen && (
           <div className="space-y-1.5 text-xs mt-2">
-            <LegendItem color="bg-blue-600" shape="line" label="Streams" />
+            {showStreams && (
+              <LegendItem color="bg-blue-600" shape="line" label="Streams" />
+            )}
             {showRiparianExtent && (
               <LegendItem
                 color="bg-emerald-600"
@@ -903,7 +912,7 @@ export default function App() {
                 label="Riparian extent (Stage 1, RF)"
               />
             )}
-            {viewMode === 'ndvi' ? (
+            {viewMode === 'ndvi' && (
               <>
                 <span className="block text-[10px] text-gray-500 pt-1">
                   Buffer NDVI Health
@@ -911,17 +920,17 @@ export default function App() {
                 <LegendItem
                   color="bg-green-600/70"
                   shape="box"
-                  label="Healthy (>0.3)"
+                  label="Healthy (>0.25)"
                 />
                 <LegendItem
                   color="bg-amber-400/70"
                   shape="box"
-                  label="Degraded (0.15-0.3)"
+                  label="Degraded (0.10-0.25)"
                 />
                 <LegendItem
                   color="bg-red-600/70"
                   shape="box"
-                  label="Bare (<0.15)"
+                  label="Bare (<0.10)"
                 />
                 <LegendItem
                   color="bg-emerald-400/50"
@@ -929,7 +938,8 @@ export default function App() {
                   label="No NDVI Data"
                 />
               </>
-            ) : (
+            )}
+            {viewMode === 'smp' && (
               <>
                 <span className="block text-[10px] text-gray-500 pt-1">
                   SMP Health Grade
@@ -966,42 +976,96 @@ export default function App() {
                 />
               </>
             )}
-            <span className="block text-[10px] text-gray-500 pt-1">
-              Parcels
-            </span>
-            <LegendItem
-              color="bg-green-600/60"
-              shape="box"
-              label="Compliant"
-            />
-            <LegendItem
-              color="bg-red-600/60"
-              shape="box"
-              label="Focus Area"
-            />
-            <LegendItem
-              color="bg-gray-500/40"
-              shape="box"
-              label="Unknown Status"
-            />
-            <span className="block text-[10px] text-gray-500 pt-1">
-              Overlays
-            </span>
-            <LegendItem
-              color="bg-cyan-400/60"
-              shape="box"
-              label="NWI Wetlands"
-            />
-            <LegendItem
-              color="bg-violet-500/50"
-              shape="box"
-              label="Hydric Soils"
-            />
-            <LegendItem
-              color="bg-gray-300/50"
-              shape="box"
-              label="Non-Hydric Soils"
-            />
+            {viewMode === 'vegetation' && (
+              <>
+                <span className="block text-[10px] text-gray-500 pt-1">
+                  Vegetation Lifeform (LANDFIRE)
+                </span>
+                <LegendItem color="bg-green-700/80" shape="box" label="Tree" />
+                <LegendItem color="bg-lime-500/80" shape="box" label="Shrub" />
+                <LegendItem color="bg-yellow-400/80" shape="box" label="Herb" />
+                <LegendItem
+                  color="bg-yellow-500/80"
+                  shape="box"
+                  label="Agriculture"
+                />
+                <LegendItem
+                  color="bg-slate-400/80"
+                  shape="box"
+                  label="Water / Barren"
+                />
+                <LegendItem
+                  color="bg-slate-300/80"
+                  shape="box"
+                  label="Unknown / Other"
+                />
+              </>
+            )}
+            {showParcels && (
+              <>
+                <span className="block text-[10px] text-gray-500 pt-1">
+                  Parcels
+                </span>
+                <LegendItem
+                  color="bg-green-600/60"
+                  shape="box"
+                  label="Compliant"
+                />
+                <LegendItem
+                  color="bg-red-600/60"
+                  shape="box"
+                  label="Focus Area"
+                />
+                <LegendItem
+                  color="bg-gray-500/40"
+                  shape="box"
+                  label="Unknown Status"
+                />
+              </>
+            )}
+            {(showWetlands || showSoils || showNmripmap) && (
+              <span className="block text-[10px] text-gray-500 pt-1">
+                Overlays
+              </span>
+            )}
+            {showWetlands && (
+              <LegendItem
+                color="bg-cyan-400/60"
+                shape="box"
+                label="NWI Wetlands"
+              />
+            )}
+            {showSoils && (
+              <>
+                {/* Keep in sync with the soil fill `match` on hydric_rating above:
+                    Yes -> #8b5cf6 (violet-500), Partial -> #c084fc (purple-400),
+                    everything else -> #d1d5db (gray-300). SSURGO rates map units as
+                    partially hydric when only some components are, and those polygons
+                    were being drawn with no legend key at all. */}
+                <LegendItem
+                  color="bg-violet-500/50"
+                  shape="box"
+                  label="Hydric Soils"
+                />
+                <LegendItem
+                  color="bg-purple-400/40"
+                  shape="box"
+                  label="Partially Hydric Soils"
+                />
+                <LegendItem
+                  color="bg-gray-300/50"
+                  shape="box"
+                  label="Non-Hydric Soils"
+                />
+              </>
+            )}
+            {showNmripmap && (
+              <LegendItem
+                color="bg-purple-500/40"
+                shape="box"
+                label="NMRipMap (NM reference)"
+              />
+            )}
           </div>
           )}
         </div>

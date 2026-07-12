@@ -25,13 +25,14 @@ them and every link 404s. Do not remove it, and do not re-add `docs/.nojekyll` (
 the whole build, serving the `.md` files as raw text).
 
 ### PRs (base = `main`)
-- **#3 / #4 / #10 / #12 / #13 MERGED** — Pages walkthrough; MVT tile SQL unified into
-  `MvtTileSql.Build` + C# xUnit tests; engineering-review corrections (NMRipMap label bug,
-  OlmoEarth fair-test); the published docs hub; the ETL/label fixes.
-- **#5 OPEN** — map-UI fixes (DEBUG colors removed, 3-way legend, stale-response guard, heatmap
-  weight clamp, default recenter) + soil/wetland popup enrichment + `MvtTileSql` layer-name
-  validation + NDVI legend/CLAUDE.md threshold reconciliation. Labeled `coderabbit`.
-  Its content lives on `feat/map-ui-and-tile-popups` — do **not** re-create it in the working tree.
+- **#3 / #4 / #5 / #10 / #12 / #13 / #14 MERGED.** Pages walkthrough; MVT tile SQL unified into
+  `MvtTileSql.Build` + C# xUnit tests; map-UI fixes + soil/wetland popup enrichment; the
+  engineering-review corrections; the published docs hub; the ETL/label fixes; the local-config
+  cleanup. **#15** (the OlmoEarth fair test) is the last one open.
+- **Merge gate:** a PR does not merge until **CodeRabbit's review is green** — not merely its
+  check. Its review on #5 caught a real one: `MvtTileSql`'s `^[a-z_]+$` layer guard was
+  bypassable, because in .NET `$` also matches *before a trailing newline*, so `"wetlands\n"`
+  passed straight into the interpolated SQL literal. Now `\A[a-z_]+\z`. See CLAUDE.md.
 
 ### Open issues (base = `main`)
 - **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — **CLOSED** by PR #13.
