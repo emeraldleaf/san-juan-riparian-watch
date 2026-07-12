@@ -737,6 +737,15 @@ case "${1:-}" in
     --lint)         cmd_lint ;;
     --lint-dotnet)  cmd_lint_dotnet ;;
     --review-status) .claude/scripts/check-coderabbit.sh "${2:-}" ;;
+    --check-encoding)
+        # The deterministic half of the encoding loop. Everything here is mechanical:
+        # no LLM, no judgement, same answer on a laptop and on CI.
+        rc=0
+        .claude/scripts/check-tombstones.sh       || rc=1
+        .claude/scripts/check-retracted-claims.sh || rc=1
+        .claude/scripts/check-doc-orphans.sh      || rc=1
+        exit $rc
+        ;;
     --help|-h)
         echo "Usage: ./dev.sh [OPTION]"
         echo ""
@@ -747,6 +756,7 @@ case "${1:-}" in
         echo "  --reconnect        Recover after external drive disconnect/reconnect"
         echo "  --update [type]    Run ETL update (full|incremental|ndvi|all) [--force]"
         echo "  --review-status N  Merge gate: is CodeRabbit GREEN on PR N's current head?"
+        echo "  --check-encoding   Drift gates: tombstones + retracted claims + doc orphans"
         echo ""
         echo "  Database:"
         echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"

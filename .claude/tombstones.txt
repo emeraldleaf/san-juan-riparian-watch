@@ -1,0 +1,30 @@
+# Removed-identifier tombstones — one extended-regex pattern per line (case-insensitive).
+# Ported from NovaCraft, whose rationale describes our own failure exactly:
+#
+#   "the compiler catches stale identifiers in code; NOTHING catches them in docs, comments,
+#    and config ... the sweep's completion criterion is 'this script passes', not 'the docs
+#    someone remembered are updated'."
+#
+# When a value or identifier is RETIRED, its spelling goes here so CI fails any doc, comment
+# or config still presenting it as current. This is the identifier-level counterpart of the
+# file-move discipline, and the sibling of docs/RETRACTIONS.md (which tombstones *claims*
+# rather than *identifiers*). See CLAUDE.md.
+#
+# Files with legitimate historical/comparative mentions go in tombstones-allowlist.txt.
+# Keep that list short: an allowlisted file can re-drift invisibly.
+
+# --- Retired NDVI health thresholds (canonical: healthy >0.25 / degraded 0.10-0.25 / bare <0.10) ---
+# The old >0.3 / 0.15 values survived in frontend/src/components/NDVILayer.tsx long after the
+# reconciliation "finished" — the legend was fixed, a component docstring was not. Stale
+# thresholds in a comment are how the frontend and the model quietly come to disagree.
+bare \(<0\.15\)
+degraded \(0\.15
+healthy \(>0\.3\)
+>\s*0\.3\)\s*→?\s*healthy
+
+# --- Codacy (removed; SonarQube is the Tier-3 gate) ---
+codacy
+
+# --- docs/.nojekyll (removing it is what made GitHub Pages render the docs at all) ---
+# Re-adding this file makes Jekyll skip the build entirely and serve every .md as raw text.
+# The tombstone is on the *filename as a thing to add back*, not on discussing it.

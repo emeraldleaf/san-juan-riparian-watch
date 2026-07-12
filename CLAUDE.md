@@ -26,6 +26,31 @@ skills, `docs/` + diagrams) × 3 enforcement tiers, kept from drifting by mechan
   `See CLAUDE.md` so the `check-claude-md-refs.sh` hook can find it.
 - **File-move discipline:** `git mv`/`git rm` triggers a stale-reference audit.
 
+### What is AUTOMATIC vs what you must RUN
+Be honest about this — a surface nobody runs is documentation, not enforcement. The
+`architecture-reviewer` was listed above as an enforcement surface while being invoked by
+**nothing**, for the whole life of the repo.
+
+| Surface | When it runs |
+|---|---|
+| PostToolUse/PreToolUse hooks (`check-claude-md-refs`, `check-file-moves`, `block-sync-over-async`) | **Automatic**, on every edit |
+| Drift gates — `./dev.sh --check-encoding` | **Automatic in CI** (`drift-gates` job) |
+| CodeRabbit | **Automatic** on every PR — and it must be **green before merge** (below) |
+| `architecture-reviewer` agent | **On demand only** — you must launch it, via `/check-rules` |
+
+**Drift gates** (`./dev.sh --check-encoding`) catch *semantic* drift, which every other check is
+blind to. Every existing check enforced file **shape** — canon size, diagram pairing, stale refs
+after a `git mv` — and not one of them could catch the public engineering-review page still
+presenting a **retracted** result as fact, an ADR nothing linked to, or **retired NDVI thresholds**
+living on in a component docstring. All three actually happened.
+- `.claude/tombstones.txt` — retired identifiers; CI fails any doc/comment/config resurrecting one.
+- `docs/RETRACTIONS.md` — withdrawn *claims*; a doc may state one **only if it also retracts it**.
+- Doc orphans — every spec/ADR must be linked from the Pages hub (`docs/index.md`).
+
+When you retire a value or withdraw a result, **add it to the registry**. The sweep's completion
+criterion is "`./dev.sh --check-encoding` passes", not "the docs someone remembered are updated".
+See `docs/code-review.md`.
+
 ## External Drive Configuration
 **IMPORTANT**: This entire project lives on an external drive. The drive MUST be mounted
 before starting Docker, running any services, or editing code.

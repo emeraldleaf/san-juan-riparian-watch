@@ -113,9 +113,23 @@ paired diagrams.
 
 ### 3 tiers
 The enforcement spectrum: Tier 1 Convention (humans + AI on review) → Tier 2
-PR-review automation (CodeRabbit, architecture-reviewer, PostToolUse hooks) →
-Tier 3 Mechanical gates (build, analyzers/SonarQube, CI). *Promote down* as a
-rule earns it.
+PR-review automation (CodeRabbit; PostToolUse/PreToolUse hooks) → Tier 3
+Mechanical gates (build, analyzers/SonarQube, CI, `./dev.sh --check-encoding`).
+*Promote down* as a rule earns it.
+
+**The `architecture-reviewer` is Tier 1, not Tier 2** — it runs only when *you*
+launch it (`/check-rules`). It was listed as a Tier-2 automation while being
+invoked by nothing, which is how a surface becomes documentation instead of
+enforcement. If a rule needs to hold, put it in a tier that runs itself.
+
+### Semantic drift (vs. structural drift)
+Structural drift = file shape: canon size, diagram pairing, refs stale after a
+`git mv`. Every hook in this repo caught that. **Semantic drift** = a document
+asserting something no longer true — a *retracted* result still presented as
+fact, a *retired* threshold still taught, an ADR nothing links to. Nothing
+caught that, and all three happened. Gates: `.claude/tombstones.txt` (retired
+identifiers), `docs/RETRACTIONS.md` (withdrawn claims), doc-orphan check
+(reachability). Run them with `./dev.sh --check-encoding`. See CLAUDE.md.
 
 ### Smallest durable surface
 The minimum surface that holds a rule effectively — picked on encode. A rule
