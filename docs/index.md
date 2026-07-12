@@ -112,6 +112,10 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Reference
 
+- [Data licences & attribution](data-licenses.md) — **can we train on this?** Yes: the CSU datasets
+  are **CC BY-SA 4.0**. But **ShareAlike binds our outputs** (derived maps must be CC BY-SA too), and
+  the tamarisk probability raster — the one you'd reach for — contains **0 pixels over the San Juan**.
+  Measured, not assumed.
 - [Data sources](data-sources.md) — every source, its endpoint, and the trap in each.
   **NMRipMap is classified** (filter `L2_Code`, never fetch raw) and its **label vintage is 2020**.
 - [Retractions](RETRACTIONS.md) — withdrawn claims. CI fails any doc restating one without retracting it.

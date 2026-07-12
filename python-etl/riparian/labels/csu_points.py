@@ -26,6 +26,11 @@ was implicit, ~45% of the positive class was wrong.
 
 **Label vintage: 2017.** Fit against 2017 imagery. See CLAUDE.md.
 
+**Licence: CC BY-SA 4.0** (verified from the DSpace `dc.rights.uri`, not from a README). Training on
+it is permitted, attribution is mandatory, and **ShareAlike binds our derived data products** — any
+label layer or invasive-cover map built from these points must itself be CC BY-SA 4.0. See
+``docs/data-licenses.md``. This is not a footnote: plan for it, do not discover it at publication.
+
 Known defects in the SOURCE FILE (both handled here; do not "clean up" the handling):
 
 * **`Virgin_River` has x and y TRANSPOSED** — all 119 rows carry latitude in `x` and longitude in `y`,
