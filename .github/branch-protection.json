@@ -20,7 +20,8 @@
     "contexts": [
       "CodeRabbit",
       "CLAUDE.md size budget (soft 400 / hard 500)",
-      "Every .excalidraw has a sibling .svg"
+      "Every .excalidraw has a sibling .svg",
+      "Drift gates (tombstones · retracted claims · doc orphans)"
     ]
   },
   "enforce_admins": true,
