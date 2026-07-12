@@ -1,9 +1,99 @@
 # Project Status
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-12
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
+
+## Current state — git, PRs, and WHY things are where they are (2026-07-12)
+
+**READ THIS FIRST if you are a coding agent picking up the repo.**
+
+### Branches
+- **`feat/etl-fixes-and-labels`** — the ETL/label work, now **merged up to date with `main`**.
+  Carries `ad89b67` (ETL enrichment + SMP scoring + the review-driven bug fixes), the NMRipMap
+  class crosswalk, the OlmoEarth task scaffold, and the corpus/lit-review work.
+- `feat/docintel-private-split` — the **old** name for the same work, left in place because it is
+  checked out in the primary working tree. `feat/etl-fixes-and-labels` supersedes it.
+- The docs (literature review, Stage-2 spec, both 2026-07-11 ADRs) are **already on `main`** via
+  PR #12 with content identical to the branch, so they merged clean. `docintel/corpus/
+  seed_sources.yaml` (25 sources) exists **only on the branch** — `main` still has the original 11.
+
+### GitHub Pages — LIVE
+Built from `main`/`docs` (legacy Jekyll). Hub at
+`https://emeraldleaf.github.io/san-juan-riparian-watch/` links the engineering review, literature
+review, all specs and ADRs. `docs/_config.yml` declares **`jekyll-optional-front-matter`** — this is
+load-bearing: none of the specs/ADRs have YAML front matter, and without that plugin Jekyll skips
+them and every link 404s. Do not remove it, and do not re-add `docs/.nojekyll` (it makes Jekyll skip
+the whole build, serving the `.md` files as raw text).
+
+### PRs (base = `main`)
+- **#3 / #4 / #10 / #12 MERGED** — Pages walkthrough; MVT tile SQL unified into `MvtTileSql.Build`
+  + C# xUnit tests; engineering-review corrections (NMRipMap label bug, OlmoEarth fair-test);
+  the published docs hub.
+- **#5 OPEN** — map-UI fixes (DEBUG colors removed, 3-way legend, stale-response guard, heatmap
+  weight clamp, default recenter) + soil/wetland popup enrichment + `MvtTileSql` layer-name
+  validation + NDVI legend/CLAUDE.md threshold reconciliation. Labeled `coderabbit`.
+- The primary working tree still shows ~15 dirty files. Most are the **content of PR #5** and must
+  not be committed elsewhere; the rest are misc local config (`.vscode`, `.claude/settings.json`,
+  `aspire.config.json`, `README_SONAR.md`, deleted `.codacy/codacy.yaml`) — user's call.
+
+### Open issues (base = `main`)
+- **#6 / #7 / #8** (the 3 HIGH ETL bugs) and **#11** (NMRipMap labels) — fixes ride on
+  `feat/etl-fixes-and-labels`. They close when that branch merges, not before.
+- **#9** (OlmoEarth re-run without mean-pooling over time) — open, not started.
+
+### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
+All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt
+on full run (was wiped by CASCADE); ArcGIS HTTP-200 error bodies now raise + paginator stops at first
+gap (no gapped bronze); LANDFIRE EVH `32767` fill filtered from continuous stats; NLCD wired via EROS
+ImageServer + GeoServer WMS fallback in `main()`; `health_scorer` aligned height/lifeform pairs +
+continuous NDVI curve + **per-watershed** summary aggregation; LiDAR CHM resamples DTM onto the DSM
+grid before differencing. Verified: `py_compile`, 32 pytest, live per-watershed SQL.
+
+### Positioning — what is actually novel here (2026-07-11, READ THIS)
+Two of our components **substantially reproduce published work**. Say so; do not claim otherwise.
+- **Riparian extent mapping is already solved basin-wide.** CO-RIP (Woodward et al. 2018,
+  ISPRS IJGI) mapped riparian corridor + vegetation for the *entire Colorado River Basin —
+  including the San Juan* — using **valley-bottom delineation + Random Forest on Landsat**,
+  median **κ 0.80**. Our HAND envelope ≈ their valley bottom; our RF-on-spectral ≈ their RF.
+  **"We built an RF riparian classifier" is not a contribution.** Use CO-RIP as a *baseline to
+  beat and a label source*, not something to re-derive.
+- **Tamarisk detection is established** (S2+RF **87.8% OA**; Landsat 80–91%), and the literature
+  is explicit that **phenology — specifically late-season senescence — is the discriminator**
+  (Tamarix stays green after natives brown). This *indicts our OlmoEarth harness*: it mean-pools
+  tokens over time, destroying exactly that signal (#9).
+- **The real gap:** CO-RIP gives extent-without-species; CSU/NREL's 2018 dataset gives **3,000+
+  tamarisk/Russian-olive occurrence points** but no map — CSU call them *"complementary products
+  rather than a single integrated map of invasive versus native species."* **Nobody has produced
+  a wall-to-wall, time-series, native-vs-invasive cover + change product at reach scale.** That,
+  plus mining weak labels from existing authoritative GIS and an EO-foundation-model fine-tune,
+  is the contribution. See `docs/specs/2026-07-11-stage2-invasives-tamarix.md`.
+- Free ground truth found: NMRipMap `L2 = IC` ("Lowland **Introduced** Riparian Woodland and
+  Scrub") = **332 tamarisk/Russian-olive polygons on the Animas alone** — but it *conflates* the
+  two species; the CSU points can split them.
+
+### NDVI health thresholds (CANONICAL)
+`classify_health()` in `ndvi_processor.py` is the single source of truth:
+**healthy >0.25 / degraded 0.10–0.25 / bare <0.10** (peak-growing median ~0.17). Frontend legend +
+CLAUDE.md now match — do not reintroduce the old >0.3 / 0.15 values.
+
+### "Empty views" — the 3 buffer view-mode buttons (NDVI / SMP / Vegetation)
+`silver.vegetation_health`, `gold.buffer_health_score`, `silver.buffer_vegetation_structure` are all
+**0 rows** in the current DB snapshot, so all three buttons render the buffer polygons in a uniform
+"no-data" color (geometry draws; the *differentiating* color does not). Populating them needs the
+NDVI/health/scoring ETL run — deferred until the (now-fixed) ETL bugs are validated end-to-end. Do
+NOT run the ETL just to fill these before the fixes are confirmed, or you bake wrong data into the demo.
+
+### Local runtime / DB (external-drive hazard)
+- Live render verified via the **internal-disk stable PG** (data on `~/riparian-pgdata-stable`, OFF the
+  flaky external drive): `docker run -d --name riparian-pg-stable -p 55432:5432 -v
+  ~/riparian-pgdata-stable:/var/lib/postgresql/data postgis/postgis:16-3.4`; C# API on :5237; frontend
+  `VITE_API_URL=http://localhost:5237 npm run dev` (:3000). Layers with data draw (streams, buffers,
+  parcels, wetlands, riparian-extent RF + NMRipMap); parcels sit east of the old center (recenter fixed).
+- **Docker zombie:** the `riparian-pg-stable` container can get stuck (external-drive containerd
+  `meta.db: input/output error` → `docker stop/rm` no-op). Fix = restart Docker Desktop. Do NOT keep
+  hammering docker against the failing store, and NEVER start the external-drive Aspire/Docker stack.
 
 ## Where we are
 
@@ -140,8 +230,26 @@ later behind the existing provider seam. Landed this session:
    quality flags.
 4. **Reference-layer validation** — NMRipMap (NM) + CO-RIP (CO), IoU/F1 stratified by stream
    order; validate NM vs CO separately.
-5. **OlmoEarth-everywhere** on the **Hyperstack GPU VM** — embedding store, head training,
-   baseline-vs-OlmoEarth disagreement maps.
+5. **OlmoEarth — re-run via Ai2's own `olmoearth_projects` recipe (HIGH VALUE, 2026-07-11).**
+   Our "RF 0.73 beat OlmoEarth-Nano 0.46" result is very likely measuring **our harness, not
+   the model**. Ai2's published [`mangrove`](https://github.com/allenai/olmoearth_projects)
+   project is a near-exact analog of Stage 1 (segment woody vegetation near water from an S2
+   time series, validated against an authoritative reference map — GMW there, **NMRipMap**
+   here) and it does four things we did not:
+   - `OLMOEARTH_V1_BASE`, not Nano;
+   - **fine-tunes the backbone** (`FreezeUnfreeze`, unfreeze @ epoch 20 at 10× LR) instead of
+     freezing it behind a **sklearn RandomForest head**;
+   - **12 monthly S2 mosaics** (`period_duration: 30d`, `min_matches: 12`) vs our
+     `max_timesteps=5`;
+   - a real `SegmentationPoolingDecoder`, instead of **mean-pooling tokens over time AND
+     band-sets** — which discards the phenology signal that *is* the riparian discriminator.
+   Reported mangrove accuracy: 97.6%. **Scaffold committed at
+   `olmoearth_run_data/riparian_extent/`** (`dataset.json` / `model.yaml` / `olmoearth_run.yaml`,
+   transcribed from `mangrove`, NMRipMap as label source, spatial split). Needs a GPU +
+   `olmoearth_projects` checkout to run. Note **v1.1 cuts compute ~3×** (band-merged tokens)
+   and **v1.2 adds RoPE** — re-check whether a smaller variant is viable first.
+   Either outcome is publishable; the current comparison is not a fair test. Tracked as an issue.
+   Then: baseline-vs-OlmoEarth disagreement maps.
 6. **Web app** — frontend map layer for extent (endpoint exists) + reach summaries.
 
 ## Environment notes

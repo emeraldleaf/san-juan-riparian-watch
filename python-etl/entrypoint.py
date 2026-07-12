@@ -23,21 +23,34 @@ from etl_pipeline import (
     PostGISWriter,
     _resolve_database_url,
 )
+from health_scorer import HealthScorer
+from landfire_processor import (
+    LANDFIRE_EVH_URL,
+    LANDFIRE_EVT_URL,
+    LandfireProcessor,
+    PostGISLandfireWriter,
+)
+from lidar_processor import LidarProcessor
 from ndvi_processor import (
     NdviProcessor,
     PlanetaryComputerSearcher,
     PostGISNdviWriter,
 )
+from nlcd_processor import NLCD_EROS_URL, NLCD_IMAGE_SERVER_URL, NlcdProcessor, PostGISNlcdWriter
+from raster_processor import FallbackRasterSource, GeoServerWmsSource, ImageServerSource
 from run_tracker import RunTracker
+from ssurgo_processor import SsurgoProcessor
 
 logger = logging.getLogger(__name__)
 
 
-def execute_run(update_type: str) -> None:
+def execute_run(update_type: str, *, force_reload: bool = False) -> None:
     """Execute a single ETL run of the given type.
 
     Args:
         update_type: One of 'full', 'incremental', 'ndvi', 'all'.
+        force_reload: If True, re-fetch all data even if tables are
+            already populated (e.g. NWI wetlands).
     """
     url = _resolve_database_url()
     if not url:
@@ -49,7 +62,35 @@ def execute_run(update_type: str) -> None:
     pipeline = EtlPipeline(
         client=ArcGISFeatureClient(),
         writer=PostGISWriter(engine),
+        force_reload=force_reload,
     )
+
+    # Wire up enrichment processors (NLCD, LANDFIRE, SSURGO, LiDAR, scorer)
+    # NLCD: Try EROS ImageServer first; fall back to MRLC GeoServer WMS
+    nlcd_primary = ImageServerSource(base_url=NLCD_EROS_URL)
+    nlcd_fallback = GeoServerWmsSource(
+        base_url=NLCD_IMAGE_SERVER_URL,
+        layers="NLCD_2021_Land_Cover_L48",
+        palette_to_value=GeoServerWmsSource.NLCD_PALETTE_MAP,
+    )
+    nlcd_source = FallbackRasterSource(primary=nlcd_primary, fallback=nlcd_fallback)
+    nlcd_writer = PostGISNlcdWriter(engine=engine)
+    nlcd_proc = NlcdProcessor(source=nlcd_source, writer=nlcd_writer, engine=engine)
+
+    evt_source = ImageServerSource(base_url=LANDFIRE_EVT_URL)
+    evh_source = ImageServerSource(base_url=LANDFIRE_EVH_URL)
+    lf_writer = PostGISLandfireWriter(engine=engine)
+    landfire_proc = LandfireProcessor(
+        evt_source=evt_source, evh_source=evh_source,
+        writer=lf_writer, engine=engine,
+    )
+
+    pipeline.set_raster_processors(nlcd_proc, landfire_proc)
+    pipeline.set_ssurgo_processor(SsurgoProcessor(engine))
+    # LiDAR disabled: 3DEP per-buffer tile lookups too slow for 6747 buffers.
+    # TODO: Re-enable after optimizing spatial tile index.
+    # pipeline.set_lidar_processor(LidarProcessor(engine))
+    pipeline.set_health_scorer(HealthScorer(engine))
 
     run_id = tracker.start_run(update_type)
     try:
@@ -125,6 +166,10 @@ def main() -> None:
         choices=["full", "incremental", "ndvi", "all", "scheduled"],
         help="Run mode (default: full for backwards compatibility)",
     )
+    parser.add_argument(
+        "--force", action="store_true", default=False,
+        help="Force re-fetch of all data, even if tables are populated",
+    )
     args = parser.parse_args()
 
     import os
@@ -134,7 +179,7 @@ def main() -> None:
         from scheduler import get_schedule_config, run_scheduled
         run_scheduled(execute_run, get_schedule_config())
     else:
-        execute_run(mode)
+        execute_run(mode, force_reload=args.force)
 
 
 if __name__ == "__main__":

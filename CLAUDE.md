@@ -207,8 +207,9 @@ Colorado Public Parcels REST fields → columns (renamed in `etl_pipeline.py` `l
 
 ### NDVI & Phenology
 - NDVI = (NIR − Red) / (NIR + Red), range −1 to +1
-- Health thresholds calibrated for semi-arid San Juan Basin: healthy (>0.3), degraded (0.15–0.3),
-  bare (<0.15)
+- Health thresholds calibrated for semi-arid San Juan Basin (peak-growing median ~0.17):
+  healthy (>0.25), degraded (0.10–0.25), bare (<0.10) — the single source of truth is
+  `classify_health()` in `ndvi_processor.py`; keep the frontend legend in sync
 - Only use imagery from **peak growing season (June–August)** for the San Juan Basin
 - Tag every vegetation_health record with `season_context`; dormant readings score `dormant`, not `bare`
 

@@ -8,8 +8,9 @@ Study area: San Juan Basin, HUC8 14080101.
 
 import logging
 import os
-import re
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
@@ -18,6 +19,7 @@ import pandas as pd
 import requests
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from psycopg2 import sql as psql
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,9 @@ DEFAULT_BUFFER_DISTANCE_M = 30.48  # 100 feet
 # ArcGIS pagination
 ARCGIS_BATCH_SIZE = 1000
 
+# Shared log format for batch fetch progress
+_BATCH_LOG_FMT = "Fetched %s batch: %d features (offset %d)"
+
 # NHDPlus feature type code for sinks
 SINK_FTYPE = 378
 
@@ -71,9 +76,9 @@ PARCEL_FIELD_MAP: dict[str, str] = {
 
 # NWI field renaming (source API field -> database column)
 NWI_FIELD_MAP: dict[str, str] = {
-    "WETLAND_TYPE": "wetland_type",
-    "ATTRIBUTE": "cowardin_code",
-    "ACRES": "acres",
+    "Wetlands.WETLAND_TYPE": "wetland_type",
+    "Wetlands.ATTRIBUTE": "cowardin_code",
+    "Wetlands.ACRES": "acres",
 }
 
 
@@ -168,6 +173,10 @@ class SpatialWriter(Protocol):
 class ArcGISFeatureClient:
     """Fetches geospatial features from ArcGIS REST API endpoints."""
 
+    _RETRYABLE_CODES = {500, 502, 503, 504}
+    _MAX_RETRIES = 4
+    _BACKOFF_BASE = 10  # seconds
+
     def __init__(self, timeout: int = 120) -> None:
         self._timeout = timeout
 
@@ -182,6 +191,9 @@ class ArcGISFeatureClient:
     ) -> gpd.GeoDataFrame:
         """Fetch features from an ArcGIS REST endpoint as a GeoDataFrame.
 
+        Retries up to ``_MAX_RETRIES`` times on transient server errors
+        (HTTP 500/502/503/504) with exponential backoff.
+
         Args:
             url: Full URL to the layer (including layer ID).
             where: SQL WHERE clause for attribute filtering.
@@ -194,21 +206,50 @@ class ArcGISFeatureClient:
             GeoDataFrame in EPSG:4269, or empty GeoDataFrame if no features.
 
         Raises:
-            requests.HTTPError: If the API request fails.
+            requests.HTTPError: If the API request fails after all retries.
         """
         params = self._build_params(
             where, out_fields, geometry_filter,
             result_offset, result_record_count,
         )
-        response = requests.get(
-            f"{url}/query", params=params, timeout=self._timeout,
-        )
-        response.raise_for_status()
-
-        features = response.json().get("features", [])
-        if not features:
-            return gpd.GeoDataFrame()
-        return gpd.GeoDataFrame.from_features(features, crs="EPSG:4269")
+        last_exc: Exception | None = None
+        for attempt in range(self._MAX_RETRIES + 1):
+            try:
+                response = requests.get(
+                    f"{url}/query", params=params, timeout=self._timeout,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                # ArcGIS returns errors as HTTP 200 with an {"error": ...} body.
+                # Treat that as a failure, not an empty page, so pagination cannot
+                # silently drop a middle page and write gapped data.
+                if isinstance(payload, dict) and "error" in payload:
+                    raise RuntimeError(
+                        f"ArcGIS returned an error body for {url}: {payload['error']}"
+                    )
+                features = payload.get("features", [])
+                if not features:
+                    return gpd.GeoDataFrame()
+                return gpd.GeoDataFrame.from_features(features, crs="EPSG:4269")
+            except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                retryable = (
+                    isinstance(exc, (requests.ConnectionError, requests.Timeout))
+                    or status in self._RETRYABLE_CODES
+                )
+                if not retryable or attempt == self._MAX_RETRIES:
+                    raise
+                wait = self._BACKOFF_BASE * (2 ** attempt)
+                logger.warning(
+                    "Transient error (attempt %d/%d, status=%s) — retrying in %ds: %s",
+                    attempt + 1, self._MAX_RETRIES, status, wait, url,
+                )
+                last_exc = exc
+                time.sleep(wait)
+        # Should not reach here, but just in case:
+        if last_exc:
+            raise last_exc  # pragma: no cover
+        return gpd.GeoDataFrame()  # pragma: no cover
 
     def _build_params(
         self,
@@ -240,16 +281,53 @@ class PostGISWriter:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
+    def _raw_execute(
+        self,
+        query: psql.Composable,
+        fetch: bool = False,
+    ) -> Any:
+        """Execute a psycopg2.sql query on the engine's raw connection.
+
+        Uses the underlying psycopg2 cursor directly — bypassing
+        ``sqlalchemy.text()`` — so that ``psycopg2.sql.Identifier``
+        handles all identifier quoting safely.
+
+        Args:
+            query: A ``psycopg2.sql.Composable`` (SQL + Identifier).
+            fetch: If True, return ``fetchone()``; otherwise return
+                the cursor's ``rowcount``.
+
+        Returns:
+            A row tuple when *fetch* is True, or the affected row count.
+        """
+        raw = self._engine.raw_connection()
+        try:
+            with raw.cursor() as cur:
+                cur.execute(query)
+                result = cur.fetchone() if fetch else cur.rowcount
+            raw.commit()
+        finally:
+            raw.close()
+        return result
+
     def count_rows(self, schema: str, table: str) -> int:
-        """Return row count for a table."""
-        with self._engine.connect() as conn:
-            row = conn.execute(
-                text(f"SELECT count(*) FROM {schema}.{table}"),  # noqa: S608
-            ).fetchone()
+        """Return row count for a table.  Returns 0 if the table does not exist."""
+        query = psql.SQL("SELECT count(*) FROM {}.{}").format(
+            psql.Identifier(schema), psql.Identifier(table),
+        )
+        try:
+            row = self._raw_execute(query, fetch=True)
+        except Exception as exc:  # noqa: BLE001
+            if "does not exist" in str(exc):
+                return 0
+            raise
         return int(row[0]) if row else 0
 
     def truncate(self, schema: str, table: str, cascade: bool = False) -> None:
         """Truncate a table.
+
+        Silently succeeds if the table does not exist yet (it will be
+        created on the next ``to_postgis`` call with ``if_exists='append'``).
 
         Args:
             schema: Target schema name.
@@ -258,10 +336,44 @@ class PostGISWriter:
                 to prevent accidentally wiping expensive derived data
                 (e.g. vegetation_health via riparian_buffers FK).
         """
-        suffix = " CASCADE" if cascade else ""
-        with self._engine.connect() as conn:
-            conn.execute(text(f"TRUNCATE TABLE {schema}.{table}{suffix}"))  # noqa: S608
-            conn.commit()
+        suffix = psql.SQL(" CASCADE") if cascade else psql.SQL("")
+        query = psql.SQL("TRUNCATE TABLE {}.{}").format(
+            psql.Identifier(schema), psql.Identifier(table),
+        ) + suffix
+        try:
+            self._raw_execute(query)
+        except Exception as exc:  # noqa: BLE001
+            if "does not exist" in str(exc):
+                logger.debug("Table %s.%s does not exist yet — skipping truncate", schema, table)
+            else:
+                raise
+
+    def ensure_serial_pk(self, schema: str, table: str) -> None:
+        """Ensure a table has an ``id`` serial primary key column.
+
+        ``to_postgis(if_exists='append')`` may silently recreate the
+        table from the GeoDataFrame schema, stripping any migration-
+        defined columns that aren't in the DataFrame (like ``id``).
+        This method adds the column back when it's missing.
+        """
+        raw = self._engine.raw_connection()
+        try:
+            with raw.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_schema = %s AND table_name = %s "
+                    "AND column_name = 'id'",
+                    (schema, table),
+                )
+                if cur.fetchone() is None:
+                    logger.info("Adding id serial primary key to %s.%s", schema, table)
+                    alter = psql.SQL(
+                        "ALTER TABLE {}.{} ADD COLUMN id SERIAL PRIMARY KEY"
+                    ).format(psql.Identifier(schema), psql.Identifier(table))
+                    cur.execute(alter)
+            raw.commit()
+        finally:
+            raw.close()
 
     def write(
         self,
@@ -333,6 +445,10 @@ class PostGISWriter:
             Tuple of (rows inserted, rows updated).
         """
         staging = f"_staging_{table}"
+        si = psql.Identifier(schema)
+        ti = psql.Identifier(table)
+        sti = psql.Identifier(staging)
+        cci = psql.Identifier(conflict_column)
 
         # Write to staging table (replace if exists)
         gdf.to_postgis(
@@ -342,40 +458,44 @@ class PostGISWriter:
 
         # Deduplicate staging table — keep last row per conflict key
         # (ON CONFLICT cannot update the same row twice in one command)
-        dedup_sql = text(f"""
-            DELETE FROM {schema}.{staging} a
-            USING {schema}.{staging} b
-            WHERE a.ctid < b.ctid
-            AND a.{conflict_column} = b.{conflict_column}
-        """)  # noqa: S608
-        with self._engine.connect() as conn:
-            conn.execute(dedup_sql)
-            conn.commit()
+        dedup_query = psql.SQL(
+            "DELETE FROM {s}.{st} a USING {s}.{st} b"
+            " WHERE a.ctid < b.ctid AND a.{cc} = b.{cc}"
+        ).format(s=si, st=sti, cc=cci)
+        self._raw_execute(dedup_query)
 
-        cols = ", ".join(gdf.columns)
-        set_clause = ", ".join(
-            f"{col} = EXCLUDED.{col}" for col in update_columns
+        col_ids = psql.SQL(", ").join(psql.Identifier(c) for c in gdf.columns)
+        set_parts = [psql.SQL("{c} = EXCLUDED.{c}").format(c=psql.Identifier(col))
+                     for col in update_columns]
+        set_parts.append(psql.SQL("{c} = now()").format(c=psql.Identifier("imported_at")))
+        set_clause = psql.SQL(", ").join(set_parts)
+
+        upsert_query = psql.SQL(
+            "WITH upsert_result AS ("
+            "  INSERT INTO {s}.{t} ({cols})"
+            "  SELECT {cols} FROM {s}.{st}"
+            "  ON CONFLICT ({cc}) DO UPDATE SET {set_clause}"
+            "  RETURNING (xmax = 0) AS inserted"
+            ") SELECT"
+            "  COUNT(*) FILTER (WHERE inserted) AS insert_count,"
+            "  COUNT(*) FILTER (WHERE NOT inserted) AS update_count"
+            " FROM upsert_result"
+        ).format(
+            s=si, t=ti, st=sti, cc=cci,
+            cols=col_ids, set_clause=set_clause,
         )
-        set_clause += ", imported_at = now()"
 
-        upsert_sql = text(f"""
-            WITH upsert_result AS (
-                INSERT INTO {schema}.{table} ({cols})
-                SELECT {cols} FROM {schema}.{staging}
-                ON CONFLICT ({conflict_column}) DO UPDATE
-                SET {set_clause}
-                RETURNING (xmax = 0) AS inserted
-            )
-            SELECT
-                COUNT(*) FILTER (WHERE inserted) AS insert_count,
-                COUNT(*) FILTER (WHERE NOT inserted) AS update_count
-            FROM upsert_result
-        """)  # noqa: S608
+        drop_query = psql.SQL("DROP TABLE IF EXISTS {}.{}").format(si, sti)
 
-        with self._engine.connect() as conn:
-            result = conn.execute(upsert_sql).fetchone()
-            conn.execute(text(f"DROP TABLE IF EXISTS {schema}.{staging}"))  # noqa: S608
-            conn.commit()
+        raw = self._engine.raw_connection()
+        try:
+            with raw.cursor() as cur:
+                cur.execute(upsert_query)
+                result = cur.fetchone()
+                cur.execute(drop_query)
+            raw.commit()
+        finally:
+            raw.close()
 
         inserted = result[0] if result else 0
         updated = result[1] if result else 0
@@ -442,13 +562,20 @@ class EtlPipeline:
         writer: Spatial writer for persisting data to PostGIS.
     """
 
+    # Number of concurrent page fetches for large endpoints (e.g. NWI).
+    # Conservative to avoid overwhelming government APIs.
+    _PAGE_WORKERS = 4
+
     def __init__(
         self,
         client: FeatureClient,
         writer: SpatialWriter,
+        *,
+        force_reload: bool = False,
     ) -> None:
         self._client = client
         self._writer = writer
+        self._force_reload = force_reload
 
     def _count_rows(self, schema: str, table: str) -> int:
         """Return the row count of a table (for pre-flight checks)."""
@@ -538,29 +665,44 @@ class EtlPipeline:
         where: str = "1=1",
         explode: bool = False,
         int_cols: list[str] | None = None,
+        parallel_pages: int = 1,
+        skip_if_populated: bool = False,
     ) -> None:
         """Fetch, transform, and write a single feature layer.
 
         Paginates through the ArcGIS REST API to load all features
         (the API caps responses at maxRecordCount, typically 2000).
+
+        Args:
+            parallel_pages: Number of concurrent page fetches.  Set > 1
+                for large, slow endpoints (e.g. NWI) to overlap I/O
+                wait time.  Keep at 1 for small layers or rate-sensitive
+                services.
+            skip_if_populated: When True, skip fetching if the target
+                table already has rows.  Useful for semi-static
+                reference data (e.g. NWI wetlands) that doesn't change
+                between pipeline runs.
         """
+        if skip_if_populated:
+            existing = self._writer.count_rows(schema, name)
+            if existing > 0:
+                logger.info(
+                    "Skipping %s — table already has %d rows "
+                    "(use --force to reload)",
+                    name, existing,
+                )
+                return
+
         logger.info("Loading %s", name)
 
-        batches: list[gpd.GeoDataFrame] = []
-        offset = 0
-        while True:
-            batch = self._client.query(
-                url=url, where=where, geometry_filter=envelope,
-                result_offset=offset,
-                result_record_count=ARCGIS_BATCH_SIZE,
+        if parallel_pages > 1:
+            batches = self._fetch_pages_parallel(
+                name, url, where, envelope, parallel_pages,
             )
-            if batch.empty:
-                break
-            batches.append(batch)
-            logger.info("Fetched %s batch: %d features (offset %d)", name, len(batch), offset)
-            offset += ARCGIS_BATCH_SIZE
-            if len(batch) < ARCGIS_BATCH_SIZE:
-                break
+        else:
+            batches = self._fetch_pages_sequential(
+                name, url, where, envelope,
+            )
 
         if not batches:
             logger.warning("No %s found in study area", name)
@@ -580,6 +722,95 @@ class EtlPipeline:
         self._writer.truncate(schema, name, cascade=True)
         self._writer.write(gdf, name, schema)
         logger.info("Finished loading %d %s", len(gdf), name)
+
+    def _fetch_pages_sequential(
+        self,
+        name: str,
+        url: str,
+        where: str,
+        envelope: dict[str, Any] | None,
+    ) -> list[gpd.GeoDataFrame]:
+        """Fetch all pages from an ArcGIS endpoint one at a time."""
+        batches: list[gpd.GeoDataFrame] = []
+        offset = 0
+        while True:
+            batch = self._client.query(
+                url=url, where=where, geometry_filter=envelope,
+                result_offset=offset,
+                result_record_count=ARCGIS_BATCH_SIZE,
+            )
+            if batch.empty:
+                break
+            batches.append(batch)
+            logger.info(_BATCH_LOG_FMT, name, len(batch), offset)
+            offset += ARCGIS_BATCH_SIZE
+            if len(batch) < ARCGIS_BATCH_SIZE:
+                break
+        return batches
+
+    def _fetch_pages_parallel(
+        self,
+        name: str,
+        url: str,
+        where: str,
+        envelope: dict[str, Any] | None,
+        max_workers: int,
+    ) -> list[gpd.GeoDataFrame]:
+        """Fetch pages from an ArcGIS endpoint with concurrent requests.
+
+        Launches ``max_workers`` page fetches at a time.  When all
+        workers in a wave finish, any that returned a full page trigger
+        the next wave of offsets.  This keeps server load bounded while
+        overlapping network I/O.
+        """
+        batches: list[gpd.GeoDataFrame] = []
+        next_offset = 0
+        done = False
+
+        while not done:
+            # Build a wave of offsets to fetch concurrently
+            offsets = [
+                next_offset + i * ARCGIS_BATCH_SIZE
+                for i in range(max_workers)
+            ]
+            next_offset = offsets[-1] + ARCGIS_BATCH_SIZE
+
+            wave_results: dict[int, gpd.GeoDataFrame] = {}
+            with ThreadPoolExecutor(max_workers=max_workers,
+                                    thread_name_prefix=f"page-{name}") as pool:
+                futures = {
+                    pool.submit(
+                        self._client.query,
+                        url=url, where=where, geometry_filter=envelope,
+                        result_offset=off,
+                        result_record_count=ARCGIS_BATCH_SIZE,
+                    ): off
+                    for off in offsets
+                }
+                for future in as_completed(futures):
+                    off = futures[future]
+                    batch = future.result()
+                    if not batch.empty:
+                        wave_results[off] = batch
+
+            # Process ALL requested offsets in order (not just the non-empty ones):
+            # stop at the first offset that returns no page (end of data) or a partial
+            # page, and never append a later offset across a gap. Iterating only the
+            # non-empty offsets would silently jump over a missing middle page.
+            for off in offsets:
+                batch = wave_results.get(off)
+                if batch is None:
+                    # Empty page = end of data at this offset. (A 200-error body now
+                    # raises in the client, so this only fires on a genuine empty page.)
+                    done = True
+                    break
+                batches.append(batch)
+                logger.info(_BATCH_LOG_FMT, name, len(batch), off)
+                if len(batch) < ARCGIS_BATCH_SIZE:
+                    done = True
+                    break
+
+        return batches
 
     def load_parcels(self) -> None:
         """Load Colorado parcels with pagination and field renaming.
@@ -678,7 +909,13 @@ class EtlPipeline:
         """Load NWI wetland polygons from FWS ArcGIS REST service.
 
         Uses the watershed bounding box as a spatial filter to limit
-        results to the study area.
+        results to the study area.  Fetches pages in parallel
+        (``_PAGE_WORKERS`` concurrent requests) and skips the fetch
+        entirely when the table is already populated (override with
+        ``--force``).
+
+        After writing, ensures the table has an ``id`` serial primary
+        key — ``to_postgis`` may recreate the table without one.
         """
         logger.info("Loading NWI wetland polygons")
         envelope = self._writer.get_watershed_envelope(HUC8_CODE)
@@ -688,7 +925,14 @@ class EtlPipeline:
             url=NWI_URL,
             envelope=envelope, explode=False,
             col_map=NWI_FIELD_MAP,
+            parallel_pages=self._PAGE_WORKERS,
+            skip_if_populated=not self._force_reload,
         )
+
+        # to_postgis(if_exists='append') may silently recreate the table
+        # without the migration's id SERIAL PRIMARY KEY.  Ensure it exists.
+        self._writer.ensure_serial_pk("bronze", "nwi_wetlands")
+
         logger.info("Finished loading NWI wetlands")
 
     def analyze_compliance(self) -> None:
@@ -740,27 +984,234 @@ class EtlPipeline:
         count = self._writer.execute(_UPDATE_SUMMARY_NDVI_SQL)
         logger.info("Updated %d summary records with NDVI stats", count)
 
+    # -- Raster processing -------------------------------------------------
+
+    def set_raster_processors(
+        self,
+        nlcd_processor: Any = None,
+        landfire_processor: Any = None,
+    ) -> None:
+        """Set optional raster processors for NLCD and LANDFIRE.
+
+        These are optional because the raster processing can fail
+        if remote services are unavailable, and should not block
+        the core vector ETL pipeline.
+
+        Args:
+            nlcd_processor: NlcdProcessor instance, or None to skip.
+            landfire_processor: LandfireProcessor instance, or None to skip.
+        """
+        self._nlcd_processor = nlcd_processor
+        self._landfire_processor = landfire_processor
+
+    def set_ssurgo_processor(
+        self,
+        ssurgo_processor: Any = None,
+    ) -> None:
+        """Set optional SSURGO soil processor.
+
+        Optional because the NRCS web services may be unavailable
+        and should not block the rest of the pipeline.
+
+        Args:
+            ssurgo_processor: SsurgoProcessor instance, or None to skip.
+        """
+        self._ssurgo_processor = ssurgo_processor
+
+    def set_health_scorer(
+        self,
+        health_scorer: Any = None,
+    ) -> None:
+        """Set optional composite health scorer.
+
+        Args:
+            health_scorer: HealthScorer instance, or None to skip.
+        """
+        self._health_scorer = health_scorer
+
+    def set_lidar_processor(
+        self,
+        lidar_processor: Any = None,
+    ) -> None:
+        """Set optional 3DEP LiDAR canopy processor.
+
+        The processor fetches DSM/DTM tiles from Planetary Computer
+        and computes per-buffer canopy height statistics.
+
+        Args:
+            lidar_processor: LidarProcessor instance, or None to skip.
+        """
+        self._lidar_processor = lidar_processor
+
+    def _run_raster_processors(self) -> None:
+        """Run NLCD and LANDFIRE raster processors if configured.
+
+        Catches exceptions from each processor independently so a
+        failure in one does not block the other or the rest of the
+        pipeline.
+        """
+        if hasattr(self, "_nlcd_processor") and self._nlcd_processor:
+            try:
+                logger.info("Running NLCD land cover processor")
+                self._nlcd_processor.process_buffers()
+            except Exception:
+                logger.exception("NLCD processing failed — continuing")
+
+        if hasattr(self, "_landfire_processor") and self._landfire_processor:
+            try:
+                logger.info("Running LANDFIRE vegetation structure processor")
+                self._landfire_processor.process_buffers()
+            except Exception:
+                logger.exception("LANDFIRE processing failed — continuing")
+
+    def _run_ssurgo_processor(self) -> None:
+        """Run SSURGO soil processor if configured.
+
+        Fetches soil map unit polygons from NRCS WFS,
+        hydric ratings from tabular service, and computes
+        buffer-soil intersections.
+        """
+        if not hasattr(self, "_ssurgo_processor") or not self._ssurgo_processor:
+            return
+        try:
+            logger.info("Running SSURGO soil processor")
+            envelope = self._writer.get_watershed_envelope(HUC8_CODE)
+            # Parse the ArcGIS-style envelope into a plain bbox tuple
+            coords = envelope["geometry"].split(",")
+            bbox = (
+                float(coords[0]),  # xmin
+                float(coords[1]),  # ymin
+                float(coords[2]),  # xmax
+                float(coords[3]),  # ymax
+            )
+            self._ssurgo_processor.process(bbox)
+        except Exception:
+            logger.exception("SSURGO processing failed — continuing")
+
+    def _run_health_scorer(self) -> None:
+        """Run the composite health scorer if configured.
+
+        Computes SMP 80/10/10 composite health scores for every buffer
+        using NDVI, NLCD, and LANDFIRE data from silver tables.
+        """
+        if not hasattr(self, "_health_scorer") or not self._health_scorer:
+            return
+        try:
+            logger.info("Running composite health scorer")
+            self._health_scorer.score_all_buffers()
+            self._health_scorer.update_summary()
+        except Exception:
+            logger.exception("Health scoring failed — continuing")
+
+    def _run_lidar_processor(self) -> None:
+        """Run 3DEP LiDAR canopy processor if configured.
+
+        Fetches DSM/DTM tiles from Planetary Computer STAC,
+        computes CHM = DSM - DTM, and writes per-buffer canopy
+        height statistics to silver.buffer_canopy.
+        """
+        if not hasattr(self, "_lidar_processor") or not self._lidar_processor:
+            return
+        try:
+            logger.info("Running 3DEP LiDAR canopy processor")
+            envelope = self._writer.get_watershed_envelope(HUC8_CODE)
+            coords = envelope["geometry"].split(",")
+            bbox = (
+                float(coords[0]),
+                float(coords[1]),
+                float(coords[2]),
+                float(coords[3]),
+            )
+            self._lidar_processor.process(bbox)
+        except Exception:
+            logger.exception("LiDAR canopy processing failed — continuing")
+
     # -- Orchestration ------------------------------------------------------
 
     def run(self) -> None:
-        """Run the full pipeline: bronze -> silver -> gold."""
+        """Run the full pipeline: bronze -> silver -> gold.
+
+        Bronze layer fetches are I/O-bound (external HTTP APIs) and write
+        to separate tables, so NHDPlus, parcels, and NWI wetlands are
+        fetched concurrently after the watershed boundary (which they
+        all depend on for the spatial envelope) is loaded.
+        """
         logger.info("Starting Riparian Buffer Compliance ETL pipeline")
 
-        # Bronze -- raw data ingestion
+        # Bronze -- watershed must load first (provides spatial envelope)
         self.load_watershed()
-        self.load_nhdplus_layers()
-        self.load_parcels()
-        self.load_nwi_wetlands()
 
-        # Silver -- spatial processing
+        # Bronze -- remaining sources fetched concurrently (I/O-bound)
+        bronze_loaders = [
+            ("NHDPlus", self.load_nhdplus_layers),
+            ("Parcels", self.load_parcels),
+            ("NWI Wetlands", self.load_nwi_wetlands),
+        ]
+        with ThreadPoolExecutor(max_workers=3, thread_name_prefix="bronze") as pool:
+            futures = {
+                pool.submit(fn): name for name, fn in bronze_loaders
+            }
+            errors: list[tuple[str, Exception]] = []
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    future.result()
+                    logger.info("Bronze loader '%s' finished", name)
+                except Exception as exc:
+                    logger.error("Bronze loader '%s' failed: %s", name, exc)
+                    errors.append((name, exc))
+            if errors:
+                failed = ", ".join(n for n, _ in errors)
+                raise RuntimeError(
+                    f"Bronze loading failed for: {failed}"
+                ) from errors[0][1]
+
+        # Silver -- spatial processing. Buffer-wetland intersection must run here:
+        # generate_buffers() truncates silver.riparian_buffers CASCADE, which empties
+        # silver.buffer_wetlands (FK), so a full run has to rebuild it or the layer
+        # stays permanently empty.
         self.generate_buffers()
         self.analyze_compliance()
         self.analyze_buffer_wetlands()
 
+        # Silver -- enrichment processors (independent, I/O-bound)
+        silver_processors = [
+            ("SSURGO", self._run_ssurgo_processor),
+            ("Raster", self._run_raster_processors),
+            ("LiDAR", self._run_lidar_processor),
+        ]
+        enrichment_failures: list[str] = []
+        with ThreadPoolExecutor(max_workers=3, thread_name_prefix="silver") as pool:
+            futures = {
+                pool.submit(fn): name for name, fn in silver_processors
+            }
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    future.result()
+                    logger.info("Silver processor '%s' finished", name)
+                except Exception as exc:
+                    # Enrichment is optional, so a failure doesn't abort the run —
+                    # but it means downstream health scores are computed from partial
+                    # data, so record it and surface it loudly at the end.
+                    logger.warning("Silver processor '%s' failed: %s", name, exc)
+                    enrichment_failures.append(name)
+
         # Gold -- aggregated analytics
         self.calculate_summary()
 
-        logger.info("ETL pipeline completed successfully")
+        # Gold -- composite health scoring (after all silver data ready)
+        self._run_health_scorer()
+
+        if enrichment_failures:
+            logger.warning(
+                "ETL pipeline completed, but health scores were computed from PARTIAL "
+                "silver data — these enrichment processors failed: %s. Re-run once the "
+                "underlying source is reachable.",
+                ", ".join(enrichment_failures),
+            )
+        else:
+            logger.info("ETL pipeline completed successfully")
 
     # -- Incremental pipeline -----------------------------------------------
 
@@ -810,7 +1261,7 @@ class EtlPipeline:
             if batch.empty:
                 break
             batches.append(batch)
-            logger.info("Fetched %s batch: %d features (offset %d)", name, len(batch), offset)
+            logger.info(_BATCH_LOG_FMT, name, len(batch), offset)
             offset += ARCGIS_BATCH_SIZE
             if len(batch) < ARCGIS_BATCH_SIZE:
                 break
@@ -966,9 +1417,19 @@ class EtlPipeline:
         if buffers_changed:
             self.analyze_buffer_wetlands()
 
+        # Silver -- SSURGO soils (rerun if buffers changed)
+        if buffers_changed:
+            self._run_ssurgo_processor()
+
+        # Silver -- raster processing (always rerun if buffers changed)
+        if buffers_changed:
+            self._run_raster_processors()
+            self._run_lidar_processor()
+
         # Gold -- recompute after any silver changes
         if streams_changed or parcels_changed or buffers_changed:
             self.calculate_summary()
+            self._run_health_scorer()
         else:
             logger.info("No bronze changes — skipping silver/gold recompute")
 
@@ -1005,11 +1466,17 @@ _ANALYZE_COMPLIANCE_SQL = text("""
             p.id AS parcel_id,
             b.id AS buffer_id,
             b.area_sq_m AS buffer_area_sq_m,
-            ST_Intersection(p.geom, b.geom) AS overlap_geom
+            ST_Intersection(
+                ST_MakeValid(p.geom),
+                ST_MakeValid(b.geom)
+            ) AS overlap_geom
         FROM bronze.parcels p
         JOIN silver.riparian_buffers b
             ON p.geom && b.geom
-            AND ST_Intersects(p.geom, b.geom)
+            AND ST_Intersects(
+                ST_MakeValid(p.geom),
+                ST_MakeValid(b.geom)
+            )
     )
     INSERT INTO silver.parcel_compliance (
         parcel_id, buffer_id, overlap_area_sq_m, overlap_pct,
@@ -1028,7 +1495,8 @@ _ANALYZE_COMPLIANCE_SQL = text("""
     WHERE ST_Area(i.overlap_geom::geography) > 1
 """)
 
-# Buffer-wetland intersection using && pre-filter per convention
+# Buffer-wetland intersection using && pre-filter per convention.
+# ST_MakeValid repairs self-intersections in NWI source polygons.
 _ANALYZE_BUFFER_WETLANDS_SQL = text("""
     WITH intersections AS (
         SELECT
@@ -1037,11 +1505,17 @@ _ANALYZE_BUFFER_WETLANDS_SQL = text("""
             b.area_sq_m AS buffer_area_sq_m,
             w.wetland_type,
             w.cowardin_code,
-            ST_Intersection(b.geom, w.geom) AS overlap_geom
+            ST_Intersection(
+                ST_CollectionExtract(ST_MakeValid(b.geom), 3),
+                ST_CollectionExtract(ST_MakeValid(w.geom), 3)
+            ) AS overlap_geom
         FROM silver.riparian_buffers b
         JOIN bronze.nwi_wetlands w
             ON b.geom && w.geom
-            AND ST_Intersects(b.geom, w.geom)
+            AND ST_Intersects(
+                ST_CollectionExtract(ST_MakeValid(b.geom), 3),
+                ST_CollectionExtract(ST_MakeValid(w.geom), 3)
+            )
     )
     INSERT INTO silver.buffer_wetlands (
         buffer_id, wetland_id, overlap_area_sq_m,
@@ -1201,6 +1675,94 @@ def main() -> None:
         client=ArcGISFeatureClient(),
         writer=PostGISWriter(engine),
     )
+
+    # Set up raster processors (optional — fail gracefully)
+    try:
+        from landfire_processor import (
+            LANDFIRE_EVH_URL,
+            LANDFIRE_EVT_URL,
+            LandfireProcessor,
+            PostGISLandfireWriter,
+        )
+        from nlcd_processor import (
+            NLCD_EROS_URL,
+            NLCD_IMAGE_SERVER_URL,
+            NlcdProcessor,
+            PostGISNlcdWriter,
+        )
+        from raster_processor import (
+            FallbackRasterSource,
+            GeoServerWmsSource,
+            ImageServerSource,
+            WCSSource,
+        )
+
+        # NLCD: EROS ImageServer (exportImage) primary, MRLC GeoServer WMS fallback.
+        # NLCD_IMAGE_SERVER_URL is the GeoServer /ows endpoint, which ImageServerSource
+        # cannot call — it must go through GeoServerWmsSource (matches entrypoint.py).
+        nlcd_source = FallbackRasterSource(
+            primary=ImageServerSource(base_url=NLCD_EROS_URL),
+            fallback=GeoServerWmsSource(
+                base_url=NLCD_IMAGE_SERVER_URL,
+                layers="NLCD_2021_Land_Cover_L48",
+                palette_to_value=GeoServerWmsSource.NLCD_PALETTE_MAP,
+            ),
+        )
+        nlcd_writer = PostGISNlcdWriter(engine)
+        nlcd_proc = NlcdProcessor(nlcd_source, nlcd_writer, engine)
+
+        evt_source = ImageServerSource(LANDFIRE_EVT_URL)
+        evh_source = ImageServerSource(LANDFIRE_EVH_URL)
+        lf_writer = PostGISLandfireWriter(engine)
+        lf_proc = LandfireProcessor(evt_source, evh_source, lf_writer, engine)
+
+        pipeline.set_raster_processors(nlcd_proc, lf_proc)
+        logger.info("Raster processors configured (NLCD + LANDFIRE)")
+    except ImportError:
+        logger.warning(
+            "Raster processor modules not found — skipping NLCD/LANDFIRE"
+        )
+    except Exception:
+        logger.exception(
+            "Failed to configure raster processors — skipping NLCD/LANDFIRE"
+        )
+
+    # Set up SSURGO processor (optional — fail gracefully)
+    try:
+        from ssurgo_processor import SsurgoProcessor
+
+        ssurgo_proc = SsurgoProcessor(engine)
+        pipeline.set_ssurgo_processor(ssurgo_proc)
+        logger.info("SSURGO soil processor configured")
+    except ImportError:
+        logger.warning("SSURGO processor module not found — skipping")
+    except Exception:
+        logger.exception("Failed to configure SSURGO processor — skipping")
+
+    # Set up health scorer (optional — fail gracefully)
+    try:
+        from health_scorer import HealthScorer
+
+        scorer = HealthScorer(engine)
+        pipeline.set_health_scorer(scorer)
+        logger.info("Composite health scorer configured")
+    except ImportError:
+        logger.warning("Health scorer module not found — skipping")
+    except Exception:
+        logger.exception("Failed to configure health scorer — skipping")
+
+    # Set up LiDAR canopy processor (optional — fail gracefully)
+    try:
+        from lidar_processor import LidarProcessor
+
+        lidar_proc = LidarProcessor(engine)
+        pipeline.set_lidar_processor(lidar_proc)
+        logger.info("3DEP LiDAR canopy processor configured")
+    except ImportError:
+        logger.warning("LiDAR processor module not found — skipping")
+    except Exception:
+        logger.exception("Failed to configure LiDAR processor — skipping")
+
     pipeline.run()
 
 
