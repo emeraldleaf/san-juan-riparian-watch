@@ -66,6 +66,11 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Decision records
 
+- [Train the beetle model on the ecoregion-matched Colorado Plateau](decisions/2026-07-12-beetle-training-pool-ecoregion-matched.md)
+  — **zero defoliated points fall inside the San Juan.** The beetle's 2017 impact was ecoregionally
+  split (Escalante 21.6% live tamarisk; Arizona **87%** live), so training defoliation on the lower
+  basin would transfer across an ecoregion boundary — exactly what CO-RIP's κ 0.42–0.90 range warns
+  against. Train on the Plateau, validate on the San Juan, and say plainly that it is transfer.
 - [Fine-tune OlmoEarth on invasives, with extent as a calibration control](decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md)
   — **the contribution is the *time axis*.** Every existing product is one frozen epoch; nobody has
   an annual riparian product for this basin, of extent or of species. Also records why the beetle

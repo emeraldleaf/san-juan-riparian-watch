@@ -23,6 +23,7 @@ record: the paper, the claims extracted, a coverage map against our encoding sur
 
 | Date | Source | Verdict | What it did to us |
 |---|---|---|---|
+| 2026-07-12 | [Perkins et al. (2025)](2026-07-12-perkins-2025-canyonlands.md) — *Riparian Vegetated Area in Canyonlands NP, 1940–2022* | 🟠 **RETRACTS** | **Extent over time is not novel *on its own*.** They mapped riparian vegetated area back to **1940** — further than Landsat reaches. It survives only **qualified**: theirs is aerial, discrete dates, 152 km of one park, *area* not species, **no beetle**. Ours must say *annual, automated, wall-to-wall, satellite, species-level, beetle-aware*. **Confirms the beetle gap a third time** — a 2025 riparian-change paper that never mentions *Diorhabda*. |
 | 2026-07-12 | [Evangelista et al. (2018)](2026-07-12-evangelista-2018-csu-nrel.md) — CSU/NREL, *Mapping Native and Non-Native Riparian Vegetation in the Colorado River Watershed* | 🟠 **RETRACTS** | **Falsified Novelty Claim 1.** We said CSU produced "points but no map" and that "nobody has produced a native-vs-invasive cover + change product". They shipped riparian maps for **2006, 2016 and the change between them**, and **Russian-olive maps on the San Juan** for both years. We had read their web page, never the report. Claim rewritten: **annual, 10 m, beetle-aware**. |
 | 2026-07-11 | [Woodward et al. (2018), CO-RIP](2026-07-11-corip-woodward-2018.md) — *ISPRS IJGI* 7(10):397 | 🟠 **RETRACTS** | **Killed "we built an RF riparian classifier" as a contribution.** CO-RIP mapped riparian extent for the **entire Colorado Basin, San Juan included**, at median **κ 0.80** — valley-bottom + Random Forest on Landsat. That is our Stage-1 method class, published in 2018. Extent for one epoch is **not** a contribution; it is a baseline. |
 | 2026-07-11 | [Tamarisk detection — the established literature](2026-07-11-tamarisk-detection-established.md) (S2+RF 87.8% OA; Landsat 80–91%; senescence phenology) | 🟠 **RETRACTS** | **Killed "we detect tamarisk from satellite" as a contribution.** Settled since ~2005. It also handed us the discriminator (**late-season senescence**) — which then indicted our own harness for mean-pooling the time axis away. |
@@ -61,8 +62,5 @@ stronger position than the one we started with, and we only reached it by being 
 
 ## Still to audit
 
-- **Perkins et al. (2025)**, *River Research and Applications* — riparian vegetated area in
-  Canyonlands NP, **1940–2022**. A multi-decade *extent* time series brushes against our "annual
-  extent" framing. **Not yet audited.**
 - Anything the `/paper-audit` command is pointed at. Run it before building on a novelty claim, not
   after.

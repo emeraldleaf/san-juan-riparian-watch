@@ -141,6 +141,28 @@ class TestVintage:
         assert LABEL_YEAR == 2017
 
 
+class TestEcoregionMatchedPool:
+    """The lower basin is excluded on principle, not on convenience."""
+
+    def test_arizona_and_virgin_river_are_excluded(self) -> None:
+        from riparian.labels.csu_points import COLORADO_PLATEAU_TRIPS, LOWER_BASIN_TRIPS
+        assert COLORADO_PLATEAU_TRIPS.isdisjoint(LOWER_BASIN_TRIPS)
+        assert "Arizona" in LOWER_BASIN_TRIPS
+        assert "Escalante" in COLORADO_PLATEAU_TRIPS
+
+    def test_pool_keeps_only_plateau_trips(self) -> None:
+        from riparian.labels.csu_points import colorado_plateau
+        pts = [
+            LabeledPoint(-111.0, 38.0, TAMARISK, DEFOLIATED, 0.9, "red tam", "Escalante", "1"),
+            LabeledPoint(-112.0, 33.0, TAMARISK, LIVE, 0.9, "tamarisk", "Arizona", "2"),
+        ]
+        pool = colorado_plateau(pts)
+        assert [p.trip for p in pool] == ["Escalante"], (
+            "Arizona is a different desert at a different stage of biocontrol (87% still live in "
+            "2017) — pooling it imports the domain shift the model must not learn"
+        )
+
+
 @pytest.mark.live
 class TestAgainstTheRealFile:
     """A crosswalk that covers a fixture but not the real vocabulary is worthless."""
