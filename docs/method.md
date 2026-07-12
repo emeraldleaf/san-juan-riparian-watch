@@ -26,7 +26,7 @@ The conventional worry about LLM-assisted engineering is hallucinated code. That
 | Wrong logic | a unit test | routine |
 | **A retracted result still published as fact** | **nothing** | ← the real problem |
 | **A model scored against 45%-wrong labels** | **nothing** | |
-| **A novelty claim already falsified by a 2018 paper** | **nothing** | |
+| **A novelty claim already falsified by a 2018 paper** (Evangelista et al., 2-epoch) | **nothing** | |
 | **A "fix" that confirms a hypothesis that is actually false** | **nothing** | |
 
 These are all **semantic** failures. They compile. They pass tests. They read beautifully. They are
@@ -46,7 +46,7 @@ these dates.
 | 2 | The published RF-vs-OlmoEarth result | **retracted** — invalid three separate ways | re-derivation |
 | 3 | Labels were **NAIP 2020**; we fit them against **Sentinel-2 2024** | 4-year gap = label noise we inflicted on ourselves | reading the source metadata |
 | 4 | *"Mean-pooling explains the gap"* — the hypothesis the whole re-run was built on | **tested and DISPROVED.** F1 0.021 → 0.065 vs RF's 0.701 | running the control |
-| 5 | *"CSU produced points but no map; nobody has done this"* | **false.** They shipped 2006/2016 change maps, incl. Russian olive **on the San Juan** | `/paper-audit` |
+| 5 | *"CSU produced points but no map; nobody has done this"* | **false.** **Evangelista et al. (2018)** shipped **2-epoch** (2006/2016) change maps, incl. Russian olive **on the San Juan** | `/paper-audit` |
 | 6 | *"We built an RF riparian classifier"* as a contribution | CO-RIP did it basin-wide at **κ 0.80 in 2018** | reading, **after we'd built it** |
 | 7 | `MvtTileSql` layer guard `^[a-z_]+$` | **.NET `$` matches before a trailing newline** — `"wetlands\n"` reached the SQL literal | **CodeRabbit** |
 | 8 | The public engineering-review page | still presenting the **retracted** result as a headline stat, defended by reasoning **also** disproved | the retraction gate |
@@ -171,6 +171,10 @@ mechanical rather than exhortative.
   STATUS.md, the README and the hub all sailed through while carrying a false claim.
 - `mapfile` doesn't exist in macOS bash 3.2 — a gate that doesn't run identically on a laptop and in CI
   is not a gate.
+- **The gates only scanned *tracked* files.** `git grep` and `git ls-files` do not see a brand-new
+  file, so a gate could pass on a laptop and fail in CI — which is exactly what happened **on the pull
+  request that added this very document**. The gate refused to merge it, correctly, and in doing so
+  exposed itself. Now `--untracked` / `--others`, and verified against an untracked violating file.
 
 All three were found by **using** the gate on a real correction rather than admiring it. **Every gate
 in this repo was verified to FAIL against the real drifted files from git history** — not against a

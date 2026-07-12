@@ -28,7 +28,7 @@ else RED=""; GREEN=""; NC=""; fi
 FILES=()
 while IFS= read -r line; do
     FILES+=("$line")
-done < <(git ls-files 'docs' 'README.md' 'CLAUDE.md' 'CONTEXT.md' \
+done < <(git ls-files --cached --others --exclude-standard 'docs' 'README.md' 'CLAUDE.md' 'CONTEXT.md' \
     | grep -Ev '^docs/RETRACTIONS\.md$' \
     | grep -E '\.(md|html)$')
 

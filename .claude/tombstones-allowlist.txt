@@ -29,3 +29,7 @@ README.md
 
 # Instructs reviewers "this is MapLibre GL, NOT Leaflet" — the mention is the instruction.
 .coderabbit.yaml
+
+# THE receipts doc. It quotes retired identifiers precisely in order to record the errors they
+# caused ("the command that scaffolds map layers still said Leaflet"). The mention IS the lesson.
+docs/method.md

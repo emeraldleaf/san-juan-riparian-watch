@@ -37,7 +37,9 @@ while IFS= read -r pattern; do
     # Exit codes: 0 = matches (violation), 1 = clean, >=2 = error (e.g. invalid
     # regex) — an invalid tombstone must FAIL the audit, not silently disable it.
     set +e
-    hits=$(git grep -inE "$pattern" -- '.' "${excludes[@]}" 2>&1)
+    # --untracked: a NEW file is invisible to `git grep` until it is committed, so the gate
+    # passed locally and failed in CI on the very PR that added this file. Local must equal CI.
+    hits=$(git grep --untracked -inE "$pattern" -- '.' "${excludes[@]}" 2>&1)
     status=$?
     set -e
     if [ "$status" -ge 2 ]; then
