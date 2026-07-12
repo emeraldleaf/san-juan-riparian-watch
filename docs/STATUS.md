@@ -44,12 +44,27 @@ the whole build, serving the `.md` files as raw text).
   which a frozen embedding is good at). What is still untested is OlmoEarth **as Ai2 uses it**:
   fine-tuned Base + SegmentationPoolingDecoder, not a frozen Nano + sklearn RF head. That needs
   a GPU. See `docs/olmoearth-vs-rf-baseline.md`.
-  - **Plan of record (ADR 2026-07-12):** fine-tune **invasives**, with **extent as a calibration
-    control run first**. Extent alone re-derives CO-RIP; invasives is the real gap. But a bad
-    invasives number *run alone* is uninterpretable — broken pipeline, 332-polygon label scarcity,
-    and the beetle confound all predict the same failure. The control has none of those, so it
-    isolates "does our fine-tuning pipeline work at all?". **Gate: if extent lands well below the
-    pixel-level RF baseline, STOP and debug — do not proceed to Step 2.**
+  - **Plan of record (ADR 2026-07-12, revised):** **the contribution is the TIME axis**, for extent
+    *and* invasives. Every existing product is one frozen epoch — CO-RIP is a single raster;
+    NMRipMap is a single 2020 map. **Nobody has an annual riparian product for this basin, of
+    extent or of species.** So: Step 1 **extent** (calibration control) → Step 2 **invasives**
+    (species head) → **Step 3: run it across the archive** — annual extent trajectories + annual
+    native-vs-invasive cover/spread. Matching CO-RIP for one epoch is not the deliverable; it is
+    the calibration that makes the time series trustworthy.
+    **Gate: if extent lands well below the pixel-level RF baseline, STOP and debug — do not
+    proceed.**
+  - **The beetle has no un-confounded PLACE — but it does have an un-confounded TIME.** OlmoEarth
+    supports `LANDSAT` (record from **1984**) and `NAIP`, not just Sentinel-2 (from 2015-10).
+    *Diorhabda* was released **2004–07**, so a Landsat series spans a **~20-year pre-beetle era**
+    where late-senescence holds uncontaminated. That is the only way to separate "Tamarix senesces
+    late" from "defoliated Tamarix browns early". Sensor choice (S2 10 m / ~10 yr vs Landsat 30 m /
+    ~40 yr) is decided **after** Step 1, on evidence — 30 m may be too coarse for the corridor.
+  - 🔴 **LABEL VINTAGE = 2020 — fit on 2020 imagery.** NMRipMap v2.0 Plus (Muldavin et al. 2023)
+    was photo-interpreted from **NAIP 2020**. The 2026-07-12 fair test used **S2 2024** — a 4-year
+    gap, i.e. label noise we introduced ourselves. The RF-vs-OlmoEarth *comparison* still stands
+    (both arms ate it), but the **absolute numbers are pessimistic**, and it would hurt invasives
+    far more than extent (Tamarix cover is exactly what the beetle changes). Predict any year;
+    **fit on 2020**.
   - ⚠️ **Two RF baselines exist and they are NOT interchangeable.** Stage-1 delineation is
     **pixel-level (10 m): F1 0.90–0.92**. The fair-test number is **patch-level (80 m): F1 0.701**
     and belongs to the frozen-embedding + RF-head experiment. The fine-tune predicts at
