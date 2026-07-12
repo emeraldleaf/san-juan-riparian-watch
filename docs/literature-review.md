@@ -89,10 +89,18 @@ single scenes* consistently across the literature.
 
 ## 4. The biocontrol confound — the most important finding in this review
 
-**A biological control agent, the northern tamarisk beetle (*Diorhabda carinulata*), was released
-in 2001 (CA, CO, UT, TX), established along the Colorado River near Moab, Utah in 2004, and has
-since defoliated tamarisk across much of the *upper* Colorado River Basin.**
-**The San Juan lies in that upper basin.**
+**CONFIRMED for our exact AOI — this is not a hypothetical risk, it is the ground condition.**
+
+- The northern tamarisk beetle (*Diorhabda carinulata*) was released in 2001 (CA, CO, UT, TX).
+- **Releases were made directly on the Dolores, Colorado, and *San Juan* Rivers, 2004–2007.**
+- **By 2014 the beetle was present on virtually all river systems and tributaries in the Upper
+  Basin** — i.e. across the whole San Juan network.
+- USGS **OFR 2018-1070** — *Population dynamics of the northern tamarisk beetle in the Colorado
+  River Basin* ([PDF](https://pubs.usgs.gov/of/2018/1070/ofr20181070.pdf)) — documents **plant
+  phenology and beetle abundance/movement specifically along the Dolores and San Juan Rivers.**
+  It is the single most important reference for this project's Tamarix work, and is now in the
+  doc-intelligence corpus.
+- Expert-panel synthesis: [USGS 70168717](https://pubs.usgs.gov/publication/70168717).
 
 Remote-sensing studies of the resulting defoliation:
 
@@ -123,7 +131,15 @@ Consequences:
    the defoliation hypothesis.
 3. Where beetle presence is known, weight the **early-season (leaf-out)** phenology window, which
    biocontrol perturbs less than senescence.
-4. Record beetle-release/known-defoliation geography as a covariate. *(Open: where in the San Juan?)*
+4. Record beetle-release/defoliation geography as a covariate. **Answered:** releases were made
+   *on the San Juan itself* (2004–2007) and the beetle saturated the Upper Basin by 2014 — so
+   there is **no un-confounded control area within the AOI**. The covariate is not "where is the
+   beetle" (everywhere) but **"where and when did defoliation actually occur"**, which USGS
+   OFR 2018-1070 and the VI-decline detection methods (§4) can supply.
+5. **The vintage of our labels now matters.** NMRipMap's `IC` (introduced woody) polygons were
+   mapped over a period that overlaps the defoliation era. A stand mapped as Tamarix may since
+   have been repeatedly defoliated — or died back. Label age must be carried as metadata, not
+   assumed current.
 
 ---
 

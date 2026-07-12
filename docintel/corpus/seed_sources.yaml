@@ -274,6 +274,35 @@ sources:
     # Defoliated tamarix browns EARLY, inverting the "stays green late" discriminator.
     # Defoliation must be modelled as a state, not read as tamarisk absence or as recovery.
 
+  - id: usgs-ofr-2018-1070-beetle-population-dynamics-san-juan
+    title: "Population dynamics of the northern tamarisk beetle (Diorhabda carinulata) in the Colorado River Basin"
+    url: https://pubs.usgs.gov/of/2018/1070/ofr20181070.pdf
+    agency: USGS
+    year: 2018
+    doc_type: report
+    format: pdf
+    license: public-domain-us-gov
+    geo_focus: true            # documents plant phenology + beetle abundance ON THE SAN JUAN
+    topics: [tamarisk, biocontrol, diorhabda, phenology, defoliation, san-juan, dolores]
+    # THE key document for the biocontrol confound. Beetles were RELEASED ON THE DOLORES,
+    # COLORADO AND SAN JUAN RIVERS 2004-2007, and by 2014 were present on virtually all
+    # Upper Basin river systems and tributaries — i.e. across our entire AOI. Chapter 1
+    # documents plant phenology and beetle abundance/movement along the Dolores and San
+    # Juan. Defoliated Tamarix browns EARLY, inverting the "stays green late" discriminator
+    # that the tamarisk mapping literature depends on. This is not a hypothetical risk for
+    # this project — it is the ground condition.
+
+  - id: usgs-tamarisk-beetle-expert-panel-synthesis
+    title: "Tamarisk beetle (Diorhabda spp.) in the Colorado River basin: synthesis of an expert panel forum"
+    url: https://pubs.usgs.gov/publication/70168717
+    agency: USGS
+    year: 2016
+    doc_type: report
+    format: html
+    license: public-domain-us-gov
+    geo_focus: false
+    topics: [tamarisk, biocontrol, diorhabda, management, synthesis]
+
   - id: nagler-2021-lcr-greenness-water-use
     title: "Riparian Area Changes in Greenness and Water Use on the Lower Colorado River, 2000-2020"
     url: https://doi.org/10.3390/rs13071332    # MDPI bot-blocks automated fetch

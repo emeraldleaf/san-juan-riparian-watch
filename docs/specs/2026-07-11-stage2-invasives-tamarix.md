@@ -235,9 +235,21 @@ dominant_change_type, confidence, review_priority
    unverified — this determines whether Phase-3 species split is reachable at all.)
 2. Does CO-RIP's Landsat-era vegetation raster still agree with current Sentinel-2 observations,
    or has the corridor moved enough that it is a *historical* label?
-3. Tamarisk **beetle (*Diorhabda*) defoliation** confounds senescence phenology — defoliated
-   Tamarix browns *early*, inverting the discriminator. Where has biocontrol been released in the
-   basin? (USGS/EROS riparian-ET work tracks defoliation signals and is the reference to follow.)
+3. ~~Where has biocontrol been released in the basin?~~ **ANSWERED (2026-07-11) — and it is bad
+   news.** The northern tamarisk beetle was **released directly on the Dolores, Colorado and San
+   Juan Rivers in 2004–2007**, and by 2014 was present on **virtually all Upper Basin river
+   systems and tributaries**. There is therefore **no un-confounded control area inside our AOI**.
+   Defoliated Tamarix browns *early*, inverting the late-senescence discriminator the entire
+   tamarisk-mapping literature relies on. Consequences we must design for:
+   - A phenology classifier may **systematically miss defoliated stands**.
+   - **A greenness decline in a Tamarix reach is NOT recovery** — it may be biocontrol working.
+     Reporting it as restoration success would be the exact error this spec exists to prevent.
+   - Defoliation is **episodic and non-stationary** (multiple events per season, varying by year),
+     so a model trained on year *X* may not transfer to year *Y*.
+   - **Model defoliation as a state**, not as Tamarix absence. Prefer the **early-season leaf-out**
+     window, which biocontrol perturbs less than senescence.
+   - Key reference, now in the RAG corpus: USGS **OFR 2018-1070**, which documents plant phenology
+     and beetle abundance **on the San Juan itself**. https://pubs.usgs.gov/of/2018/1070/ofr20181070.pdf
 
 ---
 
