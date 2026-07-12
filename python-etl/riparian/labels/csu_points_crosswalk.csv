@@ -1,0 +1,44 @@
+source_species,normalized_label,tamarisk_condition,confidence,note
+tamarisk,tamarisk,live,0.95,live tamarisk
+Tamarisk,tamarisk,live,0.95,casing variant of the same class
+red tam,tamarisk,defoliated,0.90,"red foliage from tamarisk beetle attack — DEFOLIATION, not absence"
+live dead tam mix,tamarisk,mixed,0.80,"stand is part live part dead — partial defoliation; the hardest class"
+dead tam,tamarisk,dead,0.85,"dead standing tamarisk — still tamarisk, still not absence"
+Russian olive,russian_olive,,0.95,"the class NMRipMap's IC conflates with tamarisk and cannot split"
+Russian Olive,russian_olive,,0.95,casing variant of the same class
+cottonwood,native_riparian_woody,,0.95,Populus — the native this project is trying to protect
+willow,native_riparian_woody,,0.95,Salix
+box elder,native_riparian_woody,,0.90,Acer negundo
+water birch,native_riparian_woody,,0.85,Betula occidentalis
+sycamore,native_riparian_woody,,0.80,Platanus wrightii
+riparian mix,native_riparian_woody,,0.60,"mixed native riparian — no single dominant; lower confidence by construction"
+riparian g and f,native_riparian_woody,,0.50,"riparian grasses and forbs — riparian but HERBACEOUS, not woody; weak positive"
+"cottonwood, riparian g and f",native_riparian_woody,,0.70,cottonwood over riparian grass/forb understory
+"cottonwood, riparian g and f, juniper",native_riparian_woody,,0.60,mixed; juniper suggests a dry margin
+mesquite,other_woody,,0.60,"Prosopis — a phreatophyte, often bosque, but NOT the riparian gallery forest. Ambiguous on purpose."
+honey mesquite,other_woody,,0.60,Prosopis glandulosa — same ambiguity
+elm,other_woody,,0.40,"Siberian elm is itself invasive in SW riparian; the bare string cannot tell us which. Low confidence."
+walnut,other_woody,,0.50,Juglans — can be riparian; ambiguous
+palm,other_woody,,0.50,"almost certainly planted/ornamental (Arizona trips)"
+shrub,other_woody,,0.40,unspecified shrub
+shrub hackberry,other_woody,,0.60,Celtis
+sage,upland_veg,,0.90,Artemisia — upland; a strong NEGATIVE for riparian
+"sage, pinon, manzanita",upland_veg,,0.90,upland shrub/woodland assemblage
+"sage, other shrubs",upland_veg,,0.85,upland
+pinon,upland_veg,,0.90,Pinus edulis — upland
+pine,upland_veg,,0.90,upland conifer
+gamble oak,upland_veg,,0.85,Quercus gambelii (spelling variant) — upland
+gambel oak,upland_veg,,0.85,Quercus gambelii — upland
+grass,upland_veg,,0.70,unqualified grass — likely upland
+grass and Forbes,upland_veg,,0.70,"grass + forbs (sic: 'Forbes'); casing/spelling variant"
+grass and forbes upland,upland_veg,,0.90,explicitly upland
+upland,upland_veg,,0.95,explicitly upland
+ag,agriculture,,0.95,"agriculture — the class the weak labels notoriously failed on"
+agriculture/ golfcourse,agriculture,,0.90,agriculture / managed turf
+water,non_veg,,0.95,open water
+bare ground,non_veg,,0.95,bare
+road,non_veg,,0.95,road
+rock,non_veg,,0.95,rock
+wash,non_veg,,0.85,dry wash — bare/ephemeral channel
+urban,non_veg,,0.95,urban
+absent_point,absence,,0.95,"explicit absence point — dominant cover recorded elsewhere in the source"
