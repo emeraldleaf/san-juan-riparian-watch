@@ -58,6 +58,11 @@ product at reach scale is what this project is for.
 
 ## Decision records
 
+- [Fine-tune OlmoEarth on invasives, with extent as a calibration control](decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md)
+  — **the contribution is the *time axis*.** Every existing product is one frozen epoch; nobody has
+  an annual riparian product for this basin, of extent or of species. Also records why the beetle
+  confound has no un-confounded *place* but does have an un-confounded *time*, and why training
+  imagery must match the 2020 label vintage.
 - [Confidence-weighted label crosswalk](decisions/2026-07-11-confidence-weighted-label-crosswalk.md)
   — no source is ground truth; every label carries a source, a class, and a confidence. Records
   the two labelling failures that motivated it.
@@ -66,6 +71,7 @@ product at reach scale is what this project is for.
   always-on GPU**.
 - [Delineation over hydrology buffers](decisions/2026-07-03-delineation-over-hydrology-buffers.md)
 - [Document-intelligence subsystem](decisions/2026-07-04-document-intelligence-subsystem.md)
+- [NextAurora rules applicability](decisions/2026-07-04-nextaurora-rules-applicability.md)
 
 ## Specs
 
@@ -76,8 +82,13 @@ product at reach scale is what this project is for.
 
 ## Results
 
-- [OlmoEarth vs the RF baseline](olmoearth-vs-rf-baseline.md) — an honest negative result, and
-  why it is probably **measuring the harness, not the model**.
+- [OlmoEarth vs the RF baseline](olmoearth-vs-rf-baseline.md) — **a retraction, and a hypothesis
+  that failed.** The published RF 0.73 / OlmoEarth 0.46 result is withdrawn: the ground truth was
+  ~45% wrong, the model's time axis was averaged away, and the labels were four years older than
+  the imagery. Fixing the pooling was supposed to be the explanation — it wasn't (F1 0.021 →
+  0.065, against the baseline's 0.701). The twist: **the corrupted labels had been *flattering* the
+  foundation model**, because they rewarded predicting corridor membership, which a frozen
+  embedding is good at.
 
 ---
 
