@@ -18,6 +18,21 @@ normalized label. The crosswalk is mirrored in ``crosswalk.csv`` for inspection.
 Bonus: ``IC`` — *"Lowland Introduced Riparian Woodland and Scrub"* — is an authoritative
 **tamarisk / Russian-olive** label (the Stage-2 invasive class), free ground truth that
 the project otherwise lacks.
+
+LABEL VINTAGE — 2020. READ THIS BEFORE PICKING A DATE RANGE.
+    NMRipMap **v2.0 Plus** (Muldavin et al., 2023) was photo-interpreted from **NAIP 2020**
+    (1 m ortho), per the service's own layer metadata. The labels therefore describe the
+    corridor as it was in **2020**, not today.
+
+    **Fit and validate against imagery from the same year.** The 2026-07-12 fair test used
+    Sentinel-2 from *2024* against these 2020 labels — a 4-year gap over which corridors
+    genuinely move (beetle defoliation, floods, channel migration, restoration), which fed
+    every model label noise we introduced ourselves. It is worse for the invasive class than
+    for extent: riparian *extent* is fairly stable over four years; *Tamarix cover* is exactly
+    what the beetle has been changing since 2004.
+
+    Predict any year you like — but fit on 2020.
+    See docs/decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md.
 """
 
 from __future__ import annotations

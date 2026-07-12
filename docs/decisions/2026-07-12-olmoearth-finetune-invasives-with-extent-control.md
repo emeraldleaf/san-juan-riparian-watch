@@ -3,18 +3,63 @@
 **Date:** 2026-07-12 · **Status:** Accepted (planning) · **Supersedes:** nothing
 **Tracks:** issue #9 · **Scaffold:** `olmoearth_run_data/riparian_extent/`
 
+> **Revised 2026-07-12 (same day), after review.** The first draft of this ADR framed extent as
+> "already solved, therefore not a contribution" and treated the control as a throwaway benchmark.
+> That was wrong in two ways, and it also missed a live defect in the fair test. Both corrections
+> are folded in below; the two-step structure survives, with a much better justification.
+> §"The real axis is TIME" and §"Label vintage" are the new material.
+
 ## Context
 
-We are about to spend GPU time fine-tuning OlmoEarth. Two things constrain what that run
+We are about to spend GPU time fine-tuning OlmoEarth. Three things constrain what that run
 should target.
 
-**Extent is already solved.** CO-RIP (Woodward et al. 2018) mapped riparian corridor +
-vegetation for the entire Colorado Basin — including the San Juan — at median κ 0.80. Our own RF
-baseline reaches **pixel-level spatial-CV F1 0.90–0.92** on the NMRipMap-trained NM tiles. A
-successful extent fine-tune therefore buys a *benchmark*, not a contribution: "our foundation
-model matches a 2018 paper, and also beats the RF we wrote ourselves."
+### The real axis is TIME — for extent *and* invasives
 
-**Invasives is the actual gap.** Nobody has produced a wall-to-wall, time-series,
+**Every existing product is a single frozen epoch.** CO-RIP (Woodward et al. 2018) is one static
+raster. NMRipMap v2.0 Plus is one static map, photo-interpreted from **NAIP 2020**. Neither is a
+time series. **Nobody has an annual riparian product for this basin — of extent OR of species.**
+
+So "extent is solved" is too blunt. *Extent for one epoch* is solved. An **annual extent
+trajectory over the EO record is not**, and neither is annual native-vs-invasive cover. The
+contribution is the **time axis**, applied to both:
+
+1. Match CO-RIP / NMRipMap for **one epoch** → this is *calibration*: it proves the model is
+   trustworthy against an authoritative reference.
+2. Roll the same model across the **EO record** → annual extent trajectories **and** annual
+   invasive cover + spread.
+
+This reframes the extent control. It is not a throwaway benchmark; **it is the calibration that
+unlocks the time series.** A model you cannot trust for one epoch cannot be trusted for forty.
+
+**And the archive is deep.** OlmoEarth natively supports `LANDSAT` and `NAIP` modalities, not just
+`SENTINEL2` (verified: `Modality` enum in `olmoearth_pretrain_minimal`). For this AOI:
+
+| Sensor | Record starts | Annual maps | Note |
+|---|---|---|---|
+| Sentinel-2 | **2015-10** | ~10 | 10 m; what our pipeline uses today |
+| **Landsat** | **1984-04** | **~40** | 30 m; *and it is the sensor CO-RIP itself used* |
+| NAIP | — | — | 1 m; **the imagery NMRipMap was interpreted from** |
+
+> #### The beetle confound has no un-confounded PLACE — but it does have an un-confounded TIME
+>
+> We had written the *Diorhabda* confound off as unsolvable: the beetle reached virtually every
+> Upper Basin river by 2014, so there is no clean control *area* in the AOI. True — but the
+> beetle was only released in **2004–07**, and **Landsat reaches back to 1984**. That is a
+> **~20-year pre-beetle era** in which the late-season-senescence discriminator holds
+> uncontaminated.
+>
+> So the time axis does not merely *suffer* the confound — it is the only thing that can
+> **isolate** it: characterise Tamarix phenology pre-2004, then measure what defoliation does to
+> it afterward. This is a real experimental design and it exists only because of the temporal
+> record.
+>
+> Caveats, stated now: Landsat is 30 m against narrow corridors, and our NMRipMap labels are from
+> **2020 — post-beetle** — so applying them backwards is a domain shift, not a free lunch.
+
+### Invasives is the species gap
+
+Nobody has produced a wall-to-wall, time-series,
 native-vs-invasive cover product at reach scale — CSU call their occurrence points and the extent
 maps *"complementary products rather than a single integrated map of invasive versus native
 species."* And the discriminator for Tamarix is **late-season senescence phenology**, which is
@@ -39,9 +84,39 @@ harness (mean-pooling over time) and corrupted labels (~45% wrong). See
 `docs/olmoearth-vs-rf-baseline.md`. Repeating that mistake with a *more expensive* experiment is
 the failure mode this ADR exists to prevent.
 
+### Label vintage — train on imagery CONTEMPORANEOUS with the labels
+
+**This is a live defect, not a hypothetical.** NMRipMap's own service metadata says:
+
+> **NMRipMap Version 2.0 Plus** (Muldavin et al., **2023**) — *"a comprehensive review … leveraged
+> high-quality 1-meter resolution ortho-photography from **2020** (NAIP 2020)"*
+
+The labels were **photo-interpreted from 2020 imagery.** The fair test in
+`docs/olmoearth-vs-rf-baseline.md` was run on **Sentinel-2 from 2024** — a **4-year label/imagery
+gap**. We trained and scored 2020-vintage labels against 2024 reflectance, across which corridors
+genuinely move: beetle defoliation, floods, channel migration, restoration plantings.
+
+Consequences, stated precisely:
+
+- The **relative** RF-vs-OlmoEarth comparison **still stands** — both arms ate the same mismatch.
+- The **absolute** numbers are **pessimistic** for every arm. RF's 0.701 and OlmoEarth's 0.065 are
+  both depressed by label noise we introduced ourselves.
+- **For invasives it is much worse than for extent.** Riparian *extent* is fairly stable over four
+  years; *Tamarix cover* is not — it is exactly what the beetle has been changing since 2004. A
+  4-year gap is far more damaging to the species task than to the extent task.
+
+**Decision: train on Sentinel-2 from the 2020 growing season**, contemporaneous with NAIP 2020.
+S2 has covered the basin since 2015-10, so 2020 is fully available. Any epoch we *predict* may of
+course be any year — but the epoch we *fit and validate against NMRipMap* must be 2020.
+
+Generalised as a standing rule: **the training imagery year must match the label vintage.** If we
+later adopt CO-RIP as a label source, its imagery is Landsat of *its* epoch, not 2020 S2 — and the
+same rule applies.
+
 ## Decision
 
 **Run extent first, as a calibration control, in the same GPU session. Then retarget to invasives.**
+**Both fit on 2020 imagery, matching the label vintage.**
 
 ### Step 1 — Extent (the control)
 
@@ -74,11 +149,35 @@ It answers exactly one narrow question: **does our fine-tuning pipeline work at 
 > by ~0.2 F1 and manufacture a win. The 0.701 number belongs to the *frozen-embedding + RF-head*
 > experiment and stays there.
 
-### Step 2 — Invasives (the contribution)
+### Step 2 — Invasives (the species head)
 
-Same cube, same code path, same folds; swap the label layer to Tamarix / native / other using
+Same 2020 cube, same code path, same folds; swap the label layer to Tamarix / native / other using
 NMRipMap `L2 = IC` (introduced woody riparian). This is a head swap and a retrain, not a new
 pipeline.
+
+### Step 3 — Inference across the record (THE CONTRIBUTION)
+
+Steps 1 and 2 produce a *calibrated model*. Step 3 is what nobody has done: **run it over every
+year of the archive** and publish the trajectories.
+
+- **Extent over time** — an annual riparian-extent series. CO-RIP is one epoch; this is the
+  movie, not the frame. Novel on its own.
+- **Invasives over time** — annual native-vs-invasive cover, and therefore *spread and retreat*.
+  This is the product CSU explicitly say does not exist.
+- **The beetle window** — if Landsat is used, the series spans **pre-2004 (beetle-free)** through
+  the release years and after. That is the only way to separate "Tamarix senesces late" from
+  "defoliated Tamarix browns early", and it turns the confound from a threat into the subject.
+
+Sensor choice is a genuine open design question, not settled here:
+
+| | Reach | Resolution | Trade-off |
+|---|---|---|---|
+| Sentinel-2 only | 2016–now (~10 yr) | 10 m | Resolves narrow corridors; **misses the entire pre-beetle era** |
+| Landsat (or S2+Landsat) | 1984–now (~40 yr) | 30 m | Spans pre-beetle; **30 m may be too coarse** for the corridor |
+
+Decide it after Step 1, on evidence: if the 10 m control barely resolves the corridor, 30 m Landsat
+will not, and the pre-beetle ambition has to be scoped down or fused (S2 for resolution, Landsat
+for reach). Do not commit to Landsat before we know the model works at 10 m.
 
 ### The decision table
 
