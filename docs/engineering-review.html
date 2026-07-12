@@ -1216,16 +1216,55 @@ emb = tokens.mean(dim=(3, 4)).squeeze(0)   <span class="c"># (P_H, P_W, D)</span
           vectorise-and-write path as the baseline.
         </p>
 
+        <div class="callout scrutiny">
+          <span class="chip">Retracted</span>
+          <p>
+            <strong>The result this section originally reported — RF F1 0.73 vs OlmoEarth F1 0.46 — is
+            withdrawn.</strong> It was invalid for three independent reasons found afterwards, and the
+            explanation offered for it turned out to be wrong too. Both the numbers and the reasoning
+            are corrected below rather than quietly deleted, because how a wrong result gets caught is
+            the more useful thing to show.
+          </p>
+        </div>
+
+        <p>
+          Three defects, all found after publishing:
+        </p>
+        <ol>
+          <li>
+            <strong>The ground truth was ~45% wrong.</strong> <code>fetch_nmripmap</code> rasterised
+            <em>every</em> NMRipMap polygon as riparian. On this AOI 341 polygons are mapped but only
+            <strong>189 are woody riparian</strong> — the rest are developed, agriculture, upland and
+            water, all of which were being taught to both models as riparian.
+          </li>
+          <li>
+            <strong>The foundation model's time axis was averaged away</strong> before the classifier
+            ever saw it (the mean-pooling described below).
+          </li>
+          <li>
+            <strong>The labels and the imagery were four years apart.</strong> NMRipMap v2.0 Plus was
+            photo-interpreted from <strong>NAIP 2020</strong>; the run used <strong>Sentinel-2
+            2024</strong>. Corridors move in four years — defoliation, floods, channel migration — so
+            every model was fed label noise we introduced ourselves.
+          </li>
+        </ol>
+
+        <p>
+          The re-run below fixes the labels and the pooling, holds everything else constant (same AOI,
+          same patch grid, same spatial folds, same RandomForest head), and varies only the
+          <em>representation</em>:
+        </p>
+
         <div class="verdict">
           <div class="stat win">
             <span class="label">Random forest</span>
-            <span class="value">F1 0.73</span>
-            <span class="foot">22 hand-designed features · 5-fold spatial CV</span>
+            <span class="value">F1 0.701</span>
+            <span class="foot">22 hand features · corrected labels · AUC 0.951</span>
           </div>
           <div class="stat lose">
-            <span class="label">OlmoEarth-Nano</span>
-            <span class="value">F1 0.46</span>
-            <span class="foot">learned embeddings · same labels, same folds</span>
+            <span class="label">OlmoEarth v1.1-Nano</span>
+            <span class="value">F1 0.065</span>
+            <span class="foot">phenology-preserving pooling · same folds · AUC 0.634</span>
           </div>
         </div>
 
@@ -1255,25 +1294,90 @@ emb = tokens.mean(dim=(3, 4)).squeeze(0)   <span class="c"># (P_H, P_W, D)</span
         </div>
 
         <p>
-          That last row is the one that matters. Mean-pooling across the time axis <strong>discards the
+          The obvious suspect was the last row. Mean-pooling across the time axis <strong>discards the
           phenology signal</strong> — and phenology is the entire thesis of this project (phreatophytes
           stay green into the dry season because their roots reach groundwater, while the uplands brown
-          out). The foundation model was denied the one thing it exists to exploit, and then judged for
-          failing. So “RF 0.73 beat OlmoEarth 0.46” most likely reads as <em>“a random forest beat a
-          crippled Nano.”</em> The honest verdict is that this <strong>measured the harness, not the
-          model</strong>. A re-run under the published recipe is scaffolded at
-          <code>olmoearth_run_data/riparian_extent/</code>; either outcome is publishable, but the
-          current comparison should not be cited as evidence about foundation models.
+          out). The model was denied the one thing it exists to exploit, and then judged for failing.
+          That defect is real, and it is now pinned by a unit test that builds two classes with
+          <strong>identical seasonal means and different trajectories</strong>: under mean-pooling they
+          collapse to the same vector and no classifier can separate them; with the trajectory preserved
+          they separate perfectly.
         </p>
+
+        <div class="callout scrutiny">
+          <span class="chip">The hypothesis was wrong</span>
+          <p>
+            Fixing the pooling <strong>did not rescue the model</strong>. F1 goes from 0.021 to 0.065 —
+            roughly triples, on <em>both</em> checkpoints — against the baseline's 0.701. It comes
+            nowhere close. <strong>Mean-pooling does not explain the gap.</strong> A defect being real
+            does not make it the cause, and it was tempting to stop at the satisfying story.
+          </p>
+          <p>
+            The more interesting finding is the opposite of the one expected: <strong>the corrupted
+            labels had been flattering the foundation model, not handicapping it.</strong> The old
+            labels rewarded predicting <em>corridor membership</em> — urban, agriculture, water and
+            upland inside the valley all counted as riparian — and a frozen foundation-model embedding
+            is good at exactly that: landform and context. Score it on the real task (woody riparian
+            vegetation, not the valley it sits in) and its F1 falls from 0.46 to 0.065.
+          </p>
+        </div>
+
+        <p>
+          So the honest statement is narrower than either the original claim or its correction. Every
+          arm above is a <strong>frozen encoder feeding a scikit-learn RandomForest</strong> — a
+          configuration Ai2 endorses nowhere. What remains genuinely untested is OlmoEarth
+          <em>as Ai2 actually uses it</em>: a fine-tuned <code>BASE</code> with a
+          <code>SegmentationPoolingDecoder</code>. That run needs a GPU and is scaffolded at
+          <code>olmoearth_run_data/riparian_extent/</code>. Until it exists, none of this should be
+          cited as evidence about foundation models.
+        </p>
+
+        <div class="callout">
+          <span class="chip">What the fine-tune is actually for</span>
+          <p>
+            And when it runs, the target is <strong>not</strong> extent. Extent for a single epoch is
+            solved — CO-RIP mapped the whole Colorado Basin, San Juan included, at κ 0.80 in 2018.
+            <strong>But every existing product is one frozen epoch.</strong> CO-RIP is a single raster;
+            NMRipMap is a single 2020 map. Nobody has an <em>annual</em> riparian product for this
+            basin — of extent or of species.
+          </p>
+          <p>
+            So the contribution is the <strong>time axis</strong>: match the reference for one epoch as
+            <em>calibration</em>, then run the model across the archive for annual extent trajectories
+            and annual native-vs-invasive cover. That also cracks a problem we had written off. The
+            tamarisk beetle (<em>Diorhabda</em>) was released on the San Juan in 2004–07 and defoliated
+            tamarisk <strong>browns early</strong>, inverting the late-senescence signal the whole
+            detection literature relies on — so there is no un-confounded <em>place</em> left in the
+            basin. But OlmoEarth ingests Landsat, whose record starts in <strong>1984</strong>. There
+            is no un-confounded place; there is a <strong>twenty-year un-confounded <em>time</em></strong>.
+          </p>
+        </div>
 
         <div class="callout scrutiny">
           <span class="chip">Scrutinize</span>
           <p>
-            An honest critic should note the comparison is not perfectly clean: the FM path operates at
-            patch resolution with majority-vote labels and a different CV block size (0.004° vs 0.02°),
-            so the two models are not scored on identical fold geometry. The direction of the result is
-            probably robust — a 0.27 F1 gap is not a fold artefact — but the exact margin should not be
-            quoted to two decimal places as a like-for-like.
+            The re-run fixed the fold-geometry objection that stood here before — both arms are now
+            scored on the same patch grid, the same labels and the same folds, with the same head, so
+            only the representation varies. Two caveats survive, and one is ours.
+          </p>
+          <p>
+            <strong>The labels are still four years older than the imagery</strong> (NAIP 2020 vs
+            Sentinel-2 2024). Both arms ate the same mismatch, so the <em>comparison</em> holds — but
+            every absolute number on this page is <strong>pessimistic</strong>, and a future run must
+            fit on 2020 imagery to match the label vintage. Second: <strong>80&nbsp;m patches are coarse
+            against a narrow corridor</strong>, which is consistent with the collapse being in
+            <em>recall</em> (0.04) rather than in ranking (AUC 0.63) — the embeddings carry real signal
+            the head cannot convert into detections at threshold.
+          </p>
+          <p>
+            One methodological trap worth naming, because it nearly produced a second false finding: a
+            sanity probe asking “can the embeddings predict their own patch's NDVI?” returned
+            <strong>AUC 0.23</strong> — far <em>below</em> chance, which looks like a catastrophically
+            broken encoder. It wasn't. <code>cross_val_score</code> defaults to an
+            <strong>unshuffled</strong> KFold, so on a raveled spatial grid the folds are contiguous
+            spatial bands and the learned relationship inverts across them. Shuffled, the same
+            embeddings score <strong>0.85</strong>. A bad number is a claim about your harness until you
+            prove otherwise — which is the lesson this entire section keeps re-teaching.
           </p>
         </div>
       </section>

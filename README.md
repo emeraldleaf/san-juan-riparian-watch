@@ -12,6 +12,29 @@ The stack is a STAC Earth-observation ETL, a PostGIS spatial database, a Python 
 (a RandomForest baseline measured head-to-head against the **OlmoEarth** foundation model),
 a .NET Aspire-orchestrated C# REST API, and a React + MapLibre map frontend.
 
+> ### What is actually new here — the time axis
+>
+> Riparian extent for **one epoch** is already solved: CO-RIP (Woodward et al. 2018) mapped the
+> whole Colorado Basin, San Juan included, at median κ 0.80. Building another RF extent classifier
+> is not a contribution, and this repo says so.
+>
+> **But every existing product is a single frozen epoch.** CO-RIP is one raster; NMRipMap is one
+> 2020 map; CSU's 3,000+ tamarisk points are occurrences, not a map — CSU themselves call these
+> *"complementary products rather than a single integrated map of invasive versus native species."*
+> **Nobody has an annual riparian product for this basin — of extent *or* of species.**
+>
+> So the goal is the **time axis**: match the authoritative reference for one epoch as
+> *calibration*, then run the model across the Earth-observation record to produce
+> **riparian extent over time** and **native-vs-invasive cover over time** — spread, retreat, and
+> change at reach scale.
+>
+> That also cracks a problem we had written off. The tamarisk beetle (*Diorhabda*) was released on
+> the San Juan in **2004–07**, and defoliated *Tamarix* **browns early** — inverting the
+> late-senescence signal the entire detection literature depends on. There is no un-confounded
+> *place* left in the basin. But Landsat's record starts in **1984**: there is a **twenty-year
+> un-confounded *time***. See
+> [the fine-tune ADR](docs/decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md).
+
 [![ci-python](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-python.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-python.yml)
 [![ci-dotnet](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-dotnet.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-dotnet.yml)
 [![ci-frontend](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/emeraldleaf/san-juan-riparian-watch/actions/workflows/ci-frontend.yml)
@@ -106,8 +129,21 @@ independent reference-layer validation, not a single inflated accuracy number.
 Also landed: a **HAND (Height Above Nearest Drainage)** valley-bottom envelope (Stage 1A),
 a **per-reach** processor (NHD flowlines → ~250 m reaches → `%riparian_cover`), an
 **invasive-species** labeling module (NMRipMap → tamarisk / Russian-olive labels), an
-**OlmoEarth** embedding scaffold (the foundation-model contender, finished on a GPU VM),
-and **reference-layer validation** against NMRipMap (NM) with CO-RIP planned for Colorado.
+**OlmoEarth** embedding scaffold (the foundation-model contender), and **reference-layer
+validation** against NMRipMap (NM) with CO-RIP planned for Colorado.
+
+> **On the OlmoEarth result: the published RF-beats-the-foundation-model number is retracted.**
+> It was scored against ground truth that was ~45% wrong, with the model's time axis averaged away,
+> against imagery four years newer than the labels. The obvious fix — restore the time axis — was
+> tested and **did not explain the gap**. The twist is that the corrupted labels had been
+> *flattering* the foundation model, not handicapping it. What remains untested is OlmoEarth **as
+> Ai2 actually uses it** (fine-tuned `BASE` + `SegmentationPoolingDecoder`, not a frozen Nano
+> feeding a scikit-learn RandomForest). Full story, with the numbers:
+> [OlmoEarth vs the RF baseline](docs/olmoearth-vs-rf-baseline.md).
+>
+> **Label vintage matters:** NMRipMap v2.0 Plus was photo-interpreted from **NAIP 2020**, so models
+> are fit on **2020** imagery and may *predict* any year. Fitting 2020 labels against 2024
+> reflectance is label noise you inflict on yourself.
 
 ---
 

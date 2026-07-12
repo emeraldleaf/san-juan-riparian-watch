@@ -71,6 +71,24 @@ condition ∨ negative trend ∨ high LUI).
 Two delineation/condition methods run side by side: the **baseline**
 (interpretable, paper-grounded land-cover masking + indices) and the
 **foundation model** (OlmoEarth multimodal embeddings). Compared head-to-head.
+The published head-to-head is **retracted** — see `docs/olmoearth-vs-rf-baseline.md`.
+
+### Label vintage
+**The year the reference labels describe, which is not the year you fetched them.**
+NMRipMap v2.0 Plus (2023) was photo-interpreted from **NAIP 2020**, so it describes the
+corridor as it was in **2020**. Rule: **fit and validate on imagery from the label's year;
+predict any year.** Fitting 2020 labels against 2024 reflectance is label noise you inflict
+on yourself — and it is worst for **invasive cover**, which is exactly what the beetle has
+been changing since 2004. See CLAUDE.md.
+
+### Calibration vs. contribution (the time axis)
+**Calibration** = matching an authoritative reference for **one epoch** (CO-RIP, NMRipMap).
+Necessary, but not novel — CO-RIP already did it basin-wide at κ 0.80.
+**Contribution** = the **time axis**: every existing product is one frozen epoch, so an
+*annual* series of riparian **extent** and of **native-vs-invasive cover** is what nobody has.
+The beetle makes this necessary rather than optional: there is no un-confounded *place* left in
+the basin, but Landsat reaches **1984** and *Diorhabda* arrived **2004–07**, so there is a
+~20-year un-confounded *time*. See CLAUDE.md.
 
 ### Medallion (bronze / silver / gold)
 One-directional data flow: bronze (raw ingest) → silver (spatial processing,

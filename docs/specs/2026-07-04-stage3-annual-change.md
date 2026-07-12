@@ -4,6 +4,32 @@
 (`riparian_probability` per composite) and Stage-2 condition. See
 [Stage-1 spec](2026-07-03-stage1-riparian-delineation.md).
 
+> ## This stage IS the contribution (added 2026-07-12)
+>
+> Stages 1 and 2 are calibration; **Stage 3 is the deliverable.** Riparian extent for a *single
+> epoch* is solved — CO-RIP mapped the whole Colorado Basin, San Juan included, at κ 0.80. But
+> **every existing product is one frozen epoch**: CO-RIP is one raster, NMRipMap is one 2020 map,
+> CSU's tamarisk data are points not a map. **Nobody has an annual riparian product for this basin
+> — of extent *or* of species.**
+>
+> So the two products this stage emits are both novel:
+> 1. **Riparian extent over time** — the movie, not the frame.
+> 2. **Native-vs-invasive cover over time** — spread and retreat at reach scale, the product CSU
+>    explicitly say does not exist.
+>
+> **The beetle makes the temporal record necessary, not merely nice.** *Diorhabda* was released on
+> the San Juan in **2004–07**, and defoliated *Tamarix* **browns early** — inverting the
+> late-senescence discriminator the whole detection literature relies on. There is no un-confounded
+> *place* left in the basin. But **Landsat's record starts in 1984**, so there is a **~20-year
+> un-confounded *time***: characterise Tamarix phenology pre-beetle, then measure what defoliation
+> did to it. Only a time series can separate "Tamarix senesces late" from "defoliated Tamarix
+> browns early".
+>
+> Sensor trade-off is open and decided on evidence, not in advance: **Sentinel-2** is 10 m but only
+> reaches 2015-10 (misses the pre-beetle era entirely); **Landsat** reaches 1984 but at 30 m, which
+> may be too coarse for a narrow corridor. See
+> [the fine-tune ADR](../decisions/2026-07-12-olmoearth-finetune-invasives-with-extent-control.md).
+
 ## Goal
 
 Produce **annual** change products for (a) riparian *extent* boundaries and (b) riparian
@@ -34,6 +60,11 @@ Produce **annual** change products for (a) riparian *extent* boundaries and (b) 
 - **Baseflow / late-summer** (persistence): groundwater-subsidy signal — separates true
   riparian from seasonal uplands. San Juan Basin default: leaf-on Jun–Aug, baseflow Aug–Sep.
 - The *same* windows for every year with data.
+
+> **Predicting every year ≠ fitting on every year.** The model is *applied* across the record, but
+> it is **fit on the label's own year** — NMRipMap v2.0 Plus is NAIP-2020-derived, so training and
+> validation use **2020** imagery (see "label vintage" in CONTEXT.md). Fitting on a year the labels
+> do not describe injects label noise into the very baseline every later year is compared against.
 
 ## Outputs
 
