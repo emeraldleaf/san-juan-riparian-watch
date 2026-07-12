@@ -48,11 +48,19 @@ inverting the discriminator the entire literature depends on. So a greenness dec
 reach **is not recovery** — it may be biocontrol working. There is no un-confounded control area
 inside the study area.
 
-**The actual gap.** CO-RIP gives extent *without species*. CSU/NREL's 2018 dataset gives 3,000+
-tamarisk/Russian-olive occurrence points *without a map* — they call these
-*"complementary products rather than a single integrated map of invasive versus native species."*
-**Nobody has joined them.** A wall-to-wall, time-series, **native-vs-invasive cover and change**
-product at reach scale is what this project is for.
+**The actual gap — corrected 2026-07-12, against ourselves.** We used to say *"CSU produced points,
+not a map; nobody has joined them."* **That was wrong**, and an audit of the source report (rather
+than its web page) found it. **Evangelista et al. (2018)** shipped riparian-vegetation maps for
+**2006, 2016 and the change between them**, and Russian-olive maps **on the San Juan for 2006 and
+2016**.
+
+The gap survives, narrower and better grounded — **in the incumbent's own words**. They report that
+**Landsat cannot resolve the tamarisk phenological signature** (*"without a different sensor with
+greater spectral or grain resolution this is a difficult constraint to overcome"*), and that
+**beetle defoliation confounded their models**. Theirs is **2-epoch, 30 m, beetle-confounded**.
+
+**What does not exist: an annual, 10 m, beetle-aware, wall-to-wall native-vs-invasive product.**
+That is what this project is for — and their recommendation is, in effect, its specification.
 
 ---
 

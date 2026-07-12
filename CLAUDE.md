@@ -20,7 +20,11 @@ This repo uses the NextAurora **encoding-loop method**: rules encoded across 5 s
 skills, `docs/` + diagrams) × 3 enforcement tiers, kept from drifting by mechanical hooks.
 - **Shared vocabulary:** `CONTEXT.md` (riparian science + method terms)
 - **Procedures:** `/feature-spec`, `/check-rules`, `/sync-status`, `/add-endpoint`,
-  `/add-etl-step`, `/add-map-layer` in `.claude/commands/`
+  `/add-etl-step`, `/add-map-layer`, **`/paper-audit`** in `.claude/commands/`
+- **`/paper-audit` — run it on any relevant paper.** Our contribution is a *novelty claim*
+  ("nobody has produced a wall-to-wall, time-series, native-vs-invasive product"), and **one paper
+  can falsify it.** We learned CO-RIP had already solved basin-wide extent by *reading*, not by any
+  gate — late. The audit actively tries to falsify the claim and can return **THREAT**.
 - **Lean canon:** keep this file under **500 lines** (soft 400). Detail beyond a
   one-paragraph headline moves to a paired `docs/` doc; the paraphrase ends with
   `See CLAUDE.md` so the `check-claude-md-refs.sh` hook can find it.
