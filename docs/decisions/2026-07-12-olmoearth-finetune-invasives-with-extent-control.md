@@ -160,8 +160,13 @@ pipeline.
 Steps 1 and 2 produce a *calibrated model*. Step 3 is what nobody has done: **run it over every
 year of the archive** and publish the trajectories.
 
-- **Extent over time** — an annual riparian-extent series. CO-RIP is one epoch; this is the
-  movie, not the frame. Novel on its own.
+- **Extent over time** — an **annual, automated, wall-to-wall, satellite-derived** riparian-extent
+  series. CO-RIP is one epoch; this is the movie, not the frame.
+  ⚠️ **Every qualifier there is load-bearing.** *Extent over time* alone is **not** novel:
+  [Perkins et al. (2025)](../audits/2026-07-12-perkins-2025-canyonlands.md) mapped riparian vegetated
+  area in Canyonlands from **1940 to 2022** — further back than Landsat reaches. But theirs is
+  **aerial imagery, discrete dates, 152 km of one national park, *area* not species, and no beetle**.
+  Never state the flat claim.
 - **Invasives over time** — annual native-vs-invasive cover, and therefore *spread and retreat*.
   This is the product CSU explicitly say does not exist.
 - **The beetle window** — if Landsat is used, the series spans **pre-2004 (beetle-free)** through
