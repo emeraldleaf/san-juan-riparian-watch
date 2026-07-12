@@ -374,6 +374,52 @@ sources:
     # signature, and that beetle defoliation confounded their models. Both limits are the spec for
     # this project. Ingest so the RAG answers from the primary source, not our summary of it.
 
+  # --- Our own prior-art audits (docs/audits/) -----------------------------------
+  # Ingested as SUMMARIES, not as sources. They are dense, quote-bearing syntheses of the
+  # prior art with an explicit verdict, so they answer "what has already been done, and why
+  # is X not novel?" better than any single paper does.
+  #
+  # PROVENANCE WARNING — doc_type: audit. These are OUR readings of other people's work.
+  # The primary sources are ingested too (evangelista-2018, CO-RIP, the tamarisk papers), and
+  # a citation to an audit must never be mistaken for a citation to the source. If the RAG
+  # answers a factual question about a paper, it should be answering from the paper. The audit
+  # is for the question "has this been done before, and what did it do to our claims?"
+  - id: audit-evangelista-2018-csu-nrel
+    title: "Prior-art audit — Evangelista et al. (2018), CSU/NREL (verdict: RETRACTS)"
+    agency: this project (docs/audits/)
+    url: https://emeraldleaf.github.io/san-juan-riparian-watch/audits/2026-07-12-evangelista-2018-csu-nrel.html
+    year: 2026
+    doc_type: audit
+    format: html
+    license: project
+    geo_focus: true
+    fetch: auto
+    topics: [prior-art, tamarisk, russian-olive, change-detection, beetle, novelty]
+
+  - id: audit-corip-woodward-2018
+    title: "Prior-art audit — CO-RIP (Woodward et al. 2018) (verdict: RETRACTS)"
+    agency: this project (docs/audits/)
+    url: https://emeraldleaf.github.io/san-juan-riparian-watch/audits/2026-07-11-corip-woodward-2018.html
+    year: 2026
+    doc_type: audit
+    format: html
+    license: project
+    geo_focus: true
+    fetch: auto
+    topics: [prior-art, riparian-extent, random-forest, novelty]
+
+  - id: audit-tamarisk-detection-established
+    title: "Prior-art audit — tamarisk detection is established (verdict: RETRACTS)"
+    agency: this project (docs/audits/)
+    url: https://emeraldleaf.github.io/san-juan-riparian-watch/audits/2026-07-11-tamarisk-detection-established.html
+    year: 2026
+    doc_type: audit
+    format: html
+    license: project
+    geo_focus: true
+    fetch: auto
+    topics: [prior-art, tamarisk, phenology, senescence, novelty]
+
 # ---------------------------------------------------------------------------
 # Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
 # 1 hop), then re-listed above with concrete ids before ingest for reproducibility.

@@ -99,12 +99,30 @@ Include: the citation; the specific claim; which surface it hits; what changes; 
 THREAT — **what remains ours** after conceding the point. (CO-RIP took extent; the time axis and
 the species split survived. Do that analysis honestly rather than reflexively defending.)
 
+### 6. WRITE THE AUDIT DOWN — this step is not optional
+
+Persist it as **`docs/audits/YYYY-MM-DD-<first-author>-<year>.md`**, and add a row to
+**`docs/audits/README.md`** (the falsification log).
+
+**Do not skip this because the conclusion has already been propagated into the docs.** That is
+exactly what happened with the CSU/NREL audit: the *conclusions* reached six files within the hour,
+while the *evidence and reasoning* existed only in a pull-request body — not citable, not
+reproducible, and invisible to a reader of the repo.
+
+The record must contain the **verbatim quotes** that did the work. A paraphrase of a falsifying quote
+is not evidence; the next person cannot check it, and neither can a reviewer.
+
+This directory **is** the related-work section of any publication from this project — written to
+*attack* the contribution rather than to justify it. `docs/audits/README.md` explains why that is
+worth publishing.
+
 ## Output shape
 
 1. **Paper** — citation, year, sensor/resolution, study area, label source + vintage
 2. **Claims** — 5–10 bullets
 3. **Coverage map** — a table: claim → surface → quoted rule → covered / gap / threat
 4. **Verdict** — one of the six, with the reason
-5. **Draft issue body** — only if GAP / THREAT / RETRACTS
+5. **The audit record** — written to `docs/audits/`, logged in `docs/audits/README.md`
+6. **Draft issue body** — only if GAP / THREAT / RETRACTS
 
 See CLAUDE.md.
