@@ -135,6 +135,13 @@ weakest gate; it now has the newest one. Two things are worth stating plainly:
    returns whatever you told it to; it cannot tell you that `TRUNCATE ... CASCADE` silently took your
    dependent table with it. That needed a real database, and now CI runs one.
 
+   **It proved itself on its first run, at my expense.** The new live-DB test hard-coded
+   `buffer_id = 1` when rebuilding after the wipe — and PostgreSQL rejected it with a
+   `ForeignKeyViolation`, because `TRUNCATE` does **not** reset the `SERIAL` sequence: the rebuilt row
+   lands on a fresh id. **A mock would have accepted `buffer_id = 1` without complaint.** The gate
+   caught a false assumption in the very test written to demonstrate it. That is the argument for
+   running the SQL for real, made better than any paragraph could.
+
 **What this did NOT fix:** the frontend still has no test runner, there is still no coverage
 measurement, and `BannedApiAnalyzers` is still unwired — deliberately, because sync-over-async has
 **never once been violated** in this repo, and the method's own rule is *do not mechanize a rule that

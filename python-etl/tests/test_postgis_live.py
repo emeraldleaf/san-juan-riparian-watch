@@ -110,16 +110,30 @@ class TestFkCascadeWipesDependents:
                 c.execute(text("TRUNCATE silver.riparian_buffers"))
 
     def test_the_fix_is_to_rebuild_dependents_after_the_wipe(self, engine) -> None:
-        """`analyze_buffer_wetlands()` must run in `run()`; it had been commented out."""
+        """`analyze_buffer_wetlands()` must run in `run()`; it had been commented out.
+
+        NB — the rebuilt buffer does NOT get id 1. `TRUNCATE` (without `RESTART IDENTITY`) leaves the
+        SERIAL sequence where it was, so the new row lands on a fresh id. The rebuild must therefore
+        reference the id the database actually assigned, not the one it had last run.
+
+        This test was originally written with a hard-coded `buffer_id = 1` and the live database
+        rejected it with a ForeignKeyViolation. **A mock would have accepted it happily** — which is
+        the entire argument for running the SQL for real.
+        """
         with engine.begin() as c:
             c.execute(text("TRUNCATE silver.riparian_buffers CASCADE"))
-            c.execute(text("""
+            new_id = c.execute(text("""
                 INSERT INTO silver.riparian_buffers (stream_id, geom) VALUES
                   (1, ST_GeomFromText('POLYGON((-108 37, -108 37.01, -107.99 37.01, -108 37))', 4269))
-            """))
-            # the rebuild step that was missing
-            c.execute(text("INSERT INTO silver.buffer_wetlands (buffer_id, acres) VALUES (1, 3.5)"))
+                RETURNING id
+            """)).scalar_one()
+            # the rebuild step that had been commented out of run()
+            c.execute(
+                text("INSERT INTO silver.buffer_wetlands (buffer_id, acres) VALUES (:bid, 3.5)"),
+                {"bid": new_id},
+            )
 
+        assert new_id != 1, "TRUNCATE does not reset the sequence — do not assume stable ids"
         assert _count(engine, "silver.buffer_wetlands") == 1
 
 
