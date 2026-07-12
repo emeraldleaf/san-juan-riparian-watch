@@ -63,10 +63,14 @@ It solves three problems NMRipMap cannot:
 labels at all** before this.
 
 🔴 **Two constraints, verified by downloading and counting — do not skip these:**
-1. **Only ~148 points fall inside the San Juan basin** (45 Russian olive, 37 tamarisk, 4 live/dead
-   mix). Enough to **split the species locally** and to validate — **not** enough to train alone.
-2. **No `red tam` points in our AOI.** All 283 are in Arizona / Escalante. Defoliation must be learned
-   basin-wide and **transferred**, or the AOI widened. We cannot locally validate it from this dataset.
+1. **Only 167 points fall inside the San Juan basin** — 49 Russian olive, 47 tamarisk, 39 native
+   riparian woody, 13 agriculture, 10 absence. Enough to **split the species locally** and to
+   validate — **not** enough to train alone. *(Counted by `riparian/labels/csu_points.py`, which
+   supersedes an earlier rough bbox estimate of ~148.)*
+2. 🔴 **Zero `red tam` (defoliated) points in our AOI** — all 283 are Arizona / Escalante. The AOI has
+   only **4 `mixed`** beetle-affected points. **Defoliation must be learned basin-wide and
+   transferred, or the AOI widened.** We cannot locally validate the beetle signal from this dataset,
+   and that is the single most important scoping fact for Stage 2.
 3. 🐛 **The `Virgin_River` trip has x/y TRANSPOSED** in the source file (`x` holds 35.8–38.6, `y` holds
    −114…−108). A naive loader puts 119 points in the wrong hemisphere. Also normalize the casing —
    `Russian olive` / `Russian Olive` / `tamarisk` / `Tamarisk` are all present. Crosswalk it like
