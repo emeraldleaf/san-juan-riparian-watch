@@ -81,6 +81,16 @@ That is what this project is for — and their recommendation is, in effect, its
 - [Document-intelligence subsystem](decisions/2026-07-04-document-intelligence-subsystem.md)
 - [NextAurora rules applicability](decisions/2026-07-04-nextaurora-rules-applicability.md)
 
+## The method — AI-assisted research that catches its own errors
+
+- [**The method**](method.md) — **a companion to the science, not a footnote to it.** The failure mode
+  of AI-assisted research is work that is fast, fluent, plausible and **wrong**, and invisible
+  precisely because it looks finished. Exhortation does not fix that; **gates do.** Every mechanism is
+  justified by a dated failure it actually caught — including the retracted result that stayed live on
+  this very site, the novelty claim a 2018 paper had already falsified, and the hypothesis we tested
+  and **disproved**. Also records what *didn't* work: **every documentation-only surface drifted**, and
+  a broken gate is worse than no gate because it reports "clean".
+
 ## Prior-art audits — the falsification log
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim

@@ -420,6 +420,18 @@ sources:
     fetch: auto
     topics: [prior-art, tamarisk, phenology, senescence, novelty]
 
+  - id: project-method-ai-assisted-research
+    title: "The method — AI-assisted research that catches its own errors"
+    agency: this project (docs/method.md)
+    url: https://emeraldleaf.github.io/san-juan-riparian-watch/method.html
+    year: 2026
+    doc_type: method
+    format: html
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [method, encoding-loop, drift, retraction, falsification, ai-engineering]
+
 # ---------------------------------------------------------------------------
 # Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
 # 1 hop), then re-listed above with concrete ids before ingest for reproducibility.
