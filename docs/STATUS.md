@@ -107,6 +107,13 @@ Two of our components **substantially reproduce published work**. Say so; do not
   That — plus weak labels mined from authoritative GIS and an EO-foundation-model fine-tune — is the
   contribution. Their own recommendation is, in effect, a specification for it.
   See `docs/literature-review.md` and `docs/specs/2026-07-11-stage2-invasives-tamarix.md`.
+- 🔴 **CO-RIP is weakest exactly where we want it.** Vintage **2006 / 2016** (Landsat, 30 m — resolved
+  from the source team's report; the Dryad page never states it). But the authors report **OOB error
+  2–35% BY ECOREGION**, worst in the north/mountains, and warn the map **over-predicts riparian
+  vegetation at high elevation**. **Turkey Creek is Southern Rockies** — northern, mountainous, high
+  elevation. So CO-RIP is a **confidence-weighted weak label in Colorado (0.55), not ground truth**.
+  An over-predicting label is worse than a missing one: it teaches the model that upland IS riparian.
+  Loader: `riparian/labels/corip.py`.
 - Free ground truth found: NMRipMap `L2 = IC` ("Lowland **Introduced** Riparian Woodland and
   Scrub") = **332 tamarisk/Russian-olive polygons on the Animas alone** — but it *conflates* the
   two species; the CSU points can split them.
