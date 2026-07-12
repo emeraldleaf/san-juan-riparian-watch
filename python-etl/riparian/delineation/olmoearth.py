@@ -41,6 +41,11 @@ from riparian.datacube.stac import (
     spatial_dims,
 )
 from riparian.delineation.baseline import predict_proba, train
+from riparian.delineation.pooling import (  # re-exported: keep `from ...olmoearth import pool_tokens` working
+    DEFAULT_POOLING,
+    MAX_MODEL_TIMESTEPS,
+    pool_tokens,
+)
 from riparian.delineation.runner import _cv_estimator, _vectorize, _write_extent
 from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
 from riparian.validation.reference import fetch_nmripmap, rasterize_mask
@@ -51,9 +56,19 @@ logger = logging.getLogger(__name__)
 OLMOEARTH_S2_ORDER = list(Modality.SENTINEL2_L2A.band_order)
 DEFAULT_PATCH_SIZE = 8
 S2_SCALE = 1e-4  # DN → reflectance
-# S2 L2A is tokenized in 3 band-sets (by native resolution); the token mask carries
-# a trailing band-set axis (see build_sample). flexi_vit stacks per-band-set masks.
-S2_NUM_BAND_SETS = 3
+
+# S2 L2A is submitted in band-sets grouped by native resolution; the token mask carries
+# a trailing band-set axis (see build_sample). Read it from the Modality rather than
+# hard-coding 3 — this is an INPUT contract and must track the library, not our memory.
+S2_NUM_BAND_SETS = Modality.SENTINEL2_L2A.num_band_sets
+
+# v1.1 is the default: it merges the S2 bands into single tokens, so the encoder emits
+# ~3x fewer tokens for the same cube (measured: the band-set axis of the returned tokens
+# is 1 for v1.1 vs 3 for v1) at the same D. The INPUT mask still carries all
+# `S2_NUM_BAND_SETS` band-sets — the merge happens inside the encoder — so build_sample
+# is unchanged and pool_tokens' band-set mean is simply a no-op on v1.1. Cheaper, and
+# it is the checkpoint Ai2 now recommends.
+DEFAULT_MODEL_ID = ModelID.OLMOEARTH_V1_1_NANO
 
 
 @dataclass(frozen=True)
@@ -61,20 +76,24 @@ class EmbeddingGrid:
     """Per-patch OlmoEarth embeddings over an AOI.
 
     Attributes:
-        data: ``(P_H, P_W, D)`` float32 patch embeddings.
+        data: ``(P_H, P_W, F)`` float32 patch features. ``F`` depends on the pooling:
+            ``D`` for ``mean_time``, ``4*D`` for ``temporal_stats``, ``T*D`` for
+            ``concat_time``.
         patch_size: Patch size (pixels) used by the encoder.
         y_coords: latitude coordinate values of the source pixel grid.
         x_coords: longitude coordinate values of the source pixel grid.
+        pooling: Which temporal pooling produced ``data``.
     """
 
     data: np.ndarray
     patch_size: int
     y_coords: np.ndarray
     x_coords: np.ndarray
+    pooling: str = "mean_time"
 
 
 def load_olmoearth(
-    model_id: ModelID = ModelID.OLMOEARTH_V1_NANO, *, weights: bool = True,
+    model_id: ModelID = DEFAULT_MODEL_ID, *, weights: bool = True,
 ) -> torch.nn.Module:
     """Load an OlmoEarth encoder in eval mode (CPU-friendly for Nano)."""
     model = load_model_from_id(model_id, load_weights=weights)
@@ -155,35 +174,38 @@ def _ymd(t: np.datetime64) -> list[int]:
 def extract_embeddings(
     model: torch.nn.Module, cube: xr.Dataset,
     bbox: tuple[float, float, float, float],
-    *, patch_size: int = DEFAULT_PATCH_SIZE,
+    *, patch_size: int = DEFAULT_PATCH_SIZE, pooling: str = DEFAULT_POOLING,
 ) -> EmbeddingGrid:
-    """Run the OlmoEarth encoder and return per-patch embeddings.
+    """Run the OlmoEarth encoder and return per-patch features.
 
     Args:
         model: A loaded OlmoEarth model (``load_olmoearth``).
-        cube: Sentinel-2 datacube.
+        cube: Sentinel-2 datacube (time-ordered).
         bbox: AOI bbox (for latlon).
         patch_size: Encoder patch size.
+        pooling: Temporal pooling — see :func:`pool_tokens`. Defaults to
+            ``temporal_stats``; pass ``mean_time`` to reproduce the published
+            (phenology-destroying) result.
 
     Returns:
-        An :class:`EmbeddingGrid` with ``(P_H, P_W, D)`` patch embeddings.
+        An :class:`EmbeddingGrid` with ``(P_H, P_W, F)`` patch features.
     """
     y_dim, x_dim = spatial_dims(cube)
     sample = build_sample(cube, bbox)
     output_dict = model.encoder(sample, patch_size=patch_size)
     latent, _pooled, _kwargs = unpack_encoder_output(output_dict)
 
-    # latent.sentinel2_l2a: (B, P_H, P_W, T, Band_Sets, D) → mean over T + Band_Sets
-    tokens = latent.sentinel2_l2a
-    emb = tokens.mean(dim=(3, 4)).squeeze(0)       # (P_H, P_W, D)
+    # latent.sentinel2_l2a: (B, P_H, P_W, T, Band_Sets, D)
+    emb = pool_tokens(latent.sentinel2_l2a, pooling).squeeze(0)   # (P_H, P_W, F)
     emb_np = emb.detach().cpu().numpy().astype("float32")
     logger.info(
-        "OlmoEarth embeddings: %s patches, D=%d (patch_size=%d)",
-        emb_np.shape[:2], emb_np.shape[-1], patch_size,
+        "OlmoEarth embeddings: %s patches, F=%d (patch_size=%d, pooling=%s, T=%d)",
+        emb_np.shape[:2], emb_np.shape[-1], patch_size, pooling, cube.sizes["time"],
     )
     return EmbeddingGrid(
         data=emb_np, patch_size=patch_size,
         y_coords=cube[y_dim].values, x_coords=cube[x_dim].values,
+        pooling=pooling,
     )
 
 
@@ -237,10 +259,16 @@ def run_delineation_olmoearth(
     date_range: str,
     huc12: str | None = None,
     patch_size: int = DEFAULT_PATCH_SIZE,
-    max_timesteps: int = 5,
+    # 12 monthly steps, matching Ai2's own mangrove recipe (period_duration 30d,
+    # min_matches 12). The old default of 5 was set when the time axis was being
+    # mean-pooled away anyway, so temporal depth bought nothing. It buys everything
+    # once `pooling` keeps the trajectory.
+    max_timesteps: int = 12,
     max_cloud_cover: int = 30,
     resolution_m: float = 10.0,
     probability_threshold: float = 0.5,
+    pooling: str = DEFAULT_POOLING,
+    model_id: ModelID = DEFAULT_MODEL_ID,
     searcher: StacSearcher | None = None,
 ) -> OlmoEarthResult:
     """Delineate riparian extent with OlmoEarth embeddings + a light RF head.
@@ -266,8 +294,21 @@ def run_delineation_olmoearth(
     )
     if cube is None:
         raise RuntimeError(f"No Sentinel-2 imagery for {bbox} over {date_range}")
+    # Subsample to at most `max_timesteps`, evenly spread across the season.
+    #
+    # The integer step FLOORS, so `isel(step)` alone can still leave MORE than
+    # max_timesteps (e.g. 18 scenes / 5 -> step 3 -> 6 kept). That silently ran a
+    # different experiment than requested, and it is now fatal: OlmoEarth's temporal
+    # embedding table holds exactly MAX_MODEL_TIMESTEPS entries, so handing it 18
+    # dies inside einops with a shape mismatch. Clamp explicitly.
+    if max_timesteps > MAX_MODEL_TIMESTEPS:
+        raise ValueError(
+            f"max_timesteps={max_timesteps} exceeds the encoder's temporal embedding "
+            f"table ({MAX_MODEL_TIMESTEPS}). Ai2's own recipe uses {MAX_MODEL_TIMESTEPS} "
+            "monthly mosaics."
+        )
     step = max(1, cube.sizes["time"] // max_timesteps)
-    cube = cube.isel(time=slice(None, None, step))
+    cube = cube.isel(time=slice(None, None, step)).isel(time=slice(0, max_timesteps))
     y_dim, x_dim = spatial_dims(cube)
     cube, side, aoi = _crop_to_square(cube, y_dim, x_dim)
     logger.info("OlmoEarth AOI: %dx%d square, %d timesteps", side, side, cube.sizes["time"])
@@ -277,7 +318,8 @@ def run_delineation_olmoearth(
     if not 0 < int(ref_mask.sum()) < ref_mask.size:
         raise RuntimeError("NMRipMap labels single-class over AOI — pick a balanced AOI")
 
-    emb = extract_embeddings(load_olmoearth(), cube, aoi, patch_size=patch_size)
+    emb = extract_embeddings(
+        load_olmoearth(model_id), cube, aoi, patch_size=patch_size, pooling=pooling)
     p_h, p_w, d = emb.data.shape
     x_patch = emb.data.reshape(p_h * p_w, d)
     y_patch, valid_patch = _aggregate_to_patches(
@@ -291,7 +333,11 @@ def run_delineation_olmoearth(
 
     xf, yf, llf = x_patch[valid_patch], y_patch[valid_patch], ll[valid_patch]
     names = tuple(f"oe_{i}" for i in range(d))
-    head = replace(train(xf, yf, names, n_estimators=150, model_version="olmoearth-nano-v1"),
+    # Version-tag BOTH the checkpoint and the pooling: a v1-mean_time run and a
+    # v1.1-temporal_stats run are different experiments and must never be confused
+    # with each other in silver.riparian_extent.
+    model_version = f"{model_id.value.lower()}-{pooling}"
+    head = replace(train(xf, yf, names, n_estimators=150, model_version=model_version),
                    method="olmoearth")
     cv = spatial_cv(xf, yf, assign_spatial_folds(llf[:, 0], llf[:, 1], block_deg=0.004),
                     n_folds=4, estimator=_cv_estimator())

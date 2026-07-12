@@ -36,6 +36,11 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install ruff mypy pytest
+          # torch from the CPU-only index: the default wheel drags in ~2 GB of CUDA that a
+          # GitHub runner can never use. tests/test_olmoearth_pooling.py needs real torch
+          # (it exercises pool_tokens, which operates on encoder tensors) — skipping it in
+          # CI would leave the phenology-preservation proof unverified where it matters.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
           pip install -r requirements-test.txt
 
       - name: Ruff (lint) — gate
