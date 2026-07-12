@@ -63,6 +63,45 @@ angle than yours is worth waiting for.
 Do not merge on a green check while findings sit unaddressed — that is the exact failure this
 gate exists to prevent.
 
+## Enforcement — `main` is a protected branch
+
+The gate is not advisory. `main` requires these checks, and **`enforce_admins` is on**, so it
+applies to the repo owner too. A direct push is rejected by the server:
+
+```
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote: - 3 of 3 required status checks are expected.
+```
+
+| Required check | Why this one |
+|---|---|
+| `CodeRabbit` | the merge gate |
+| `CLAUDE.md size budget (soft 400 / hard 500)` | lean-canon |
+| `Every .excalidraw has a sibling .svg` | doc/diagram pairing |
+
+`strict: true` — a branch must be up to date with `main` before it can merge, so the checks ran
+against what actually lands.
+
+**`dotnet` / `frontend` / `python` are deliberately NOT required.** Those workflows are
+*path-filtered*: on a docs-only PR they never run, so the check context never reports, and a PR
+that required them would wait forever for a job that will never start. They still gate every PR
+that touches their paths — they just cannot be listed here.
+
+**No approving review is required.** GitHub does not count an app's review (CodeRabbit's) toward
+the approval quota, and you cannot approve your own PR — so requiring one approval on a
+solo-maintained repo deadlocks every PR.
+
+### Escape hatch
+
+`enforce_admins: true` means that if CodeRabbit is down, `main` is frozen for everyone including
+you. To lift it temporarily:
+
+```bash
+gh api -X DELETE repos/{owner}/{repo}/branches/main/protection   # unprotect
+# ... land the emergency fix ...
+gh api -X PUT  repos/{owner}/{repo}/branches/main/protection --input .github/branch-protection.json
+```
+
 ## The three tiers
 
 | Tier | Surface | Catches |
