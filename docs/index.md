@@ -73,6 +73,12 @@ product at reach scale is what this project is for.
 - [Document-intelligence subsystem](decisions/2026-07-04-document-intelligence-subsystem.md)
 - [NextAurora rules applicability](decisions/2026-07-04-nextaurora-rules-applicability.md)
 
+## Reference
+
+- [Data sources](data-sources.md) — every source, its endpoint, and the trap in each.
+  **NMRipMap is classified** (filter `L2_Code`, never fetch raw) and its **label vintage is 2020**.
+- [Retractions](RETRACTIONS.md) — withdrawn claims. CI fails any doc restating one without retracting it.
+
 ## Specs
 
 - [Stage 1 — riparian delineation](specs/2026-07-03-stage1-riparian-delineation.md)

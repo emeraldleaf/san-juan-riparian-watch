@@ -28,3 +28,9 @@ codacy
 # --- docs/.nojekyll (removing it is what made GitHub Pages render the docs at all) ---
 # Re-adding this file makes Jekyll skip the build entirely and serve every .md as raw text.
 # The tombstone is on the *filename as a thing to add back*, not on discussing it.
+
+# --- Leaflet (removed; the frontend is MapLibre GL via react-map-gl/maplibre) ---
+# Fully gone from package.json and src/, but CLAUDE.md was still teaching "React 18 + Leaflet"
+# and describing the map as a Leaflet map — in the same file that documents MapLibre elsewhere.
+# A canon that contradicts itself is worse than one that is merely out of date.
+leaflet
