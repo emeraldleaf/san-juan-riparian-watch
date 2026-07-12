@@ -108,3 +108,51 @@ errors when comparing the two years**"* rather than real change.
 
 **Download is manual** — Dryad blocks automated fetches (401/403). `corip.download_instructions()`
 prints the steps rather than failing with a 403.
+
+## The CSU/NREL GIS products — where they are, and what they actually cover
+
+Found 2026-07-12 by chasing the prior-art audit into the repository the report names only as
+"Colorado State University Library". It is **[Mountain Scholar](https://mountainscholar.org)**, the
+same repository the field points came from, in a dedicated collection:
+**"Research Data — Riparian Habitat and Invasive Species in the Colorado River Basin"**
+(handle `10217/195562`). Eight products, all openly downloadable via the DSpace REST API.
+
+| Product | File | Size | Usable as GIS? |
+|---|---|---|---|
+| **Tamarisk probability, 2016** | `2016_tam_prob_BufClip_mosaic_FULL2.tif` | **11 MB** | ✅ **GeoTIFF**, 30 m, float32, **p ∈ 0–1**, ESRI:102008 |
+| **Valley bottoms (VBET), whole basin** | `VBETfiles.zip` | 1.3 GB | ✅ the "maximum riparian corridor extent" — what our HAND envelope re-derives |
+| Riparian vegetation 2006 / 2016 / change | `RiparianVegtation_AtlasBook_FINAL.pdf` | 1.5 GB | ❌ **a PDF map-book**, not data |
+| Tamarisk occurrence 2005–2007 | `Tam_2005_to_2007_...FinalMap.pdf` | 2.3 MB | ❌ PDF |
+| Tamarisk occurrence 2015–2017 | `Tam_2015_to_2017_...FinalMap.pdf` | 1.5 MB | ❌ PDF |
+
+### 🔴 The tamarisk probability raster does NOT cover the San Juan — measured, not assumed
+
+Downloaded it and counted valid pixels. This is the headline fact:
+
+| Region | Valid pixels | |
+|---|---|---|
+| **San Juan (entire HUC8)** | **0** | **NOT COVERED** |
+| Escalante | 0 | not covered |
+| **Dolores** | 36,114 | covered (mean p = 0.54) |
+| **Green River** | 121,070 | covered |
+
+Their report says *"**Select** tamarisk modeling results for 2016"*, and their case studies were
+*tamarisk on the **Dolores*** and *Russian olive on the **San Juan***. **The word "select" is load-
+bearing, and we have now verified it empirically instead of trusting it.**
+
+**Consequences:**
+- It **cannot** serve as weak labels or a benchmark **for our AOI**. There is nothing there.
+- It **empirically confirms our novelty claim**: the incumbent's species product is genuinely *not*
+  wall-to-wall, and **the San Juan is not in it**. That is now a measurement, not a reading of their
+  abstract.
+- It **is** usable on the **Dolores** — same Colorado Plateau ecoregion as our training pool, and one
+  of the rivers *Diorhabda* was released on (2004–07). So it is a **method benchmark**: run our model
+  on the Dolores and compare against the incumbent's own output, on ground they claim.
+- **Vintage 2016** (Landsat 30 m) — fit against 2016 imagery, and inherit their own caveat that
+  Landsat cannot resolve the tamarisk phenological signature.
+
+### Fetching them
+
+Dryad blocks automation; **Mountain Scholar does not**. Bitstreams download cleanly from
+`https://api.mountainscholar.org/server/api/core/bitstreams/<uuid>/content` — e.g. the tamarisk
+probability raster is `a61038aa-b918-4ca4-83ce-770a44f9a83b`.
