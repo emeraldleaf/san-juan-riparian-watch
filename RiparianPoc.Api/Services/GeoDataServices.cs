@@ -335,7 +335,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
             MvtTileSql.Build(
                 layer: "wetlands",
                 geom: "w.geom",
-                columns: "w.id, w.wetland_type",
+                columns: "w.id, w.wetland_type, w.cowardin_code, w.acres",
                 from: "bronze.nwi_wetlands w"),
             new { z, x, y }, ct);
 
@@ -345,7 +345,7 @@ public sealed class SpatialQueryService : ISpatialQueryService
             MvtTileSql.Build(
                 layer: "soils",
                 geom: "s.geom",
-                columns: "s.id, s.musym, s.hydric_rating",
+                columns: "s.id, s.mukey, s.musym, s.muname, s.hydric_rating, s.hydric_pct",
                 from: "bronze.ssurgo_soils s"),
             new { z, x, y }, ct);
 
