@@ -17,6 +17,15 @@
 #   geo_focus  true when the doc is rich in place/reach mentions (priority for
 #              geo-mention testing)
 #   topics     tag list (riparian, invasive, hydrology, restoration, water-quality...)
+#   fetch      auto (default) | manual
+#              'manual' = the publisher bot-blocks automated fetch (Cloudflare JS
+#              challenge), so the ingest job CANNOT retrieve it and must skip it.
+#              These are open-access papers — download the PDF once by hand into the
+#              local corpus dir. Verified 2026-07-11: mdpi.com, researchgate.net and
+#              www.usgs.gov all return 403 to curl even with a browser User-Agent;
+#              pubs.usgs.gov, arxiv.org, pmc.ncbi.nlm.nih.gov and doi.org resolve fine.
+#              Declaring this is deliberate: a corpus entry that 403s at ingest is worse
+#              than one that says up front it needs a human.
 #
 # NOTE: URLs verified via web search 2026-07-04; re-verify at fetch time (agency
 # sites move files). Licenses for federal/state works are generally public; the
@@ -144,6 +153,179 @@ sources:
     license: verify
     geo_focus: false
     topics: [water-management, compacts, administration]
+
+  # -------------------------------------------------------------------------
+  # SCIENCE / PRIOR-ART CORPUS (added 2026-07-11)
+  #
+  # The entries above are watershed policy + management documents. These are the
+  # methodological and dataset references the project builds on — so the RAG can
+  # answer "what is already known about mapping riparian / tamarisk here, and by
+  # whom?" with citations, instead of us re-deriving published work.
+  #
+  # Narrative synthesis: docs/literature-review.md
+  # -------------------------------------------------------------------------
+
+  - id: corip-woodward-2018-riparian-corridor-dataset
+    title: "CO-RIP: A Riparian Vegetation and Corridor Extent Dataset for Colorado River Basin Streams and Rivers"
+    url: https://doi.org/10.3390/ijgi7100397   # MDPI bot-blocks automated fetch
+    agency: academic            # Colorado State University / NREL
+    year: 2018
+    doc_type: paper
+    format: pdf
+    license: cc-by              # MDPI open access
+    fetch: manual             # 403 to curl even with a browser UA — download PDF by hand
+    geo_focus: true             # basin-wide, INCLUDES the San Juan
+    topics: [riparian, mapping, random-forest, landsat, valley-bottom, baseline]
+    # Valley-bottom delineation + RF on Landsat over the whole Colorado Basin
+    # (637,000 km2), median kappa 0.80. Our Stage-1 RF baseline is the same method
+    # class — this is the baseline to beat, not something to re-derive.
+
+  - id: corip-dryad-dataset
+    title: "CO-RIP data: riparian vegetation raster + valley-bottom polygons (Dryad)"
+    url: https://doi.org/10.5061/dryad.3g55sv8
+    agency: academic
+    year: 2018
+    doc_type: metadata
+    format: html
+    license: verify             # Dryad — typically CC0
+    geo_focus: true
+    topics: [riparian, dataset, labels]
+
+  - id: csu-nrel-crb-invasive-occurrence-2018
+    title: "Improved maps and invasive species data for the Colorado River Basin (tamarisk & Russian olive occurrence/absence)"
+    url: https://www.nrel.colostate.edu/improved-rip-maps-crb/
+    agency: academic            # Colorado State University / NREL
+    year: 2018
+    doc_type: webpage
+    format: html
+    license: verify
+    geo_focus: true
+    topics: [invasive, tamarisk, russian-olive, labels, occurrence]
+    # 3,000+ tamarisk/Russian-olive occurrence AND absence points. CSU describe these
+    # as "complementary products rather than a single integrated map of invasive versus
+    # native species" — i.e. the map was never made. That is the gap this project fills,
+    # and these points are what can split NMRipMap's IC (introduced = tamarix OR olive).
+
+  - id: tamarix-genotypes-sentinel2-rf
+    title: "A rapid and accurate method of mapping invasive Tamarix genotypes using Sentinel-2 images"
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC10117385/
+    agency: academic
+    year: 2023
+    doc_type: paper
+    format: html
+    license: verify             # PMC open access
+    geo_focus: false
+    topics: [tamarisk, invasive, sentinel-2, random-forest, classification]
+    # Sentinel-2 + RF: 87.8% OA (kappa 0.85). This is the accuracy bar to beat.
+
+  - id: tamarisk-colorado-river-hyperion-tm-quickbird
+    title: "Remote Sensing and Mapping of Tamarisk along the Colorado River: Hyperion, Thematic Mapper and QuickBird"
+    url: https://doi.org/10.3390/rs1030318     # MDPI bot-blocks automated fetch
+    agency: academic
+    year: 2009
+    doc_type: paper
+    format: pdf
+    license: cc-by
+    fetch: manual             # 403 to curl even with a browser UA — download PDF by hand
+    geo_focus: false
+    topics: [tamarisk, invasive, resolution, hyperspectral, comparison]
+    # QuickBird (2.5 m) BEAT both Landsat TM and hyperspectral Hyperion (both 30 m):
+    # spatial resolution mattered more than spectral depth. Implies Sentinel-2 at 10 m
+    # will suffer mixed pixels in corridors narrower than ~30 m.
+
+  - id: diao-wang-saltcedar-phenological-trajectory
+    title: "Incorporating plant phenological trajectory in exotic saltcedar detection with monthly time series of Landsat imagery"
+    url: https://diaorssilab.web.illinois.edu/wp-content/uploads/2023/11/Incorporating-plant-phenological-trajectory-in-exotic-saltcedar-detection-with-monthly-time-series-of-Landsat-imagery.pdf
+    agency: academic
+    year: 2016
+    doc_type: paper
+    format: pdf
+    license: verify
+    geo_focus: false
+    topics: [tamarisk, phenology, time-series, landsat, senescence]
+    # THE mechanism paper: leaf senescence is the most discriminating phenological stage
+    # for separating saltcedar from native riparian; phenology-guided composites beat any
+    # single scene. This is why a temporal model is right — and why mean-pooling over time
+    # (our current OlmoEarth harness) destroys the signal.
+
+  - id: usgs-tamarisk-defoliation-landsat5-detection
+    title: "Detection of tamarisk defoliation by the northern tamarisk beetle based on multitemporal Landsat 5 TM imagery"
+    url: https://pubs.usgs.gov/publication/70040060
+    agency: USGS
+    year: 2014
+    doc_type: paper
+    format: html
+    license: public-domain-us-gov
+    geo_focus: false
+    topics: [tamarisk, biocontrol, diorhabda, defoliation, landsat, change-detection]
+
+  - id: usgs-tamarisk-beetle-grand-canyon-412km
+    title: "Remote sensing of tamarisk beetle (Diorhabda carinulata) impacts along 412 km of the Colorado River in the Grand Canyon"
+    url: https://pubs.usgs.gov/publication/70196440
+    agency: USGS
+    year: 2018
+    doc_type: paper
+    format: html
+    license: public-domain-us-gov
+    geo_focus: false
+    topics: [tamarisk, biocontrol, diorhabda, defoliation, ndvi]
+    # THE CONFOUND: the beetle (released 2001; established near Moab 2004) has defoliated
+    # tamarisk across much of the UPPER Colorado Basin — which includes the San Juan.
+    # Defoliated tamarix browns EARLY, inverting the "stays green late" discriminator.
+    # Defoliation must be modelled as a state, not read as tamarisk absence or as recovery.
+
+  - id: nagler-2021-lcr-greenness-water-use
+    title: "Riparian Area Changes in Greenness and Water Use on the Lower Colorado River, 2000-2020"
+    url: https://doi.org/10.3390/rs13071332    # MDPI bot-blocks automated fetch
+    agency: USGS               # USGS + University of Arizona
+    year: 2021
+    doc_type: paper
+    format: pdf
+    license: cc-by
+    fetch: manual             # 403 to curl even with a browser UA — download PDF by hand
+    geo_focus: false           # Lower Colorado (Hoover Dam -> delta), NOT the San Juan
+    topics: [riparian, evapotranspiration, evi2, phenology, condition, biocontrol]
+    # Methods source (EVI2 greenness proxy, PAM-ET annualized phenology/water-use metric),
+    # not a San Juan data source. Finds riparian health + water use declining since 2000,
+    # attributed in part to biocontrol.
+
+  - id: olmoearth-mangrove-recipe
+    title: "OlmoEarth projects — mangrove extent mapping (fine-tuning recipe)"
+    url: https://github.com/allenai/olmoearth_projects/blob/main/docs/mangrove.md
+    agency: academic           # Allen Institute for AI
+    year: 2025
+    doc_type: metadata
+    format: html
+    license: verify
+    geo_focus: false
+    topics: [foundation-model, olmoearth, sentinel-2, segmentation, fine-tuning]
+    # Near-exact structural analog of Stage 1: woody vegetation near water, from 12 monthly
+    # Sentinel-2 mosaics, validated against an authoritative reference map (Global Mangrove
+    # Watch there; NMRipMap here). Fine-tunes OLMOEARTH_V1_BASE (FreezeUnfreeze @20, 10x LR)
+    # -> 97.6% accuracy.
+
+  - id: wetland-sparse-annotations-temporal-sam
+    title: "Wetland mapping from sparse annotations with satellite image time series and a temporal-aware segment anything model"
+    url: https://arxiv.org/pdf/2601.11400
+    agency: academic
+    year: 2026
+    doc_type: paper
+    format: pdf
+    license: verify
+    geo_focus: false
+    topics: [foundation-model, weak-supervision, sparse-labels, time-series, wetland]
+    # Closest methodological precedent to our weak-label + temporal-foundation-model approach.
+
+  - id: dargana-earthpt-canopy-finetune
+    title: "Dargana: fine-tuning EarthPT for dynamic tree canopy mapping from space"
+    url: https://arxiv.org/pdf/2504.17321
+    agency: academic
+    year: 2025
+    doc_type: paper
+    format: pdf
+    license: verify
+    geo_focus: false
+    topics: [foundation-model, earthpt, fine-tuning, canopy]
 
 # ---------------------------------------------------------------------------
 # Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
