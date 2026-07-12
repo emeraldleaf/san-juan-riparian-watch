@@ -45,6 +45,28 @@ ImageServer + GeoServer WMS fallback in `main()`; `health_scorer` aligned height
 continuous NDVI curve + **per-watershed** summary aggregation; LiDAR CHM resamples DTM onto the DSM
 grid before differencing. Verified: `py_compile`, 32 pytest, live per-watershed SQL.
 
+### Positioning — what is actually novel here (2026-07-11, READ THIS)
+Two of our components **substantially reproduce published work**. Say so; do not claim otherwise.
+- **Riparian extent mapping is already solved basin-wide.** CO-RIP (Woodward et al. 2018,
+  ISPRS IJGI) mapped riparian corridor + vegetation for the *entire Colorado River Basin —
+  including the San Juan* — using **valley-bottom delineation + Random Forest on Landsat**,
+  median **κ 0.80**. Our HAND envelope ≈ their valley bottom; our RF-on-spectral ≈ their RF.
+  **"We built an RF riparian classifier" is not a contribution.** Use CO-RIP as a *baseline to
+  beat and a label source*, not something to re-derive.
+- **Tamarisk detection is established** (S2+RF **87.8% OA**; Landsat 80–91%), and the literature
+  is explicit that **phenology — specifically late-season senescence — is the discriminator**
+  (Tamarix stays green after natives brown). This *indicts our OlmoEarth harness*: it mean-pools
+  tokens over time, destroying exactly that signal (#9).
+- **The real gap:** CO-RIP gives extent-without-species; CSU/NREL's 2018 dataset gives **3,000+
+  tamarisk/Russian-olive occurrence points** but no map — CSU call them *"complementary products
+  rather than a single integrated map of invasive versus native species."* **Nobody has produced
+  a wall-to-wall, time-series, native-vs-invasive cover + change product at reach scale.** That,
+  plus mining weak labels from existing authoritative GIS and an EO-foundation-model fine-tune,
+  is the contribution. See `docs/specs/2026-07-11-stage2-invasives-tamarix.md`.
+- Free ground truth found: NMRipMap `L2 = IC` ("Lowland **Introduced** Riparian Woodland and
+  Scrub") = **332 tamarisk/Russian-olive polygons on the Animas alone** — but it *conflates* the
+  two species; the CSU points can split them.
+
 ### NDVI health thresholds (CANONICAL)
 `classify_health()` in `ndvi_processor.py` is the single source of truth:
 **healthy >0.25 / degraded 0.10–0.25 / bare <0.10** (peak-growing median ~0.17). Frontend legend +
