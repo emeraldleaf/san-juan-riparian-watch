@@ -104,6 +104,23 @@ A sensor-consistent **annual** series is still not done.
 - Report added to the RAG corpus (`docintel/corpus/seed_sources.yaml`) so the system answers from the
   primary source, not our summary of it.
 
+## Postscript — we later MEASURED their coverage (2026-07-12)
+
+Their tamarisk product is described as *"**Select** tamarisk modeling results for 2016."* We
+downloaded the raster (`2016_tam_prob_BufClip_mosaic_FULL2.tif`, 11 MB, from Mountain Scholar) and
+counted valid pixels:
+
+| Region | Valid pixels |
+|---|---|
+| **San Juan (entire HUC8)** | **0 — not covered** |
+| Dolores | 36,114 |
+| Green River | 121,070 |
+
+**The San Juan is not in their tamarisk product.** The revised novelty claim below is therefore
+grounded in a measurement rather than in a reading of their prose — and their own *"select"* is
+confirmed to mean what it says. It also gives us a **method benchmark on the Dolores**: same
+ecoregion, a river the beetle was released on, and ground the incumbent actually claims.
+
 ## Revised novelty claim (falsifiable)
 
 > **No annual, 10 m, beetle-aware, wall-to-wall native-vs-invasive riparian cover + change product
