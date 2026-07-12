@@ -55,6 +55,11 @@ When you retire a value or withdraw a result, **add it to the registry**. The sw
 criterion is "`./dev.sh --check-encoding` passes", not "the docs someone remembered are updated".
 See `docs/code-review.md`.
 
+**The method itself is a deliverable — `docs/method.md`.** Why these gates exist, with the dated
+failures each one actually caught, and what did *not* work (every documentation-only surface drifted;
+a broken gate is worse than none because it reports "clean"). Keep it current: when a gate catches
+something real, it belongs in the receipts table.
+
 ## External Drive Configuration
 **IMPORTANT**: This entire project lives on an external drive. The drive MUST be mounted
 before starting Docker, running any services, or editing code.

@@ -12,6 +12,21 @@ The stack is a STAC Earth-observation ETL, a PostGIS spatial database, a Python 
 (a RandomForest baseline measured head-to-head against the **OlmoEarth** foundation model),
 a .NET Aspire-orchestrated C# REST API, and a React + MapLibre map frontend.
 
+> ### How this is built is part of the contribution
+>
+> **[The method](docs/method.md)** — AI-assisted research that catches its own errors. The dangerous
+> failure of LLM-assisted work is not hallucinated code (a compiler catches that); it is a **retracted
+> result still published as fact**, a model **scored against 45%-wrong labels**, a **novelty claim a
+> 2018 paper already falsified**. Those compile, pass tests, and read beautifully.
+>
+> So the rules are **mechanical, not exhortative**: a retraction registry that makes CI fail any doc
+> still asserting a withdrawn claim; tombstones for retired values; `/paper-audit`, which attacks our
+> own novelty claims and has **narrowed three of them**; and a control experiment run before the
+> interesting one. Every gate was verified by making it **fail** on real historical drift.
+>
+> It also records what didn't work — **every documentation-only surface drifted**, including an
+> "enforcement" agent that was invoked by nothing for the life of the repo.
+
 > ### What is actually new here — the time axis
 >
 > Riparian extent for **one epoch** is already solved: CO-RIP (Woodward et al. 2018) mapped the
