@@ -120,7 +120,7 @@ same repository the field points came from, in a dedicated collection:
 | Product | File | Size | Usable as GIS? |
 |---|---|---|---|
 | **Tamarisk probability, 2016** | `2016_tam_prob_BufClip_mosaic_FULL2.tif` | **11 MB** | ✅ **GeoTIFF**, 30 m, float32, **p ∈ 0–1**, ESRI:102008 |
-| **Valley bottoms (VBET), whole basin** | `VBETfiles.zip` | 1.3 GB | ✅ the "maximum riparian corridor extent" — what our HAND envelope re-derives |
+| **Valley bottoms (VBET), whole basin** | `VBETfiles.zip` → **`CRB_VBETraster.tif`, 53.8 MB** | 1.3 GB archive | ✅ **WIRED** — `riparian/delineation/vbet.py`. 30 m, binary (`100` = valley bottom). **Covers all three tiles, incl. Turkey Creek** (20.9% / 19.5% / 10.3%). Fetched by **HTTP range request** — only the 53.8 MB raster member, ~12 s, not the 1.3 GB archive. |
 | Riparian vegetation 2006 / 2016 / change | `RiparianVegtation_AtlasBook_FINAL.pdf` | 1.5 GB | ❌ **a PDF map-book**, not data |
 | Tamarisk occurrence 2005–2007 | `Tam_2005_to_2007_...FinalMap.pdf` | 2.3 MB | ❌ PDF |
 | Tamarisk occurrence 2015–2017 | `Tam_2015_to_2017_...FinalMap.pdf` | 1.5 MB | ❌ PDF |
