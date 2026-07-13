@@ -47,13 +47,31 @@ echo "PR #$PR — head ${SHORT}"
 #    because it bought confidence that nothing had earned.
 #
 #    So: look for the skip notice FIRST, and fail on it.
-SKIPPED=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
-    --jq '[.[] | select(.user.login|test("coderabbit";"i")) | select(.body|test("Review skipped"))] | length' 2>/dev/null || echo 0)
-if [[ "${SKIPPED:-0}" -gt 0 ]]; then
-    fail "CodeRabbit SKIPPED this PR (it says so in a comment) — yet its check may still be green.
-    A skipped review is not a review. Check .coderabbit.yaml for a label/title filter, or comment
-    '@coderabbitai review' to trigger one."
-fi
+#    Use the LATEST signal, not the mere presence of an old one: a PR can be skipped first and then
+#    reviewed on demand ('@coderabbitai review'), and the stale skip notice must not veto that.
+#    Equally, CodeRabbit does NOT create a formal review object when it finds nothing — it only
+#    comments. So "did it review?" is answered by its comments, not by the reviews API.
+STATUS=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
+    --jq '[.[] | select(.user.login|test("coderabbit";"i"))
+             | select(.body|test("Review skipped|Review finished|Actionable comments posted"))
+             | if (.body|test("Review skipped")) then "skipped" else "reviewed" end] | last // "none"' \
+    2>/dev/null || echo none)
+
+case "$STATUS" in
+    reviewed)
+        echo "  ${GREEN}✓${NC} CodeRabbit reviewed this PR"
+        ;;
+    skipped)
+        fail "CodeRabbit SKIPPED this PR — and its check is green anyway.
+    A skipped review is not a review, and 'no findings' from a review that never ran is not a pass.
+    Check .coderabbit.yaml for a label/title filter, or comment '@coderabbitai review'."
+        ;;
+    *)
+        fail "CodeRabbit has posted NOTHING on this PR — no review, no skip notice.
+    A green check is not a review; it posts one even when it skips. Wait, or trigger it with
+    '@coderabbitai review'."
+        ;;
+esac
 
 # 1. The check must have RUN on THIS head (not an ancestor).
 CHECK=$(gh api "repos/{owner}/{repo}/commits/$HEAD/check-runs" \
@@ -90,23 +108,10 @@ if [[ "$FINDINGS" -gt 0 ]]; then
             ;;
     esac
 else
-    # "No findings" is only meaningful if a review ACTUALLY HAPPENED. Absence of findings and
-    # absence of a review look identical from the outside — and that is exactly how 25 PRs were
-    # waved through. Demand positive evidence that CodeRabbit looked at THIS head.
-    case "$REVIEW" in
-        current:*)
-            echo "  ${GREEN}✓${NC} CodeRabbit reviewed ${SHORT} (${REVIEW#current:}) — no findings"
-            ;;
-        stale)
-            fail "no findings, but CodeRabbit's last review PREDATES ${SHORT}. It has not seen this code.
-    'No findings' from a review that never ran is not a pass."
-            ;;
-        *)
-            fail "CodeRabbit has NOT reviewed this PR at all (no review on any commit).
-    A green check is not a review — CodeRabbit posts one even when it skips. Trigger a review with
-    '@coderabbitai review', or check .coderabbit.yaml for a filter that is excluding this PR."
-            ;;
-    esac
+    # A review DID happen (established above); it simply found nothing.
+    echo "  ${GREEN}✓${NC} no CodeRabbit findings"
+    [[ "$REVIEW" == "stale" ]] && \
+        echo "  ${YELLOW}!${NC} its formal review object predates ${SHORT} (no findings, not blocking)"
 fi
 
 # 4. And the rest of the gates, so this is one command instead of three.
