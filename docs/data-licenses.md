@@ -73,12 +73,36 @@ released on, and ground the incumbent claims. Just not as training data for us.
 > **Muldavin, E., et al. (2023).** *New Mexico Riparian Habitat Map (NMRipMap) Version 2.0 Plus.*
 > New Mexico Natural Heritage Program, University of New Mexico.
 
-## Open
+## Resolved (was "Open")
 
-- 🔴 **The repository has no LICENSE file.** It is public, and it already ingests CC BY-SA data. With
-  no licence, the default is *all rights reserved* — which is the worst of both worlds for a portfolio
-  project: nobody may reuse the code, and our licence obligations for the data are unstated. **Decide
-  the source licence** (permissive for code is normal and compatible), and state the data-products
-  licence as CC BY-SA 4.0 alongside it.
-- Confirm CO-RIP's Dryad terms and NMRipMap's redistribution terms **on download**, rather than
-  assuming from the landing pages.
+- ✅ **The repository now has a licence.** **Apache-2.0** for code ([`LICENSE`](../LICENSE)),
+  **CC BY-SA 4.0** for data products ([`LICENSE-DATA.md`](../LICENSE-DATA.md)). Added 2026-07-12.
+  *(This item sat here marked 🔴 **after it had been fixed** — see the note below.)*
+- ✅ **CO-RIP is CC0-1.0** — a **public-domain dedication**, verified from the Dryad API
+  (`license: https://spdx.org/licenses/CC0-1.0.html`). **No ShareAlike, no attribution legally
+  required** (we cite it anyway, because not citing it would be indefensible). **This matters:**
+  CO-RIP-derived products are **not** bound by CC BY-SA. Only the CSU/NREL datasets impose ShareAlike.
+
+## Still open
+
+- ⚠️ **NMRipMap states no explicit licence.** The MapServer's metadata carries a **citation** and no
+  terms of use. It is publicly served by UNM + USDA Forest Service (whose own contributions would
+  normally be public domain), but the University's are not automatically so. Our position:
+  - **Querying it** (what `nmripmap.py` does) is ordinary use of a public API.
+  - **We do not redistribute the raw polygons**, and should not start.
+  - **Derived model outputs are probably fine and the terms are unstated**, which is not the same as
+    "permitted". **Before publishing a product trained on NMRipMap, ask NM Natural Heritage.** An
+    unanswered licensing question is a risk, not an absence of one.
+
+## A note on this section, because it is the point
+
+**The first item above was marked 🔴 open while already being fixed.** The LICENSE landed in PR #34;
+this document went on saying it did not exist. Nobody noticed — including me — until it was read.
+
+The drift gates (`./dev.sh --check-encoding`) catch **retracted claims** and **retired identifiers**
+and **unreachable docs**. They do **not** catch *"a document says something is unresolved when it has
+been resolved."* That is a third kind of semantic drift, and it is the *flattering* kind: it makes the
+project look like it has more open problems than it does, so nothing about it feels wrong.
+
+Recorded rather than quietly fixed, because a gap in the gates is worth more than a tidy document.
+See `docs/method.md`.
