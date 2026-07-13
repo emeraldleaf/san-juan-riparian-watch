@@ -575,3 +575,19 @@ Tracked live in [`docs/STATUS.md`](docs/STATUS.md). Near-term:
 
 *A learned, confidence-aware riparian monitoring platform for the San Juan Basin — extent,
 condition, and change from open Earth-observation data.*
+
+---
+
+## Licence — code and data are different
+
+| What | Licence |
+|---|---|
+| **Source code** | **Apache-2.0** ([`LICENSE`](LICENSE)) |
+| **Data products** — models, label layers, extent/invasive rasters, maps | **CC BY-SA 4.0** |
+
+The data products are **not** our choice: this project trains on **CC BY-SA 4.0** datasets (the
+CSU/NREL field points, valley bottoms and tamarisk rasters), and **ShareAlike requires adapted material
+to carry the same licence.** Training on them is permitted; derived maps must be CC BY-SA.
+
+Attribution and the full reasoning: [`LICENSE-DATA.md`](LICENSE-DATA.md) ·
+[`docs/data-licenses.md`](docs/data-licenses.md).
