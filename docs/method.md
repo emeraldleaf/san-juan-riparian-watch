@@ -76,6 +76,8 @@ these dates.
 | 10 | `architecture-reviewer` — a documented Tier-2 "enforcement surface" | **invoked by nothing, ever.** Six documents described it as live | asking whether it ran |
 | 11 | A sanity probe returned **AUC 0.23** — apparently a broken encoder | it wasn't. **Unshuffled KFold** on a spatial grid. Shuffled: **0.85** | refusing to accept a convenient bad number |
 | 12 | The `Virgin_River` rows in a public dataset | **x/y transposed** — 119 points in the wrong hemisphere | counting before trusting |
+| 13 | The merge gate itself, **again** — it demanded a CodeRabbit *check-run* | CodeRabbit posts **none** for an on-demand review, so the gate blocked four already-reviewed PRs **forever**. It was also *too weak*: a check-run proves it RAN, never *which commit it read* | judging by the commit CodeRabbit's walkthrough **names** |
+| 14 | The OlmoEarth scaffold's `class_path`s — and the spec **asserting they were "correct"** | **5 of 23 did not exist.** Every class *name* right, every *module* path wrong; written from a plausible memory of the layout and **never once imported**. They fail at runner startup — i.e. **Phase 1, on a rented GPU** | `check-scaffold-classpaths.sh` — importing all 23, mechanically |
 
 **Note errors 2, 3, 4 and 6.** Each was found *after* work had been built on top of it. Errors 5 and 6
 narrowed the project's central novelty claim. **Error 4 disproved the very hypothesis the fix was

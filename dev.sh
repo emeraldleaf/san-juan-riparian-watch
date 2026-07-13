@@ -744,6 +744,7 @@ case "${1:-}" in
         .claude/scripts/check-tombstones.sh       || rc=1
         .claude/scripts/check-retracted-claims.sh || rc=1
         .claude/scripts/check-doc-orphans.sh      || rc=1
+        .claude/scripts/check-scaffold-classpaths.sh || rc=1
         exit $rc
         ;;
     --help|-h)
