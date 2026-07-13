@@ -123,13 +123,40 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 1. **Install the stack** in a Python 3.11 venv (`olmoearth-runner==0.1.14`). Confirm
    `from olmoearth_run.partitioners.grid import GridPartitioner` imports.
 2. **Build the label vector layer** — the real work.
-   - *Control (extent):* NMRipMap → `1 = riparian, 2 = water, 3 = other`, `zero_is_invalid: true`.
+   - *Control (extent):* NMRipMap → `1 = riparian, 2 = water, 3 = agriculture, 4 = other`,
+     `zero_is_invalid: true`. **Four classes, not three** — this line said `3 = other` until the
+     layer was built; the scaffold's `model.yaml` has said `num_classes: 4` all along, and the
+     crosswalk splits agriculture from upland. Agriculture earns its own class because it is the
+     one negative that is *as green as riparian*: fold it into "other" and NDVI can no longer
+     separate the classes, which is exactly the failure the validator below is built to catch.
      Woody-riparian classes only (`riparian/labels/nmripmap.py` — **never a raw fetch**).
      Water from NHD/WorldCover. "Other" balanced by sampling, **clipped to the VBET valley bottom**
      (`riparian/delineation/vbet.py`) so the negatives are corridor negatives, not desert.
    - *Invasives:* CSU points → `tamarisk / russian_olive / native / other`, with **defoliation as a
      state** (`riparian/labels/csu_points.py`, `colorado_plateau()` pool).
    - Output: GeoJSON per window, in the CRS/shape `dataset.json`'s `label` layer expects.
+   - Built by `riparian/labels/label_layer.py`. Two things there are load-bearing, both about the
+     negatives: they are **clipped to the valley bottom** (a desert negative teaches "is it green",
+     which is not the task) and **capped at 3× positive area** (unbalanced, a segmentation head
+     reaches ~90% accuracy by predicting "other" everywhere while the loss curve looks *healthy*).
+2b. **Validate the labels against the imagery — BEFORE renting anything**
+   (`riparian/labels/validate_layer.py`). A label layer can be schema-perfect and still be wrong in
+   the only way that matters: not lining up with the pixels. Nothing in `rslearn` will say so —
+   training runs, loss falls, metrics look plausible, and you find out after you have paid.
+   - **Separability.** Sample peak-season NDVI from **S2 2020** (the label's own vintage) and ask
+     how well NDVI alone separates riparian from corridor negatives. `AUC < 0.65` → the labels are
+     broken or misaligned, **stop**. `> 0.95` is *suspicious, not good*: if one hand-computed index
+     nearly solves the task, the negatives are probably desert and the task is leaking.
+   - **The shift test — the one separability cannot do.** Re-score with the labels translated ±3 px.
+     **If a shifted version scores better, the labels correlate with the imagery but do not sit ON
+     it.** Separability still passes; every trained metric is then quietly wrong. We have been
+     burned by this one's cousin — the AUC-0.23 incident *looked* exactly like a misregistration
+     and was an unshuffled CV split. A real one would look identical. Measure the offset; don't guess.
+     (Tie-break toward zero shift: a straight reach is invariant along its own axis, so an arbitrary
+     argmax invents a displacement and reports a bug in labels that are fine.)
+   - **Eyes.** Overlay the polygons on **NAIP 2020** and look. NAIP 2020 is not a proxy for the
+     truth — it *is* the imagery NMRipMap was photo-interpreted from. A metric tells you the labels
+     are self-consistent; only your eyes tell you they are on the trees.
 3. **Materialise the Sentinel-2 cube locally** (`rslearn dataset prepare|ingest|materialize`). This is
    **CPU + network**, ~1.2 GB. Do it here, not on a GPU clock — a GPU idling during a Planetary
    Computer download is money set on fire.
@@ -137,6 +164,9 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 
 > ### ✅ Phase-0 exit gate — do not rent a GPU until ALL of these hold
 > - `olmoearth-runner` imports; the scaffold's class paths resolve.
+> - **The label layer passes `validate_layer.report()`** — NDVI separability is not BROKEN, and the
+>   shift test finds no offset that beats zero. This gate is deliberately hard: every failure it
+>   catches is free here and expensive later.
 > - The dataset materialises and `rslearn model fit` **completes one epoch without error**.
 > - Loss is **finite and decreasing**. A NaN here is a normalisation bug, and it costs $0 to find now.
 > - Predictions are **spatially aligned** with the labels (overlay them and look — the AUC-0.23
