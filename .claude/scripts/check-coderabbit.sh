@@ -36,6 +36,25 @@ HEAD=$(gh pr view "$PR" --json headRefOid --jq '.headRefOid' 2>/dev/null) || exi
 SHORT="${HEAD:0:7}"
 echo "PR #$PR — head ${SHORT}"
 
+# 0. A SKIPPED review must never read as green. THIS IS THE ONE THAT BIT US.
+#
+#    CodeRabbit posts a SUCCESS check even when it skips the review (e.g. a label filter did not
+#    match). This script used to trust that check and then count inline comments — and a skipped
+#    review has zero comments, so it reported "✓ no CodeRabbit findings" and waved the PR through.
+#
+#    25 of the first 29 merged PRs were skipped that way. Every one of them passed this gate. The
+#    gate was theatre, and it was reporting "clean" — which is worse than having no gate at all,
+#    because it bought confidence that nothing had earned.
+#
+#    So: look for the skip notice FIRST, and fail on it.
+SKIPPED=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
+    --jq '[.[] | select(.user.login|test("coderabbit";"i")) | select(.body|test("Review skipped"))] | length' 2>/dev/null || echo 0)
+if [[ "${SKIPPED:-0}" -gt 0 ]]; then
+    fail "CodeRabbit SKIPPED this PR (it says so in a comment) — yet its check may still be green.
+    A skipped review is not a review. Check .coderabbit.yaml for a label/title filter, or comment
+    '@coderabbitai review' to trigger one."
+fi
+
 # 1. The check must have RUN on THIS head (not an ancestor).
 CHECK=$(gh api "repos/{owner}/{repo}/commits/$HEAD/check-runs" \
     --jq '[.check_runs[] | select(.name|test("coderabbit";"i"))] | last | .conclusion // "pending"' 2>/dev/null)
@@ -71,8 +90,23 @@ if [[ "$FINDINGS" -gt 0 ]]; then
             ;;
     esac
 else
-    echo "  ${GREEN}✓${NC} no CodeRabbit findings"
-    [[ "$REVIEW" == "stale" ]] && echo "  ${YELLOW}!${NC} last review predates ${SHORT} (no findings, so not blocking)"
+    # "No findings" is only meaningful if a review ACTUALLY HAPPENED. Absence of findings and
+    # absence of a review look identical from the outside — and that is exactly how 25 PRs were
+    # waved through. Demand positive evidence that CodeRabbit looked at THIS head.
+    case "$REVIEW" in
+        current:*)
+            echo "  ${GREEN}✓${NC} CodeRabbit reviewed ${SHORT} (${REVIEW#current:}) — no findings"
+            ;;
+        stale)
+            fail "no findings, but CodeRabbit's last review PREDATES ${SHORT}. It has not seen this code.
+    'No findings' from a review that never ran is not a pass."
+            ;;
+        *)
+            fail "CodeRabbit has NOT reviewed this PR at all (no review on any commit).
+    A green check is not a review — CodeRabbit posts one even when it skips. Trigger a review with
+    '@coderabbitai review', or check .coderabbit.yaml for a filter that is excluding this PR."
+            ;;
+    esac
 fi
 
 # 4. And the rest of the gates, so this is one command instead of three.

@@ -99,13 +99,18 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    # Label-based opt-in: only auto-review PRs tagged 'coderabbit'. Add the label
-    # when a PR is ready for review, so incremental pushes on a WIP/iterating PR
-    # don't each burn a review against the per-developer rolling limit. A review
-    # can always be triggered on demand by commenting '@coderabbitai review'.
-    labels:
-      - coderabbit
-    # Belt-and-suspenders: never auto-review PRs whose title marks them in-progress.
+    # NO LABEL OPT-IN. This used to require a 'coderabbit' label, and that was a hole, not a
+    # nicety: CodeRabbit SKIPS an unlabelled PR — and still posts a SUCCESS check. So the merge
+    # gate, which requires that check, read "green" while nothing had been reviewed.
+    #
+    # It was not theoretical. 25 of 29 merged PRs were skipped, every one of them waved through
+    # as "no CodeRabbit findings". A mandatory merge gate and an opt-in reviewer are a
+    # contradiction; the reviewer wins by default, silently.
+    #
+    # If CodeRabbit is a required check (it is — see .github/branch-protection.json), it must
+    # review EVERY pull request. Do not re-add a label filter without also removing the gate.
+    #
+    # Drafts are still skipped, and so are WIP titles: those never reach the merge gate anyway.
     ignore_title_keywords:
       - wip
       - draft
