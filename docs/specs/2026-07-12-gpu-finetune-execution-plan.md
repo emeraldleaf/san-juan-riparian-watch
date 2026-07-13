@@ -31,9 +31,23 @@ olmoearth-runner==0.1.14     # PyPI. Python >=3.11,<3.12 — we are on 3.11 ✓
 ```
 
 The import name is `olmoearth_run`; the **PyPI package is `olmoearth-runner`**. There is no
-`olmoearth_run` package and no `allenai/olmoearth_run` repo — our scaffold's class paths
-(`olmoearth_run.partitioners.grid.GridPartitioner`) are correct, but the install line is not obvious,
-and guessing it on a GPU clock would have cost real money. Ai2's own
+`olmoearth_run` package and no `allenai/olmoearth_run` repo.
+
+> 🔴 **This paragraph used to claim "our scaffold's class paths are correct". They were not.**
+> Installing 0.1.14 (2026-07-13) showed **five of them did not exist**. Every class *name* was right
+> and every *module path* was wrong — the real one is
+> `olmoearth_run.runner.tools.partitioners.grid_partitioner.GridPartitioner`, not
+> `olmoearth_run.partitioners.grid.GridPartitioner`. They had been written from a plausible memory
+> of the package layout and **never once imported**, and the word "correct" in a spec is not
+> evidence. The 18 `rslearn`/`lightning`/`torchmetrics` paths *were* right; only the five
+> `olmoearth_run` ones were invented, which is exactly why it read as fine.
+>
+> These fail at runner startup — i.e. **Phase 1, on a rented GPU**. A $0 typo would have been found
+> on a paid clock. `.claude/scripts/check-scaffold-classpaths.sh` now **imports every `class_path`
+> in the scaffold** and runs in `./dev.sh --check-encoding`, so the check is mechanical rather than
+> a step someone must remember. A step a human must remember to run is not a gate.
+
+The install line is not obvious, and guessing it on a GPU clock would have cost real money. Ai2's own
 [`olmoearth_projects/pyproject.toml`](https://github.com/allenai/olmoearth_projects) is the source of
 truth.
 
@@ -120,8 +134,11 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 
 **Everything that can go wrong lives here.** Nothing is rented until Phase 0's exit gate passes.
 
-1. **Install the stack** in a Python 3.11 venv (`olmoearth-runner==0.1.14`). Confirm
-   `from olmoearth_run.partitioners.grid import GridPartitioner` imports.
+1. **Install the stack** in a Python 3.11 venv (`olmoearth-runner==0.1.14`). ✅ **DONE 2026-07-13**
+   (`.venv-olmoearth/`, gitignored). Verify with `./dev.sh --check-encoding`, which now **imports
+   every `class_path` in the scaffold** — do not hand-check one symbol and call it confirmed. That
+   is how the five bogus paths survived: the real import is
+   `olmoearth_run.runner.tools.partitioners.grid_partitioner.GridPartitioner`. All 23 now resolve.
 2. **Build the label vector layer** — the real work.
    - *Control (extent):* NMRipMap → `1 = riparian, 2 = water, 3 = agriculture, 4 = other`,
      `zero_is_invalid: true`. **Four classes, not three** — this line said `3 = other` until the
@@ -163,7 +180,8 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 4. **Dry-run on `OLMOEARTH_V1_NANO`, MPS/CPU, 1 epoch, a handful of windows.**
 
 > ### ✅ Phase-0 exit gate — do not rent a GPU until ALL of these hold
-> - `olmoearth-runner` imports; the scaffold's class paths resolve.
+> - `olmoearth-runner` imports, and **every** scaffold `class_path` resolves — checked mechanically
+>   by `./dev.sh --check-encoding`, not by eye. ✅ 23/23 (2026-07-13; five were broken).
 > - **The label layer passes `validate_layer.report()`** — NDVI separability is not BROKEN, and the
 >   shift test finds no offset that beats zero. This gate is deliberately hard: every failure it
 >   catches is free here and expensive later.

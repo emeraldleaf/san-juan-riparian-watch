@@ -5,7 +5,7 @@
 # date you want riparian extent for (the model consumes a 12-month Sentinel-2 series).
 
 partition_request_geometry:
-  class_path: olmoearth_run.partitioners.grid.GridPartitioner
+  class_path: olmoearth_run.runner.tools.partitioners.grid_partitioner.GridPartitioner
   init_args:
     grid_size: 0.1          # degrees
     projection: EPSG:3857
@@ -13,7 +13,7 @@ partition_request_geometry:
     use_utm: true
 
 prepare_window_geometries:
-  class_path: olmoearth_run.partitioners.grid.GridPartitioner
+  class_path: olmoearth_run.runner.tools.partitioners.grid_partitioner.GridPartitioner
   init_args:
     grid_size: 32           # window size in pixels
     projection: EPSG:3857
@@ -22,11 +22,11 @@ prepare_window_geometries:
 
 postprocess:
   process_dataset:
-    class_path: olmoearth_run.postprocessors.combine_geotiff.CombineGeotiff
+    class_path: olmoearth_run.runner.tools.postprocessors.combine_geotiff.CombineGeotiff
   process_partition:
-    class_path: olmoearth_run.postprocessors.combine_geotiff.CombineGeotiff
+    class_path: olmoearth_run.runner.tools.postprocessors.combine_geotiff.CombineGeotiff
   process_window:
-    class_path: olmoearth_run.postprocessors.noop.NoopRaster
+    class_path: olmoearth_run.runner.tools.postprocessors.noop_raster.NoopRaster
 
 output:
   type: raster
