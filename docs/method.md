@@ -185,7 +185,30 @@ The `architecture-reviewer` agent (error 10) was described as a live Tier-2 enfo
 compliance. It wasn't. This is the single most transferable lesson here, and it is *why* the gates are
 mechanical rather than exhortative.
 
-**And a broken gate is worse than no gate**, because it reports "clean":
+**And a broken gate is worse than no gate**, because it reports "clean". The worst example is the
+merge gate itself:
+
+> ### 🔴 The merge gate was theatre for 25 of 29 merged PRs
+>
+> `.coderabbit.yaml` required a `coderabbit` **label** for auto-review. Without it CodeRabbit
+> **skips** the PR — **and still posts a SUCCESS check.** The gate trusted that check and then counted
+> inline comments; a skipped review has **zero** comments, so it printed **"✓ no CodeRabbit findings"**
+> and waved the PR straight through.
+>
+> **Absence of findings and absence of a review are indistinguishable from the outside.** That is the
+> whole bug, in one sentence.
+>
+> **Only 4 of the first 29 merged PRs were ever actually reviewed.** Every one of the other 25 passed
+> this gate. It bought confidence that nothing had earned — while I was writing documents about how
+> gates beat exhortation.
+>
+> A **mandatory** merge gate and an **opt-in** reviewer are a contradiction, and the reviewer wins it
+> silently. Fixed on both sides: the label filter is gone, and the gate now demands **positive evidence
+> of a review on the current head** and fails outright on a "Review skipped" notice.
+>
+> Found because a reviewer asked a question I could not answer without checking.
+
+Other gates that reported "clean" while broken:
 
 - The retractions registry is a **markdown table**, so `|` is the column separator — and a regex
   alternation written `a\|b` **split across columns**. The gate matched nothing and reported success.
