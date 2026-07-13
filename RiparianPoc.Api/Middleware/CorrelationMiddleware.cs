@@ -106,10 +106,12 @@ public sealed partial class CorrelationMiddleware
             ["ClientIp"] = clientIp,
         }))
         {
+            // Request.Path is DECODED user input: "/foo%0AFATAL..." arrives as "/foo\nFATAL...".
+            // Sanitize it, not just the headers — this is the value CodeQL was actually flagging.
             _logger.LogDebug(
                 "Request started: {Method} {Path}",
-                context.Request.Method,
-                context.Request.Path);
+                LogSanitizer.Clean(context.Request.Method),
+                LogSanitizer.Clean(context.Request.Path));
 
             await _next(context);
         }

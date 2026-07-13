@@ -38,8 +38,10 @@ public sealed class ExceptionHandlingMiddleware
         catch (OperationCanceledException ex) when (context.RequestAborted.IsCancellationRequested)
         {
             // Client disconnected — nothing to send back
+            // Same log-forging vector as CorrelationMiddleware: Request.Path is decoded user input.
             _logger.LogDebug(ex, "Request cancelled by client: {Method} {Path}",
-                context.Request.Method, context.Request.Path);
+                LogSanitizer.Clean(context.Request.Method),
+                LogSanitizer.Clean(context.Request.Path));
         }
         catch (Exception ex)
         {
