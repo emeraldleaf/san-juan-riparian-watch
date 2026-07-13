@@ -24,7 +24,16 @@ model:
         encoder:
         - class_path: rslearn.models.olmoearth_pretrain.model.OlmoEarth
           init_args:
-              model_id: OLMOEARTH_V1_BASE
+              # v1.1, NOT v1. MEASURED on this exact config (32x32 window, 12 monthly mosaics,
+              # patch_size 2): v1 emits 9,216 tokens/window; v1.1 emits 3,072 — it merges the S2
+              # bands into single tokens (band-set axis 3 -> 1). Attention is O(n^2), so it
+              # compounds: v1 costs ~3x and may not fit 24 GB at batch 8. Our own fair test found
+              # v1.1 ~= v1 in quality (within noise), so the saving is free.
+              #
+              # NB: Ai2's mangrove recipe uses OLMOEARTH_V1_BASE. If rslearn 0.0.27 does not wire
+              # the v1.1 id, fall back to V1_BASE and pay the 3x — but find that out in Phase 0, on
+              # a laptop, not on a rented GPU. See docs/specs/2026-07-12-gpu-finetune-execution-plan.md
+              model_id: OLMOEARTH_V1_1_BASE
               patch_size: 2
         decoders:
           riparian_classification:

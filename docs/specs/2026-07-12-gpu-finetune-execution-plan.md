@@ -13,8 +13,8 @@ written **before** the money is spent.
 |---|---|
 | Control AOI (Animas + Malpais) | **428 km²** → 4.28 M px @ 10 m → **~4,180 windows** (32×32) |
 | Sentinel-2 cube | 12 monthly mosaics × 12 bands × uint16 ≈ **1.2 GB** |
-| Model | `OLMOEARTH_V1_BASE` — **207.5 M params** (weights+grads+Adam ≈ **3.3 GB** fp32) |
-| Tokens/window | 3,072 (patch 2 · 16×16 patches · 12 dates) |
+| Model | **`OLMOEARTH_V1_1_BASE`** — 207.5 M params (weights+grads+Adam ≈ **3.3 GB** fp32) |
+| Tokens/window | **3,072** on v1.1 — vs **9,216 on v1**. Measured, see below. |
 | VRAM | **24 GB is comfortable** (L4 / A10G). 16 GB workable at batch 4 + AMP. |
 | Training | batch 8, 60 epochs ≈ 31 k steps → **2–5 GPU-hours** |
 | **Cost of the control run** | **≈ $2–5** (RunPod L4 ≈ $0.43/hr, A10G ≈ $0.34/hr) |
@@ -38,6 +38,83 @@ and guessing it on a GPU clock would have cost real money. Ai2's own
 truth.
 
 ---
+
+## 🔴 Use v1.1-Base, not v1-Base — the scaffold is wrong
+
+`model.yaml` still says `OLMOEARTH_V1_BASE`. **Measured** on the actual config (32×32 window, 12
+monthly mosaics, `patch_size: 2`):
+
+| Checkpoint | Tokens/window |
+|---|---|
+| `OLMOEARTH_V1_BASE` | **9,216** |
+| **`OLMOEARTH_V1_1_BASE`** | **3,072** — v1.1 merges the S2 bands into single tokens (band-set axis 3 → 1) |
+
+**3× fewer tokens, and attention is O(n²), so it compounds.** Every cost figure above assumes v1.1;
+on v1 the run is roughly 3× more expensive and **may not fit 24 GB at batch 8**. Our own fair test
+found **v1.1 ≈ v1 in quality** (within noise), so this is free.
+
+> ⚠️ **Phase-0 check:** Ai2's `mangrove` recipe uses `V1_BASE`, so **rslearn 0.0.27 may not wire the
+> v1.1 model ID**. Verify it resolves *before* renting anything. If it does not: either patch the ID
+> or accept 3× the cost — but decide it on the ground, not on the clock.
+
+## 🎯 Two-stage supervision — use the out-of-AOI data. It is ~1000× our in-AOI supervision.
+
+This is the single biggest lever in the plan, and the reason to be greedy about other people's data.
+
+**The problem.** Supervision available *inside* the San Juan for the species task:
+
+| In-AOI | |
+|---|---|
+| CSU field points | **167** |
+| …of which beetle-defoliated | **0** |
+| NMRipMap `IC` | 332 polygons — and it **conflates** tamarisk with Russian olive |
+
+**The data we were about to ignore**, all Colorado Plateau, all CC BY-SA / CC0:
+
+| Out-of-AOI (same ecoregion) | |
+|---|---|
+| **CSU tamarisk *probability* raster** — Dolores | **36,114 px** @30 m |
+| **CSU tamarisk probability raster** — Green | **121,070 px** @30 m |
+| CSU field points, Plateau pool | 1,096 records (**305 beetle-affected**) |
+| CO-RIP riparian extent | basin-wide (incl. our AOI), millions of px — weak, 2–35 % OOB |
+
+**The design: pre-train on abundant-and-weak, fine-tune on scarce-and-strong.**
+
+| Stage | Labels | Imagery | Why |
+|---|---|---|---|
+| **A — auxiliary** | CO-RIP extent (2016) · CSU tamarisk probability, Dolores + Green (2016) | **S2 2016** | Learn the representation from ~1000× more supervision |
+| **B — fine-tune** | NMRipMap (extent) · CSU field points (species, incl. defoliation) | **S2 2020** / **S2 2017** | Adapt to the real task on the labels we trust |
+| **Validate** | held-out AOI windows | matching year | Report honestly, per ecoregion |
+
+**This is also the FM's central claim, finally put to the test.** "Better accuracy from the same
+scarce labels" is what a foundation model is *for*, and our literature review recorded it as
+**untested** in this domain. Stage A→B is exactly that experiment: if the FM cannot convert abundant
+weak supervision into in-AOI accuracy, that is a real finding about foundation models, not a shrug.
+
+### The four guardrails — without these it is just noise
+
+1. **Ecoregion-match the auxiliary data.** Colorado Plateau only. The beetle-pool ADR established that
+   pooling across ecoregions imports domain shift; CO-RIP's own κ spans **0.42–0.90 across ecoregions**.
+   Do not pour the Sonoran Desert into the loss because it is free.
+2. **Confidence-weight the loss.** CO-RIP's OOB error is 2–35 % *by ecoregion* and it **over-predicts at
+   high elevation** — `corip.py::ECOREGION_CONFIDENCE` already carries this (0.55 Southern Rockies,
+   0.95 arid lowland). An unweighted weak label teaches the model that **upland is riparian**, which is
+   the exact failure the NMRipMap crosswalk exists to prevent.
+3. **Match each label source to its own year.** CO-RIP & the CSU raster are **2016** → S2 2016. NMRipMap
+   is **2020** → S2 2020. CSU points are **2017** → S2 2017. Never mix a label with another year's
+   reflectance; we have already made that mistake once.
+4. **Mind the 30 m → 10 m boundary noise.** CO-RIP and the CSU raster are Landsat-derived; rasterised
+   onto a 10 m grid, every class boundary is up to three pixels of nonsense. **Down-weight boundary
+   pixels**, or run Stage A at 30 m and Stage B at 10 m.
+
+### And the honest caveat
+
+The CSU tamarisk raster is **Landsat-derived — and CSU themselves say Landsat cannot resolve the
+tamarisk phenological signature** (*"without a different sensor with greater spectral or grain
+resolution this is a difficult constraint to overcome"*). So Stage A teaches the model a **noisy,
+sensor-limited** notion of tamarisk. That is fine for a *prior* and dangerous as a *target*: if Stage B
+cannot pull away from it, we have merely learned to imitate the incumbent's limits. **Report the Stage-A
+-only baseline alongside Stage A→B**, so the difference is visible rather than assumed.
 
 ## Phase 0 — local, free, and the entire risk
 
