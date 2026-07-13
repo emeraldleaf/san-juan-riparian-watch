@@ -216,6 +216,15 @@ Other gates that reported "clean" while broken:
   STATUS.md, the README and the hub all sailed through while carrying a false claim.
 - `mapfile` doesn't exist in macOS bash 3.2 — a gate that doesn't run identically on a laptop and in CI
   is not a gate.
+- **A third kind of semantic drift the gates do not catch: *stale open items*.**
+  `docs/data-licenses.md` listed "the repository has no LICENSE file" as 🔴 **open** — for hours after
+  the LICENSE had been added and merged. Nobody noticed, **including me**, until a reader asked
+  whether the open items were still open.
+  The registries catch *retracted claims*, *retired identifiers* and *unreachable docs*. They do not
+  catch **"a document says something is unresolved when it has been resolved."** And this is the
+  *flattering* kind of drift — it makes the project look like it has **more** open problems than it
+  does, so nothing about it feels wrong, and no instinct fires. **The drift you notice is the drift
+  that embarrasses you.**
 - **The gates only scanned *tracked* files.** `git grep` and `git ls-files` do not see a brand-new
   file, so a gate could pass on a laptop and fail in CI — which is exactly what happened **on the pull
   request that added this very document**. The gate refused to merge it, correctly, and in doing so

@@ -91,6 +91,17 @@ recur get *promoted a tier*: from a comment, to a rule, to a gate.
 | 8 | Nine tile queries had **drifted apart**; the index-backed bbox pre-filter was missing from some | 10–40× slowdowns, per-layer and invisible | refactor to one canonical `MvtTileSql.Build` |
 | 9 | `max_timesteps` **floored**, so a stride kept *more* steps than requested | silently ran a different experiment than configured; later fatal | running it |
 | 10 | Shipped **DEBUG colors** in the map legend | magenta "unknown" polygons in a portfolio demo | map-UI review |
+| 11 | **`Request.Path` logged unsanitised** — ASP.NET Core *decodes* it, so `/foo%0AFATAL...` arrives as `"/foo\nFATAL..."` | **log forging**: an attacker writes lines into the audit trail meant to catch them | **CodeQL** (`cs/log-forging`, error) |
+
+> **Defect 11 is the most instructive one here, because the first fix was wrong.** CodeQL flagged the
+> middleware; I read it as the `X-Correlation-Id` / `X-Session-Id` headers, sanitised those, added 12
+> tests, and shipped it. The headers *were* a real bug — the correlation ID is echoed into a response
+> header, so it was also a response-splitting vector — **but it was not what the scanner was pointing
+> at, and the alert stayed open.** The tainted value was `Request.Path` all along, in **two**
+> middlewares, one of which I had never touched.
+>
+> **A scanner that keeps complaining after you have "fixed" something is usually right.** The
+> temptation at that moment is to dismiss the alert as a false positive. It was not.
 
 **Pattern:** defects 2–7 were all in the **Python ETL**, all data-corrupting, and all invisible to the
 test suite — because they were *semantic*, not syntactic. The ETL produced numbers. The numbers were
