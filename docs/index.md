@@ -125,6 +125,9 @@ That is what this project is for — and their recommendation is, in effect, its
 - [Stage 1 — riparian delineation](specs/2026-07-03-stage1-riparian-delineation.md)
 - [Stage 2 — invasives / Tamarix](specs/2026-07-11-stage2-invasives-tamarix.md)
 - [Stage 3 — annual change](specs/2026-07-04-stage3-annual-change.md)
+- [**GPU fine-tune execution plan**](specs/2026-07-12-gpu-finetune-execution-plan.md) — costed, with
+  the abort criteria written *before* the money is spent. **Compute is not the constraint** (~$2–5 for
+  the control run); the `rslearn` data build is, so it happens locally and for free first.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
