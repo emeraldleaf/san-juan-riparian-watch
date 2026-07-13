@@ -73,14 +73,38 @@ case "$STATUS" in
         ;;
 esac
 
-# 1. The check must have RUN on THIS head (not an ancestor).
-CHECK=$(gh api "repos/{owner}/{repo}/commits/$HEAD/check-runs" \
-    --jq '[.check_runs[] | select(.name|test("coderabbit";"i"))] | last | .conclusion // "pending"' 2>/dev/null)
-case "$CHECK" in
-    success)  echo "  ${GREEN}✓${NC} CodeRabbit check: success (on ${SHORT})" ;;
-    pending|null|"") fail "CodeRabbit has not finished on ${SHORT} — wait for it." ;;
-    *)        fail "CodeRabbit check = ${CHECK} on ${SHORT}." ;;
-esac
+# 1. Did CodeRabbit read THIS head — not an ancestor of it?
+#
+#    This USED to assert a green `coderabbit` CHECK-RUN on the head. That was wrong in both
+#    directions, and it is the second time this gate has been wrong about its own evidence:
+#
+#      TOO WEAK  — a check-run only proves CodeRabbit *ran*. It says nothing about WHICH commit it
+#                  read. That is the whole question a merge gate exists to answer.
+#      TOO STRONG— CodeRabbit emits NO check-run for an on-demand review ('@coderabbitai review').
+#                  So the gate demanded a signal that would never arrive and blocked, forever, on
+#                  four PRs it had in fact fully reviewed with zero findings.
+#
+#    A gate that blocks forever is not "safe". It is a gate people learn to bypass — which is how
+#    you end up merging unreviewed code with a clean conscience.
+#
+#    The honest evidence is CodeRabbit's own walkthrough, which states the commit range it read:
+#    "Files that changed ... between <base-sha> and <head-sha>". If the CURRENT head appears there,
+#    CodeRabbit has seen the code we are about to merge. That is strictly stronger than the check.
+#
+#    Beware the sibling trap: an on-demand review replies "✅ Review finished" even when it did
+#    nothing ("does not re-review already reviewed commits"). Never take that reply as evidence.
+#    Only the head SHA appearing in a walkthrough counts.
+REVIEWED_HEAD=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
+    --jq '.[] | select(.user.login|test("coderabbit";"i")) | .body' 2>/dev/null \
+    | grep -oiE '\b[0-9a-f]{40}\b' | grep -Fxc "$HEAD" || true)
+
+if [[ "${REVIEWED_HEAD:-0}" -gt 0 ]]; then
+    echo "  ${GREEN}✓${NC} CodeRabbit's walkthrough names ${SHORT} — it read this exact head"
+else
+    fail "CodeRabbit has not reviewed ${SHORT}.
+    Its walkthrough does not name this commit, so it has not seen what you are about to merge.
+    Push, or trigger it with '@coderabbitai review' — and do NOT trust a bare '✅ Review finished'."
+fi
 
 # 2. Unaddressed review findings block the merge, even with a green check.
 #    Top-level comments only (in_reply_to_id == null); a thread we replied in is engaged-with.
