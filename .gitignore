@@ -35,3 +35,5 @@ __pycache__/
 # macOS
 .DS_Store
 .venv-olmoearth/
+olmoearth_run_data/riparian_extent/dataset/
+.tmp/
