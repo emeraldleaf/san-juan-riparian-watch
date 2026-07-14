@@ -175,8 +175,34 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
      truth — it *is* the imagery NMRipMap was photo-interpreted from. A metric tells you the labels
      are self-consistent; only your eyes tell you they are on the trees.
 3. **Materialise the Sentinel-2 cube locally** (`rslearn dataset prepare|ingest|materialize`). This is
-   **CPU + network**, ~1.2 GB. Do it here, not on a GPU clock — a GPU idling during a Planetary
-   Computer download is money set on fire.
+   **CPU + network**. Do it here, not on a GPU clock — a GPU idling during a Planetary Computer
+   download is money set on fire. Built by `riparian/delineation/rslearn_dataset.py`.
+
+   > 🔴 **"~1.2 GB" was wrong, and it filled the boot disk (2026-07-13).**
+   > That figure describes the **materialised** output — 238 windows of 32×32 px is genuinely tiny.
+   > But **`ingest` does not download 32×32 chips.** It pulls **whole Sentinel-2 granules** into a
+   > tile store: each band is a full ~110 km scene, and with `max_matches: 12` over 12 monthly
+   > periods × 12 bands that is **tens of GB**. Two separate numbers were collapsed into one.
+   >
+   > Worse, it landed on the **wrong disk**. The dataset lives on the external drive, but `rslearn`
+   > stages downloads through **`TMPDIR`**, which defaults to `/var/folders` on the *boot* volume.
+   > It filled `/` to zero — hard enough that no tooling could write, including the tooling needed
+   > to clean up.
+   >
+   > **Export `TMPDIR` (and `TMP`/`TEMP`) onto the external drive before ingesting**, e.g.
+   > `.tmp/` in the repo root (gitignored). Budget **~15 GB** for the tile store, not 1.2 GB. The
+   > materialised windows really are ~1.2 GB — that number was never wrong, just answering a
+   > different question than the one that fills your disk.
+
+   > ⚠️ **`materialize` exits 0 when it has done nothing.** Our first run threw
+   > `NotImplementedError` on all 238 windows, swallowed it into the worker pool, and reported
+   > success having written **zero** GeoTIFFs. Cause: the scaffold said `"ingest": false` — the
+   > *direct-materialize* path, which requires the data source to implement `get_item_by_name`.
+   > Planetary Computer's `Sentinel2` inherits the base version, which **raises
+   > `NotImplementedError` by design**. It is now `"ingest": true`.
+   > **Never trust the exit code**: call `rslearn_dataset.verify_materialized()`, which asserts the
+   > rasters are on disk. A green exit that means "nothing happened" is the most expensive kind of
+   > green — on a GPU you would train on an empty cube and the loss would fall anyway.
 4. **Dry-run on `OLMOEARTH_V1_NANO`, MPS/CPU, 1 epoch, a handful of windows.**
 
 > ### ✅ Phase-0 exit gate — do not rent a GPU until ALL of these hold
