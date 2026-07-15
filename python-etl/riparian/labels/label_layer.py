@@ -4,8 +4,9 @@ This is Phase 0, step 2 of ``docs/specs/2026-07-12-gpu-finetune-execution-plan.m
 critical path. Every GPU phase is blocked on it, and it is free, so every mistake that can be
 found here is a mistake that does not get paid for at $0.43/hr.
 
-The output is a GeoJSON ``FeatureCollection`` carrying integer class ids, matching the scaffold's
-``num_classes: 4`` and ``zero_is_invalid: true``:
+The output is a GeoJSON ``FeatureCollection`` carrying integer class ids. With
+``zero_is_invalid: true`` reserving id 0, the four real classes need ``num_classes: 5`` in the
+scaffold (a laptop dry-run caught it set to 4 — ``Target 4 is out of bounds``):
 
 ===  ==========================================================================
 id   class
@@ -45,13 +46,25 @@ import logging
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Protocol
 
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
 from . import nmripmap
 from .nmripmap import PHASE1_CLASS_IDS, LabeledPolygon
+
+
+class LabeledPolygonReader(Protocol):
+    """The I/O boundary: fetch labeled polygons for a bbox.
+
+    A Protocol (per the python coding standard) so the NMRipMap fetch can be swapped for a fixture
+    in tests, or for a different label source, without touching the pure ``assemble`` logic. The
+    default binding is :func:`nmripmap.fetch_labeled`.
+    """
+
+    def __call__(self, bbox: tuple[float, float, float, float]) -> list[LabeledPolygon]:
+        ...
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +120,7 @@ def build_extent_labels(
     bbox: tuple[float, float, float, float],
     corridor: object | None = None,
     max_negative_ratio: float = MAX_NEGATIVE_RATIO,
+    reader: LabeledPolygonReader = nmripmap.fetch_labeled,
 ) -> tuple[dict, LayerStats]:
     """Build the extent (Stage-1) label layer for a bbox.
 
@@ -115,6 +129,8 @@ def build_extent_labels(
         corridor: A shapely geometry — the VBET valley bottom — that negatives are clipped to.
             ``None`` disables the clip, which is only correct for a test.
         max_negative_ratio: Cap on negative:positive area. See :data:`MAX_NEGATIVE_RATIO`.
+        reader: The labeled-polygon source (the I/O boundary). Defaults to
+            :func:`nmripmap.fetch_labeled`; inject a fixture to exercise this function offline.
 
     Returns:
         ``(feature_collection, stats)``.
@@ -124,8 +140,7 @@ def build_extent_labels(
             never a legitimate label layer, and training on it would "succeed" while learning
             nothing.
     """
-    polys = nmripmap.fetch_labeled(bbox)
-    return assemble(polys, corridor=corridor, max_negative_ratio=max_negative_ratio)
+    return assemble(reader(bbox), corridor=corridor, max_negative_ratio=max_negative_ratio)
 
 
 def assemble(

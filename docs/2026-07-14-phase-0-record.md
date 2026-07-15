@@ -46,9 +46,23 @@ and you find out after you've paid.
 
 | test | question | result on the Farmington reach |
 |---|---|---|
-| **Separability** | does NDVI (S2 2020, the labels' own vintage) separate riparian from corridor negatives? | **AUC 0.777** — in the plausible band; not <0.65 (broken) nor >0.95 (leaking) |
-| **Shift** | does a *translated* label mask score better — i.e. are they aligned, or merely correlated? | **best shift (0,0)** — labels sit *on* the pixels |
-| **Eyes** | overlay on NAIP 2020, the imagery NMRipMap was drawn from | (manual) |
+| **Separability** | does NDVI (S2 2020, the labels' own vintage) separate riparian from corridor negatives? | **AUC 0.740** — in the plausible band; not <0.65 (broken) nor >0.95 (leaking) |
+| **Shift** | does a *translated* label mask score better — i.e. are they aligned, or merely correlated? | best offset **(1, 0)**, +0.013 — a marginal ~1 px (10 m) offset; see caveat |
+| **Eyes** | overlay on NAIP 2020, the imagery NMRipMap was drawn from | (manual — **do this before Phase 1**, see caveat) |
+
+> **Corrected 2026-07-14, against ourselves.** The first pass reported **AUC 0.777, shift (0,0)**.
+> CodeRabbit's review caught that the validator's negative set included **water** (class 2), which
+> is trivially separable from vegetation and inflated the score. Excluding water — the negative set
+> is *corridor* (agriculture + other) — drops it to **0.740**. Still healthy, now honest. Reproduce
+> with `olmoearth_run_data/riparian_extent/validate_materialized.py`, which scores the **materialised
+> cube** (the exact training pixels), not the ad-hoc harness the 0.777 came from.
+>
+> The fix also swapped the per-window shift test (noise-dominated on 32×32 tiles) for a **global,
+> pooled-across-windows** one, which surfaces a **marginal ~1 px (10 m) offset**: pooled AUC 0.753 at
+> (1,0) vs 0.740 unshifted. **Not a code bug** — a rasterisation convention flip would crater the AUC
+> to ~0.5, not nudge it by 0.013. It is the sub-pixel registration slack of fusing 0.6 m NAIP-drawn
+> polygons onto a 10 m grid. **Confirm with the NAIP overlay before Phase 1**: a real 1 px label
+> offset blurs a segmentation boundary, and only the eyes-on check settles whether this is that or slack.
 
 The shift test exists because we've been burned by its cousin: the AUC-0.23 incident *looked*
 exactly like a misalignment and was an unshuffled CV split. A real one looks identical — so measure
@@ -138,7 +152,7 @@ Principles this phase reinforced, worth applying beyond it:
 - **Ran without the VBET corridor clip.** The negatives are NMRipMap's own non-riparian classes —
   already corridor-ish, but not the tight valley-bottom clip the design calls for. The clip should
   *tighten* separability, not loosen it, but **we haven't measured that**, so we don't claim it.
-- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.777
+- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.740
   holds on the narrow headwater corridors, where a 320 m window is mostly upland.
 - **Pooling decoder = one label per window.** The smoke test kept the scaffold's mangrove-style
   per-window classifier. Our windows are *not* single-class, so this is a real modelling limitation

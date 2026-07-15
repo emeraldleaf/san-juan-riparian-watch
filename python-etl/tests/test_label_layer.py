@@ -104,6 +104,22 @@ def test_a_nonfinite_or_nonpositive_cap_is_refused() -> None:
             label_layer.assemble(polys, max_negative_ratio=bad)
 
 
+def test_build_extent_labels_uses_the_injected_reader() -> None:
+    """The fetch boundary is a Protocol, so it can be exercised offline with a fixture reader."""
+    polys = [_poly(0.0, 0.0, RIPARIAN_WOODY_NATIVE), _poly(0.02, 0.02, UPLAND)]
+    seen: list[tuple[float, float, float, float]] = []
+
+    def fake_reader(bbox: tuple[float, float, float, float]) -> list[LabeledPolygon]:
+        seen.append(bbox)
+        return polys
+
+    fc, stats = label_layer.build_extent_labels((-1.0, -1.0, 1.0, 1.0), reader=fake_reader)
+
+    assert seen == [(-1.0, -1.0, 1.0, 1.0)], "the injected reader was not called with the bbox"
+    assert stats.n_positive == 1
+    assert len(fc["features"]) == stats.n_features
+
+
 def test_features_carry_the_label_vintage() -> None:
     """2020 labels must be fitted on 2020 imagery. We have made the opposite mistake once."""
     fc, _ = label_layer.assemble([_poly(0.0, 0.0, RIPARIAN_WOODY_NATIVE)])
