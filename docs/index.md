@@ -106,9 +106,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim
   about the literature, and a single paper can falsify it. This is the record of us trying to do
-  exactly that, **to ourselves, on purpose** — and of the three attacks that landed.
-  Paired with [Retractions](RETRACTIONS.md), which is **machine-checked**: once a claim is retracted,
-  CI fails any document still asserting it.
+  exactly that, **to ourselves, on purpose** — of the four attacks that landed on the *product*
+  claim, and of a fifth on the *method*: [riparian methods vs. the FM
+  fine-tune](audits/2026-07-14-riparian-methods-prior-art.md), where the foundation-model
+  contribution **survives** but the surrounding workflow turns out to be published practice we must
+  cite, not invent. Paired with [Retractions](RETRACTIONS.md), which is **machine-checked**: once a
+  claim is retracted, CI fails any document still asserting it.
 
 ## Reference
 

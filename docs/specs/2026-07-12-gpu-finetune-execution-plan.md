@@ -23,6 +23,36 @@ written **before** the money is spent.
 **Spending $40 is not the risk. Spending three days debugging `rslearn` on a rented GPU is.** The plan
 is built around that.
 
+## Prior methods check — riparian analogs, not just mangrove
+
+This is **not** a greenfield remote-sensing idea, and the scaffold's mangrove lineage hides how much
+riparian-specific precedent exists. Prior Colorado River Basin work has already mapped riparian
+corridor extent, riparian vegetation, tamarisk, and Russian olive using field labels,
+valley-bottom / corridor constraints, Landsat/Sentinel imagery, and ML workflows. Full audit:
+[`audits/2026-07-14-riparian-methods-prior-art.md`](../audits/2026-07-14-riparian-methods-prior-art.md).
+
+1. **CO-RIP** defines riparian corridors via **valley bottoms**, then maps vegetation presence/absence
+   inside them — published support for **constraining negatives to the corridor / VBET rather than
+   training on arbitrary desert negatives**, and for **per-ecoregion reporting** (its accuracy varies
+   by ecoregion).
+2. **CSU/Walton, *Mapping Native & Non-Native Riparian Vegetation in the Colorado River Watershed***
+   — the closest procedural analogue for tamarisk + Russian olive: field data, scene-based Landsat/
+   Sentinel models, 2006/2016 mapping. It documents that **strong evaluation statistics still hid
+   qualitatively wrong maps** — published support for our **overlay-and-look gate**.
+3. **CSU 2017 occurrence/absence dataset** — published *for* species distribution modeling + RS
+   detection: citable provenance for the Phase-2 field labels.
+
+**What appears un-done is the FM experiment itself** — staged weak→strong supervision for riparian
+extent and invasive-species transfer. Prior work supports the RS task and the label design; the
+foundation-model fine-tune is the experimental contribution. So the framing is: **not "remote sensing
+of riparian vegetation" (done, here, repeatedly), but "can an EO foundation model turn abundant weak
+riparian labels into better scarce-label performance for corridor extent and invasives."**
+
+> **Being right is not being first.** Corridor negatives, year-matched labels, and overlay-and-look
+> are *validated by* this literature, not invented by us. Cite them as support; do not present them
+> as novelty. And the invasives half is not cleared until the Walton report gets a direct
+> `/paper-audit` (secondary synthesis is how the Evangelista claim survived, wrong, for weeks).
+
 ## The stack (verified, not assumed)
 
 ```
