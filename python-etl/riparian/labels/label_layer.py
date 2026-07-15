@@ -134,6 +134,21 @@ def assemble(
     max_negative_ratio: float = MAX_NEGATIVE_RATIO,
 ) -> tuple[dict, LayerStats]:
     """Assemble labeled polygons into the layer. Split from the fetch so it is testable offline."""
+    import math
+
+    if not math.isfinite(max_negative_ratio) or max_negative_ratio <= 0:
+        # A NaN cap makes ``neg_area + a > budget`` false for every candidate, so the balance step
+        # silently accepts ALL negatives — the head then cheats by predicting "other" everywhere.
+        # Fail loudly instead of shipping an unbalanced layer that looks fine.
+        raise ValueError(
+            f"max_negative_ratio must be finite and positive, got {max_negative_ratio!r}"
+        )
+
+    # Canonicalize before partitioning so the seeded negative sampling and the emitted feature order
+    # do not depend on whatever order fetch_labeled() (a DB/API) happened to return. Without this,
+    # the same input in a different order yields a different capped subset — irreproducible labels.
+    polys = sorted(polys, key=lambda p: (p.label, p.l2_code, p.geometry.bounds))
+
     positives: list[tuple[LabeledPolygon, int]] = []
     negatives: list[tuple[LabeledPolygon, int]] = []
 
@@ -149,37 +164,9 @@ def assemble(
             "positive class. Check the bbox and the L2_Code crosswalk before training on this."
         )
 
-    # 1. Clip negatives to the corridor. A negative outside the valley bottom teaches the model
-    #    to separate riparian from desert, which is not the task.
-    dropped = 0
-    if corridor is not None:
-        kept: list[tuple[LabeledPolygon, int]] = []
-        for p, cid in negatives:
-            geom = p.geometry
-            if not geom.intersects(corridor):
-                dropped += 1
-                continue
-            clipped = geom.intersection(corridor)
-            if clipped.is_empty:
-                dropped += 1
-                continue
-            kept.append((_with_geometry(p, clipped), cid))
-        negatives = kept
-
+    negatives, dropped = _clip_to_corridor(negatives, corridor)
     pos_area = sum(_area_m2(p.geometry) for p, _ in positives)
-
-    # 2. Balance. Sample (deterministically) until the negative area is within the cap.
-    rng = random.Random(SEED)
-    rng.shuffle(negatives)
-    budget = pos_area * max_negative_ratio
-    balanced: list[tuple[LabeledPolygon, int]] = []
-    neg_area = 0.0
-    for p, cid in negatives:
-        a = _area_m2(p.geometry)
-        if neg_area + a > budget:
-            continue
-        balanced.append((p, cid))
-        neg_area += a
+    balanced, neg_area = _balance(negatives, budget=pos_area * max_negative_ratio)
 
     stats = LayerStats(
         n_features=len(positives) + len(balanced),
@@ -189,10 +176,51 @@ def assemble(
         negative_area_m2=neg_area,
         dropped_outside_corridor=dropped,
     )
-    _log(stats, n_negative_available=len(negatives))
+    _log(stats, n_negative_available=len(negatives), max_negative_ratio=max_negative_ratio)
 
     features = [_feature(p, cid) for p, cid in positives + balanced]
     return {"type": "FeatureCollection", "features": features}, stats
+
+
+def _clip_to_corridor(
+    negatives: list[tuple[LabeledPolygon, int]], corridor: object | None
+) -> tuple[list[tuple[LabeledPolygon, int]], int]:
+    """Clip negatives to the valley bottom. A negative outside it teaches riparian-vs-desert.
+
+    Returns the kept (clipped) negatives and the count dropped as outside the corridor.
+    """
+    if corridor is None:
+        return negatives, 0
+    kept: list[tuple[LabeledPolygon, int]] = []
+    dropped = 0
+    for p, cid in negatives:
+        clipped = p.geometry.intersection(corridor) if p.geometry.intersects(corridor) else None
+        if clipped is None or clipped.is_empty:
+            dropped += 1
+            continue
+        kept.append((_with_geometry(p, clipped), cid))
+    return kept, dropped
+
+
+def _balance(
+    negatives: list[tuple[LabeledPolygon, int]], budget: float
+) -> tuple[list[tuple[LabeledPolygon, int]], float]:
+    """Sample negatives (deterministically) until their area reaches the cap ``budget``.
+
+    ``negatives`` is already in canonical order, so the seeded shuffle is reproducible.
+    """
+    rng = random.Random(SEED)
+    shuffled = list(negatives)
+    rng.shuffle(shuffled)
+    balanced: list[tuple[LabeledPolygon, int]] = []
+    neg_area = 0.0
+    for p, cid in shuffled:
+        a = _area_m2(p.geometry)
+        if neg_area + a > budget:
+            continue
+        balanced.append((p, cid))
+        neg_area += a
+    return balanced, neg_area
 
 
 def _with_geometry(p: LabeledPolygon, geom) -> LabeledPolygon:
@@ -216,7 +244,7 @@ def _feature(p: LabeledPolygon, cid: int) -> dict:
     }
 
 
-def _log(stats: LayerStats, n_negative_available: int) -> None:
+def _log(stats: LayerStats, n_negative_available: int, max_negative_ratio: float) -> None:
     logger.info(
         "label layer: %d features (%d riparian, %d negative), negative:positive area = %.2f",
         stats.n_features,
@@ -235,7 +263,7 @@ def _log(stats: LayerStats, n_negative_available: int) -> None:
             "  balance cap dropped %d of %d available negatives (cap = %.1fx positive area)",
             n_negative_available - stats.n_negative,
             n_negative_available,
-            MAX_NEGATIVE_RATIO,
+            max_negative_ratio,
         )
 
 
