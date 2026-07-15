@@ -189,10 +189,18 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
    > It filled `/` to zero — hard enough that no tooling could write, including the tooling needed
    > to clean up.
    >
-   > **Export `TMPDIR` (and `TMP`/`TEMP`) onto the external drive before ingesting**, e.g.
-   > `.tmp/` in the repo root (gitignored). Budget **~15 GB** for the tile store, not 1.2 GB. The
-   > materialised windows really are ~1.2 GB — that number was never wrong, just answering a
-   > different question than the one that fills your disk.
+   > **Redirect ALL temp onto the external drive before ingest AND materialize**, e.g. `.tmp/` in
+   > the repo root (gitignored). Two separate temp mechanisms escape to the boot disk, and fixing
+   > only the first is a trap:
+   > - `export TMPDIR=… TMP=… TEMP=…` — Python/rslearn staging (the **ingest** leak).
+   > - `export CPL_TMPDIR=…` — **GDAL's own** scratch (the **materialize** leak). Setting `TMPDIR`
+   >   does *not* cover this; materialize still wrote ~2.8 GB to `/` until `CPL_TMPDIR` was set.
+   >   Also cap `GDAL_CACHEMAX` (e.g. 256).
+   >
+   > Budget **~15 GB** for the tile store (ours came to **11 GB**), not 1.2 GB. The materialised
+   > windows really are ~1.2 GB — that number was never wrong, just answering a different question
+   > than the one that fills your disk. Tile store + materialized output live on the data drive; the
+   > *only* thing that ever touched `/` was unredirected temp.
 
    > ⚠️ **`materialize` exits 0 when it has done nothing.** Our first run threw
    > `NotImplementedError` on all 238 windows, swallowed it into the worker pool, and reported
