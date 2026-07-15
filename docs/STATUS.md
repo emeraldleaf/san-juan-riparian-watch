@@ -11,7 +11,8 @@ On branch **`feat/label-layer-and-imagery-validation`** (PR **#39**, open). Phas
 [GPU fine-tune plan](specs/2026-07-12-gpu-finetune-execution-plan.md) is complete and its exit gate
 is **met** — all four steps ran on a laptop for $0:
 1. Stack installed; **all 23 scaffold class paths import** (5 were broken fiction).
-2. Label layer built + **validated against S2 2020 imagery**: separability AUC 0.777, spatial shift (0,0).
+2. Label layer built + **validated against S2 2020 imagery**: separability AUC **0.740** (water excluded
+   after CodeRabbit review; 0.777 was inflated by it), with a marginal ~1 px offset to confirm by eye.
 3. S2 cube materialised: **238 windows, 2,856 GeoTIFFs, verified on disk** (not by exit code).
 4. NANO dry-run: `rslearn model fit` ran 3 epochs, **val_loss 1.455 → 1.428 → 1.401**.
 
