@@ -1,9 +1,29 @@
 # Project Status
 
-**Last updated:** 2026-07-12
+**Last updated:** 2026-07-14
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
+
+## ⏩ Latest: Phase 0 of the GPU fine-tune is DONE (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
+
+On branch **`feat/label-layer-and-imagery-validation`** (PR **#39**, open). Phase 0 of the
+[GPU fine-tune plan](specs/2026-07-12-gpu-finetune-execution-plan.md) is complete and its exit gate
+is **met** — all four steps ran on a laptop for $0:
+1. Stack installed; **all 23 scaffold class paths import** (5 were broken fiction).
+2. Label layer built + **validated against S2 2020 imagery**: separability AUC 0.777, spatial shift (0,0).
+3. S2 cube materialised: **238 windows, 2,856 GeoTIFFs, verified on disk** (not by exit code).
+4. NANO dry-run: `rslearn model fit` ran 3 epochs, **val_loss 1.455 → 1.428 → 1.401**.
+
+**Seven traps caught for $0** (method receipts 13–19), each of which would have failed on a rented
+GPU. **Two decisions are open before Phase 1** — chiefly **per-window vs per-pixel decoder**
+(the scaffold's pooling head is coarse for per-pixel extent; `rslearn` ships `UNetDecoder`). See the
+record's "Open decisions". **Do not rent a GPU until the decoder choice is made.**
+
+New/changed this session: `riparian/labels/{label_layer,validate_layer}.py`,
+`riparian/delineation/{rslearn_dataset,decoders}.py`, `make_dryrun_config.py`,
+`check-scaffold-classpaths.sh`, `model.yaml` (num_classes 5), fixed merge gate. Temp MUST go on the
+data drive (`TMPDIR`+`CPL_TMPDIR`, finding 17). Everything below predates this and may be stale.
 
 ## Current state — git, PRs, and WHY things are where they are (2026-07-12)
 
