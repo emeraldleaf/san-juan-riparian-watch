@@ -84,6 +84,36 @@ SHIFTS: Final[tuple[int, ...]] = (-3, -2, -1, 0, 1, 2, 3)
 
 POSITIVE_CLASS: Final[int] = 1
 
+#: The hard negatives — the ones the model must learn to reject. Agriculture (3) is as green as
+#: riparian; "other" (4) is the corridor's non-vegetated ground. **Water (2) is deliberately
+#: excluded**: it is trivially separable from vegetation by NDVI, so letting it into the negative
+#: set inflates every AUC and can clear the gate while agriculture stays inseparable. The
+#: separability contract is riparian-vs-corridor, not riparian-vs-water.
+CORRIDOR_NEGATIVE_CLASSES: Final[tuple[int, int]] = (3, 4)
+
+#: A nonzero shift must beat zero by MORE than this to count as a real displacement. Sampling
+#: jitter alone moves AUC by ~this much, so within it we call the labels aligned — and we snap the
+#: reported best_shift to (0, 0) so the gate and the log cannot disagree.
+ALIGNMENT_TOLERANCE: Final[float] = 0.01
+
+
+def _translate(mask: np.ndarray, dy: int, dx: int) -> np.ndarray:
+    """Shift ``mask`` by (dy, dx), filling vacated cells with 0 (no label) — **no wrap**.
+
+    ``np.roll`` wraps edge pixels onto the opposite side, so a label touching the tile boundary
+    would be scored against unrelated imagery on the far edge and could inflate the AUC. A padded
+    translation drops what falls off the edge and leaves the newly exposed border unlabeled, which
+    is what a real registration offset does.
+    """
+    out = np.zeros_like(mask)
+    h, w = mask.shape
+    src_y0, src_y1 = max(0, -dy), min(h, h - dy)
+    src_x0, src_x1 = max(0, -dx), min(w, w - dx)
+    dst_y0, dst_y1 = max(0, dy), min(h, h + dy)
+    dst_x0, dst_x1 = max(0, dx), min(w, w + dx)
+    out[dst_y0:dst_y1, dst_x0:dst_x1] = mask[src_y0:src_y1, src_x0:src_x1]
+    return out
+
 
 @dataclass(frozen=True)
 class Separability:
@@ -114,11 +144,15 @@ class Alignment:
 
     @property
     def is_aligned(self) -> bool:
-        """True when no shift beats the unshifted labels by a meaningful margin.
+        """True only when the reported best shift is exactly zero.
 
-        The 0.01 tolerance is noise, not signal — sampling jitter alone moves AUC by that much.
+        The jitter tolerance is applied earlier, *inside best-shift selection* (see ``alignment``):
+        a nonzero offset that beats zero by less than :data:`ALIGNMENT_TOLERANCE` is snapped back to
+        ``(0, 0)`` there. So by the time we get here, a nonzero ``best_shift`` means a shift beat
+        zero by a real margin — which must fail the gate. Keeping the tolerance out of this property
+        is what stops the gate from passing while the log says "unshifted is best".
         """
-        return self.best_shift == (0, 0) or self.best_auc - self.unshifted_auc < 0.01
+        return self.best_shift == (0, 0)
 
 
 def auc(positive: np.ndarray, negative: np.ndarray) -> float:
@@ -148,7 +182,19 @@ def auc(positive: np.ndarray, negative: np.ndarray) -> float:
 
 
 def separability(ndvi_positive: np.ndarray, ndvi_negative: np.ndarray) -> Separability:
-    """Test 1 — can NDVI see the classes at all?"""
+    """Test 1 — can NDVI see the classes at all?
+
+    Args:
+        ndvi_positive: NDVI values sampled inside riparian (class 1) polygons/pixels. NaNs allowed
+            (cloud-masked); they are dropped before scoring.
+        ndvi_negative: NDVI values sampled inside **corridor negatives** — agriculture (3) and other
+            (4), *not* water (see :data:`CORRIDOR_NEGATIVE_CLASSES`). Passing water here inflates the
+            AUC and defeats the point of the test.
+
+    Returns:
+        A :class:`Separability` with the AUC, per-class medians, finite-sample counts, and a verdict
+        (BROKEN / OK / SUSPICIOUS). ``BROKEN`` (AUC < :data:`MIN_SEPARABILITY_AUC`) is a hard stop.
+    """
     result = Separability(
         auc=auc(ndvi_positive, ndvi_negative),
         n_positive=int(np.isfinite(ndvi_positive).sum()),
@@ -196,9 +242,9 @@ def alignment(
     scores: dict[tuple[int, int], float] = {}
     for dy in shifts:
         for dx in shifts:
-            shifted = np.roll(np.roll(label_mask, dy, axis=0), dx, axis=1)
+            shifted = _translate(label_mask, dy, dx)
             pos = ndvi[shifted == POSITIVE_CLASS]
-            neg = ndvi[(shifted > POSITIVE_CLASS)]
+            neg = ndvi[np.isin(shifted, CORRIDOR_NEGATIVE_CLASSES)]
             if pos.size == 0 or neg.size == 0:
                 continue
             scores[(dy, dx)] = auc(pos, neg)
@@ -211,7 +257,16 @@ def alignment(
     # identically. Taking an arbitrary argmax there invents a displacement that is not in the data
     # and reports a registration bug on labels that are perfectly aligned — a false alarm that
     # would send someone hunting a CRS bug that does not exist. Among equals, no shift wins.
-    best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
+    raw_best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
+    # Apply the jitter tolerance HERE, not in is_aligned: if the unshifted score is within noise of
+    # the raw best, the "displacement" is sampling jitter, so report (0, 0). This keeps best_shift,
+    # is_aligned, and the log message consistent — a nonzero best_shift now always means a real,
+    # above-jitter offset that should fail the gate.
+    best = (
+        (0, 0)
+        if scores[raw_best] - scores[(0, 0)] < ALIGNMENT_TOLERANCE
+        else raw_best
+    )
     result = Alignment(
         best_shift=best, best_auc=scores[best], unshifted_auc=scores[(0, 0)]
     )
@@ -238,9 +293,14 @@ def alignment(
 def report(sep: Separability, align: Alignment) -> bool:
     """The Phase-0 gate: may we spend money on a GPU?
 
+    Args:
+        sep: Result of :func:`separability` (test 1). A ``BROKEN`` verdict fails the gate;
+            ``SUSPICIOUS`` passes but is logged as a leakage warning upstream.
+        align: Result of :func:`alignment` (test 2). Any nonzero ``best_shift`` fails the gate.
+
     Returns:
-        True only if both tests pass. This is deliberately a hard gate — every failure it catches
-        is free here and expensive later.
+        ``True`` only if both tests pass — separability is not ``BROKEN`` **and** the labels are
+        aligned. Deliberately a hard gate: every failure it catches is free here and expensive later.
     """
     ok = sep.verdict != "BROKEN" and align.is_aligned
     if ok:

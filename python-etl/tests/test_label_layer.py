@@ -80,6 +80,30 @@ def test_the_layer_is_deterministic() -> None:
     assert first == second
 
 
+def test_the_layer_is_invariant_to_input_order() -> None:
+    """fetch_labeled() is a DB/API — its row order must not change the capped-negative selection.
+
+    The seed is fixed, but a seeded shuffle of a differently-ordered list yields a different subset.
+    Canonicalizing before sampling is what makes the layer reproducible across fetch orderings.
+    """
+    polys = [_poly(0.0, 0.0, RIPARIAN_WOODY_NATIVE)]
+    polys += [_poly(0.1 * i, 0.5, UPLAND) for i in range(40)]
+
+    ordered, _ = label_layer.assemble(polys, max_negative_ratio=3.0)
+    reversed_in, _ = label_layer.assemble(list(reversed(polys)), max_negative_ratio=3.0)
+
+    assert ordered == reversed_in, "feature output changed when the input order changed"
+
+
+def test_a_nonfinite_or_nonpositive_cap_is_refused() -> None:
+    """A NaN cap makes the balance test vacuously pass, shipping an unbalanced layer that looks fine."""
+    polys = [_poly(0.0, 0.0, RIPARIAN_WOODY_NATIVE), _poly(0.1, 0.5, UPLAND)]
+
+    for bad in (float("nan"), 0.0, -1.0):
+        with pytest.raises(ValueError, match="finite and positive"):
+            label_layer.assemble(polys, max_negative_ratio=bad)
+
+
 def test_features_carry_the_label_vintage() -> None:
     """2020 labels must be fitted on 2020 imagery. We have made the opposite mistake once."""
     fc, _ = label_layer.assemble([_poly(0.0, 0.0, RIPARIAN_WOODY_NATIVE)])
@@ -123,7 +147,8 @@ def test_aligned_labels_pass_both_tests() -> None:
     ndvi, mask = _scene()
 
     sep = validate_layer.separability(
-        ndvi[mask == validate_layer.POSITIVE_CLASS], ndvi[mask > validate_layer.POSITIVE_CLASS]
+        ndvi[mask == validate_layer.POSITIVE_CLASS],
+        ndvi[np.isin(mask, validate_layer.CORRIDOR_NEGATIVE_CLASSES)],
     )
     align = validate_layer.alignment(ndvi, mask)
 
@@ -142,7 +167,8 @@ def test_the_shift_test_catches_a_misregistration_that_separability_misses() -> 
     ndvi, mask = _scene(shift=(0, 3))
 
     sep = validate_layer.separability(
-        ndvi[mask == validate_layer.POSITIVE_CLASS], ndvi[mask > validate_layer.POSITIVE_CLASS]
+        ndvi[mask == validate_layer.POSITIVE_CLASS],
+        ndvi[np.isin(mask, validate_layer.CORRIDOR_NEGATIVE_CLASSES)],
     )
     align = validate_layer.alignment(ndvi, mask)
 
@@ -178,3 +204,51 @@ def test_broken_labels_are_a_hard_stop() -> None:
     sep = validate_layer.separability(ndvi[mask == 1], ndvi[mask > 1])
 
     assert sep.verdict == "BROKEN"
+
+
+def test_water_is_excluded_from_the_negative_set() -> None:
+    """Water is trivially separable from vegetation, so it must not pad the negative set.
+
+    The hard negative is agriculture (class 3): as green as riparian, so NDVI barely separates them.
+    Water (class 2) has near-zero NDVI — including it makes the negatives look easy and inflates the
+    AUC, which is exactly how a leaky gate passes while the real task (riparian vs agriculture) is
+    unsolved. The validator's contract is riparian-vs-corridor, and water is not corridor.
+    """
+    rng = np.random.default_rng(0)
+    ndvi = rng.normal(0.45, 0.02, size=(32, 32))  # riparian, green
+    mask = np.full((32, 32), validate_layer.POSITIVE_CLASS, dtype=int)
+    ndvi[:, :10] = rng.normal(0.43, 0.02, size=(32, 10))  # agriculture — nearly as green
+    mask[:, :10] = 3
+    ndvi[:, 10:16] = rng.normal(-0.05, 0.02, size=(32, 6))  # water — obviously not vegetation
+    mask[:, 10:16] = 2
+
+    corridor_only = validate_layer.separability(
+        ndvi[mask == validate_layer.POSITIVE_CLASS],
+        ndvi[np.isin(mask, validate_layer.CORRIDOR_NEGATIVE_CLASSES)],
+    )
+    with_water = validate_layer.separability(
+        ndvi[mask == validate_layer.POSITIVE_CLASS], ndvi[mask > validate_layer.POSITIVE_CLASS]
+    )
+
+    assert with_water.auc > corridor_only.auc, "water should inflate the AUC — that is the bug"
+    assert 2 not in validate_layer.CORRIDOR_NEGATIVE_CLASSES
+
+
+def test_a_boundary_touching_label_does_not_wrap_around_the_tile() -> None:
+    """A label on the tile edge must not be scored against imagery on the opposite edge.
+
+    `np.roll` wraps; a real registration offset does not. If a corridor sits at the left edge, a
+    +x shift with wrapping would slide it onto the (unrelated) right edge and could manufacture a
+    misleading score. The padded translation drops what falls off and leaves the exposed border
+    unlabeled, so `alignment` still reports the labels as aligned.
+    """
+    rng = np.random.default_rng(0)
+    ndvi = rng.normal(0.08, 0.02, size=(64, 64))
+    ndvi[:, :6] = rng.normal(0.45, 0.03, size=(64, 6))  # corridor hard against the left edge
+    mask = np.full((64, 64), 4, dtype=int)
+    mask[:, :6] = validate_layer.POSITIVE_CLASS
+
+    align = validate_layer.alignment(ndvi, mask)
+
+    assert align.best_shift == (0, 0), "a boundary label wrapped and invented a displacement"
+    assert align.is_aligned

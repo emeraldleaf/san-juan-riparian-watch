@@ -51,6 +51,15 @@ TIME_RANGE: Final[tuple[datetime, datetime]] = (
 MIN_POSITIVE_PX: Final[int] = 1
 
 
+class EmptyDatasetError(RuntimeError):
+    """No window contained riparian label, or materialisation wrote nothing to disk.
+
+    A distinct type (not a bare ``ValueError``) so callers and the CLI can tell "the build produced
+    an unusable dataset" apart from an ordinary bad-argument error — the whole point of Phase 0 is
+    to fail loudly *here*, on a laptop, rather than discover an empty cube on a rented GPU.
+    """
+
+
 @dataclass(frozen=True)
 class DatasetBuild:
     """What was actually built."""
@@ -129,8 +138,14 @@ def build(
             cell = shapely.geometry.box(*bounds)
 
             hits = [(shp, props) for shp, props in labels if shp.intersects(cell)]
-            positives = [p for shp, p in hits if p["class"] == 1]
-            if len(positives) < MIN_POSITIVE_PX:
+            # Count positive PIXELS, not positive polygons. Geometries are in the projection's pixel
+            # grid, so a clipped polygon's area IS its pixel count — which is what MIN_POSITIVE_PX
+            # means. Comparing len(positives) would count polygons, so raising the threshold would
+            # silently start demanding N distinct polygons instead of N pixels.
+            positive_px = sum(
+                shp.intersection(cell).area for shp, p in hits if p["class"] == 1
+            )
+            if positive_px < MIN_POSITIVE_PX:
                 n_empty += 1
                 continue  # pure-negative window: a full S2 download that teaches nothing
 
@@ -154,7 +169,7 @@ def build(
             n_built += 1
 
     if n_built == 0:
-        raise ValueError(
+        raise EmptyDatasetError(
             "no window contains riparian label — a dataset of pure negatives trains happily and "
             "learns nothing. Check the bbox and the label layer before going further."
         )
@@ -274,17 +289,17 @@ def verify_materialized(dest: Path, group: str = "train") -> int:
         The number of windows with materialized Sentinel-2 rasters.
 
     Raises:
-        RuntimeError: If any window lacks imagery. Partial materialization is also a failure —
+        EmptyDatasetError: If any window lacks imagery. Partial materialization is also a failure —
             silently training on the subset that happened to download is how you get a metric
             nobody can reproduce.
     """
     windows = sorted((dest / "windows" / group).iterdir())
     if not windows:
-        raise RuntimeError(f"no windows under {dest}/windows/{group}")
+        raise EmptyDatasetError(f"no windows under {dest}/windows/{group}")
 
     missing = [w.name for w in windows if not list(w.glob("layers/sentinel2*/**/*.tif"))]
     if missing:
-        raise RuntimeError(
+        raise EmptyDatasetError(
             f"{len(missing)} of {len(windows)} windows have NO Sentinel-2 raster on disk "
             f"(e.g. {missing[:3]}). `materialize` may have exited 0 anyway — it does that. "
             f"Check the log for NotImplementedError: with a Planetary Computer source, "

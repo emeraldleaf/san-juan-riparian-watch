@@ -45,16 +45,20 @@ count=0
 for cp in $PATHS; do
     count=$((count + 1))
     # rslearn/torch class paths live in other packages; import whatever is declared, wherever it lives.
-    if "$PY" - "$cp" <<'PY' 2>/dev/null
+    # Capture stderr so a failure shows the ACTUAL error (ModuleNotFoundError, wrong attr, ...).
+    # For a gate whose whole job is to catch $0 typos before a paid GPU clock, "does not import"
+    # with no detail just forces a manual re-run to see what everyone already paid to avoid.
+    if err=$("$PY" - "$cp" <<'PY' 2>&1
 import importlib, sys
 cp = sys.argv[1]
 module, _, cls = cp.rpartition(".")
 obj = getattr(importlib.import_module(module), cls)
 PY
-    then
+    ); then
         echo -e "  ${GREEN}✓${NC} $cp"
     else
         echo -e "  ${RED}✗${NC} $cp — does not import"
+        echo "      ${err##*$'\n'}"
         fail=1
     fi
 done
