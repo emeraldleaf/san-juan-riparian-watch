@@ -211,19 +211,48 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
    > **Never trust the exit code**: call `rslearn_dataset.verify_materialized()`, which asserts the
    > rasters are on disk. A green exit that means "nothing happened" is the most expensive kind of
    > green — on a GPU you would train on an empty cube and the loss would fall anyway.
-4. **Dry-run on `OLMOEARTH_V1_NANO`, MPS/CPU, 1 epoch, a handful of windows.**
+4. **Dry-run on `OLMOEARTH_V1_NANO`, MPS/CPU, 1 epoch, a handful of windows.** ✅ **DONE 2026-07-14.**
+   Reproduce with `olmoearth_run_data/riparian_extent/make_dryrun_config.py` (derives the dry-run
+   from the canonical `model.yaml`, so it exercises the real wiring, not a lookalike). The run shook
+   out **four more config bugs the GPU would have hit on step one**, each fixed:
+   - **`OLMOEARTH_V1_1_BASE` does not resolve** — only `V1_{NANO,TINY,BASE,LARGE}` exist in this
+     rslearn. The canonical config's own comment predicted the fallback; Phase 1 must use `V1_BASE`.
+   - **Decoder `in_channels` was `768` (BASE) but NANO emits `128`.** The pooling head silently
+     needs the encoder's embedding width; wrong on any non-BASE model.
+   - **The pooling decoder misreads a temporal cube.** `SegmentationPoolingDecoder` broadcasts to
+     `image.shape[1:3]`, which on our 4-D `[bands, timesteps, H, W]` input grabs `(timesteps, H)`,
+     not `(H, W)` — so it emitted a `12×2` prediction against a `2×2` target. Fixed by
+     `riparian.delineation.decoders.TemporalSegmentationPoolingDecoder`, which reads the true last
+     two axes. **The whole approach depends on 12 monthly mosaics, so a decoder that cannot consume
+     a temporal stack is not a small bug.**
+   - **`num_classes` was `4`, but the crosswalk emits four *real* classes.** With
+     `zero_is_invalid: true`, class 0 is the ignore label, so four real classes need `num_classes: 5`.
+     The scaffold was authored for the old three-class scheme. Crashed with `Target 4 is out of
+     bounds`; now pinned by `tests/test_class_scheme_contract.py` so the crosswalk and the config
+     cannot drift apart again.
 
 > ### ✅ Phase-0 exit gate — do not rent a GPU until ALL of these hold
 > - `olmoearth-runner` imports, and **every** scaffold `class_path` resolves — checked mechanically
 >   by `./dev.sh --check-encoding`, not by eye. ✅ 23/23 (2026-07-13; five were broken).
 > - **The label layer passes `validate_layer.report()`** — NDVI separability is not BROKEN, and the
->   shift test finds no offset that beats zero. This gate is deliberately hard: every failure it
->   catches is free here and expensive later.
-> - The dataset materialises and `rslearn model fit` **completes one epoch without error**.
-> - Loss is **finite and decreasing**. A NaN here is a normalisation bug, and it costs $0 to find now.
+>   shift test finds no offset that beats zero. ✅ AUC 0.777, best shift (0,0) on the Farmington reach.
+> - The dataset materialises and `rslearn model fit` **completes one epoch without error**. ✅ 238
+>   windows materialised + verified on disk; NANO fit ran 3 epochs clean on CPU.
+> - Loss is **finite and decreasing**. ✅ no NaN/inf; val_loss 1.455 → 1.428 → 1.401 over 3 epochs.
 > - Predictions are **spatially aligned** with the labels (overlay them and look — the AUC-0.23
 >   incident was a spatial-alignment scare that turned out to be an unshuffled CV split; a real
->   misalignment would look identical).
+>   misalignment would look identical). ⚠️ **Deferred, on purpose:** the smoke-test decoder is the
+>   pooling head, which broadcasts one prediction per window — a spatial overlay would be uniform
+>   and prove nothing. Label↔imagery alignment is already established (shift test above); prediction
+>   overlay becomes meaningful once Phase 1 runs a per-pixel decoder. **See "open modelling call".**
+>
+> **Open modelling call for Phase 1 (not a Phase-0 blocker).** The scaffold mirrors mangrove with
+> `SegmentationPoolingDecoder` — one label per window, broadcast to all pixels. Our windows are
+> *not* single-class (a 32×32 window holds riparian *and* upland), and extent is inherently
+> per-pixel. `rslearn` ships `UNetDecoder` for exactly that. Decide before Phase 1 whether the
+> control stays pooling (simpler, matches mangrove, but coarse) or moves to per-pixel (right for
+> extent, and makes the prediction-overlay check meaningful). The dry-run deliberately did **not**
+> make this call — it kept the scaffold's choice and only fixed the mechanical shape bug.
 
 ## Phase 1 — the extent control (GPU)
 

@@ -168,6 +168,91 @@ def build(
     return DatasetBuild(path=dest, n_windows=n_built, n_windows_skipped_empty=n_empty)
 
 
+def rasterize_labels_and_split(dest: Path, group: str = "train", val_fraction: int = 3) -> tuple[int, int]:
+    """Rasterize each window's vector ``label`` into a ``label_raster`` layer, and tag a split.
+
+    The model reads a **raster** segmentation target (``label_raster``, band ``label``, INT32), but
+    the label layer is authored as **vector** GeoJSON — that is the natural form for NMRipMap
+    polygons, and it is what lets the imagery validator overlay and shift them. rslearn does not
+    rasterize a vector layer into a training target on its own when you drive ``model fit``
+    directly, so we do it here, once, into the exact on-disk shape the sentinel2 layers use.
+
+    Class id 0 is left as background/no-label — with ``zero_is_invalid: true`` the loss ignores it,
+    so unlabeled pixels inside a window neither reward nor punish the model.
+
+    **The split is spatial, not random.** Windows are assigned to val by hashing their grid cell,
+    so spatially autocorrelated neighbours cannot straddle the train/val boundary — the same
+    discipline as ``riparian/delineation/validate.py``. A random split here would leak the answer
+    across the boundary and inflate every val metric; the AUC-0.23 incident was the *inverse* of
+    this (an unshuffled split that looked like a model failure), and both come from the same root:
+    a split that does not respect space.
+
+    Args:
+        dest: Dataset root.
+        group: Window group.
+        val_fraction: 1-in-N windows go to val (hash-based, deterministic).
+
+    Returns:
+        ``(n_rasterized, n_val)``.
+    """
+    import json
+
+    import numpy as np
+    import shapely
+    from rasterio.features import rasterize
+    from rslearn.utils.raster_format import GeotiffRasterFormat
+
+    from rslearn.dataset import Dataset
+    from upath import UPath
+
+    dataset = Dataset(UPath(dest))
+    fmt = GeotiffRasterFormat()
+    windows = dataset.load_windows(groups=[group])
+
+    n_rasterized = 0
+    n_val = 0
+    for window in windows:
+        label_dir = window.get_layer_dir("label")
+        geojson_path = label_dir / "data.geojson"
+        with geojson_path.open() as f:
+            fc = json.load(f)
+
+        wx0, wy0, wx1, wy1 = window.bounds
+        h, w = wy1 - wy0, wx1 - wx0
+        # Window pixel bounds are in projection units; shift geometries into the window's pixel grid.
+        shapes = []
+        for feat in fc["features"]:
+            geom = shapely.affinity.translate(
+                shapely.geometry.shape(feat["geometry"]), xoff=-wx0, yoff=-wy0
+            )
+            shapes.append((geom, int(feat["properties"]["class"])))
+
+        raster = rasterize(
+            shapes, out_shape=(h, w), fill=0, dtype="int32", all_touched=False
+        ) if shapes else np.zeros((h, w), dtype="int32")
+
+        raster_dir = window.get_raster_dir("label_raster", ["label"])
+        fmt.encode_raster(raster_dir, window.projection, window.bounds, raster[None, :, :])
+        window.mark_layer_completed("label_raster")
+        n_rasterized += 1
+
+        # Deterministic spatial split: hash the grid cell, not a random draw.
+        cell_hash = hash((wx0 // 32, wy0 // 32)) % val_fraction
+        split = "val" if cell_hash == 0 else "train"
+        window.options = {**window.options, "split": split}
+        window.save()
+        if split == "val":
+            n_val += 1
+
+    logger.info(
+        "rasterized %d label rasters; spatial split -> %d train / %d val",
+        n_rasterized,
+        n_rasterized - n_val,
+        n_val,
+    )
+    return n_rasterized, n_val
+
+
 def verify_materialized(dest: Path, group: str = "train") -> int:
     """Assert the imagery is actually ON DISK. Never trust ``materialize``'s exit code.
 
