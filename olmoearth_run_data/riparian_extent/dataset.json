@@ -52,6 +52,17 @@
         "time_offset": "-180d"
       },
       "type": "raster"
+    },
+    "label_raster": {
+      "type": "raster",
+      "band_sets": [
+        {
+          "bands": [
+            "label"
+          ],
+          "dtype": "int32"
+        }
+      ]
     }
   }
 }
