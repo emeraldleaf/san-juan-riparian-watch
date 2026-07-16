@@ -46,20 +46,27 @@ and you find out after you've paid.
 
 | test | question | result on the Farmington reach |
 |---|---|---|
-| **Separability** | does NDVI (S2 2020, the labels' own vintage) separate riparian from corridor negatives? | **AUC 0.740** — in the plausible band; not <0.65 (broken) nor >0.95 (leaking) |
+| **Separability** | does peak-season NDVI (S2 2020, the labels' own vintage) separate riparian from corridor negatives? | **AUC 0.752** — in the plausible band; not <0.65 (broken) nor >0.95 (leaking) |
 | **Shift** | does a *translated* label mask score better — i.e. are they aligned, or merely correlated? | best offset **(1, 0)**, +0.013 — a marginal ~1 px (10 m) offset; see caveat |
 | **Eyes** | overlay on NAIP 2020, the imagery NMRipMap was drawn from | (manual — **do this before Phase 1**, see caveat) |
 
-> **Corrected 2026-07-14, against ourselves.** The first pass reported **AUC 0.777, shift (0,0)**.
-> CodeRabbit's review caught that the validator's negative set included **water** (class 2), which
-> is trivially separable from vegetation and inflated the score. Excluding water — the negative set
-> is *corridor* (agriculture + other) — drops it to **0.740**. Still healthy, now honest. Reproduce
-> with `olmoearth_run_data/riparian_extent/validate_materialized.py`, which scores the **materialised
-> cube** (the exact training pixels), not the ad-hoc harness the 0.777 came from.
+> **Corrected twice, against ourselves — 0.777 → 0.740 → 0.752.** The first pass reported **AUC
+> 0.777, shift (0,0)** from an ad-hoc harness. CodeRabbit's review caught **two** contaminations:
+> 1. **Water leaked into the negatives** (class 2), trivially separable and inflating the score.
+>    The negative set is *corridor* — agriculture + other (3/4), not water.
+> 2. **All 12 monthly mosaics were averaged**, but only **3 are peak-season** (the cube spans
+>    Jan–Nov 2020 for phenology). Dormant-month NDVI dragged riparian toward upland — the exact
+>    error CLAUDE.md's peak-season rule exists to prevent. Restricting to June–August lifts riparian
+>    median NDVI from a dormant-contaminated **0.320 to 0.463** (physically sensible for lush summer
+>    riparian) and the AUC to **0.752**. Still healthy, now honest.
+>
+> Reproduce with `olmoearth_run_data/riparian_extent/validate_materialized.py`, which scores the
+> **materialised cube** (the exact training pixels), peak-season and water-excluded — not the ad-hoc
+> harness the 0.777 came from.
 >
 > The fix also swapped the per-window shift test (noise-dominated on 32×32 tiles) for a **global,
-> pooled-across-windows** one, which surfaces a **marginal ~1 px (10 m) offset**: pooled AUC 0.753 at
-> (1,0) vs 0.740 unshifted. **Not a code bug** — a rasterisation convention flip would crater the AUC
+> pooled-across-windows** one, which surfaces a **marginal ~1 px (10 m) offset**: pooled AUC 0.765 at
+> (1,0) vs 0.752 unshifted. **Not a code bug** — a rasterisation convention flip would crater the AUC
 > to ~0.5, not nudge it by 0.013. It is the sub-pixel registration slack of fusing 0.6 m NAIP-drawn
 > polygons onto a 10 m grid. **Confirm with the NAIP overlay before Phase 1**: a real 1 px label
 > offset blurs a segmentation boundary, and only the eyes-on check settles whether this is that or slack.
@@ -71,8 +78,10 @@ own axis, so ties must break toward zero shift, or it cries "registration bug" o
 
 ### 3. Materialised the Sentinel-2 cube — 238 windows, verified on disk
 
-`rslearn_dataset.py` builds the dataset: 238 windows (32×32 px @ 10 m, UTM, 12 monthly mosaics of
-2020 Jun–Aug), skipping **777 pure-negative windows** — each a full S2 download that teaches
+`rslearn_dataset.py` builds the dataset: 238 windows (32×32 px @ 10 m, UTM, **12 monthly mosaics
+spanning 2020 Jan–Nov** — the full seasonal trajectory is the phenology signal; only ~3 fall in peak
+season, which is why the validator must filter to them), skipping **777 pure-negative windows** —
+each a full S2 download that teaches
 nothing. Then `prepare → ingest → materialize`. Result: **2,856 GeoTIFFs, 11 GB tile store**,
 confirmed by `verify_materialized()` — which checks the rasters are on disk rather than trusting the
 exit code, because the exit code lied (see findings).
@@ -152,7 +161,7 @@ Principles this phase reinforced, worth applying beyond it:
 - **Ran without the VBET corridor clip.** The negatives are NMRipMap's own non-riparian classes —
   already corridor-ish, but not the tight valley-bottom clip the design calls for. The clip should
   *tighten* separability, not loosen it, but **we haven't measured that**, so we don't claim it.
-- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.740
+- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.752
   holds on the narrow headwater corridors, where a 320 m window is mostly upland.
 - **Pooling decoder = one label per window.** The smoke test kept the scaffold's mangrove-style
   per-window classifier. Our windows are *not* single-class, so this is a real modelling limitation

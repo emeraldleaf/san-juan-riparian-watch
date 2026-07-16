@@ -19,7 +19,9 @@ NDVI = (B08 − B04) / (B08 + B04), taken as the per-pixel **median across the 1
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -36,12 +38,38 @@ logger = logging.getLogger("validate_materialized")
 RED_BAND = 4  # B04, 1-indexed in the stacked geotiff
 NIR_BAND = 8  # B08
 
+#: Peak growing season for the San Juan Basin. The separability contract is about *peak-season*
+#: greenness — riparian phreatophytes staying green while the corridor browns — and the labels are
+#: NAIP-2020 peak vintage. The cube itself carries all 12 monthly mosaics (that seasonal trajectory
+#: is the phenology signal the model trains on), but scoring NDVI separability over the dormant
+#: months would drag riparian toward upland and understate the true signal.
+PEAK_MONTHS = frozenset({6, 7, 8})
+
+
+def _peak_season_tifs(window: Path) -> list[Path]:
+    """The GeoTIFFs for this window's June–August mosaics, resolved via items.json.
+
+    Sentinel-2 layers are ``sentinel2`` (group 0), ``sentinel2.1`` … ``sentinel2.N``; the group's
+    acquisition date lives in the item name (``S2A_MSIL2A_YYYYMMDDT…``). Of the 12 monthly mosaics
+    only ~3 fall in peak season, so this filter is load-bearing, not cosmetic.
+    """
+    items = json.loads((window / "items.json").read_text())
+    groups = next(x["serialized_item_groups"] for x in items if x["layer_name"] == "sentinel2")
+    tifs = []
+    for i, group in enumerate(groups):
+        month = int(re.search(r"_(\d{8})T", group[0]["name"]).group(1)[4:6])
+        if month not in PEAK_MONTHS:
+            continue
+        layer = "sentinel2" if i == 0 else f"sentinel2.{i}"
+        tifs.extend((window / "layers" / layer).glob("*/geotiff.tif"))
+    return tifs
+
 
 def _median_ndvi(window: Path) -> np.ndarray:
-    """Per-pixel median NDVI across a window's monthly Sentinel-2 mosaics."""
-    tifs = sorted(window.glob("layers/sentinel2*/*/geotiff.tif"))
+    """Per-pixel median NDVI across a window's **peak-season** Sentinel-2 mosaics."""
+    tifs = _peak_season_tifs(window)
     if not tifs:
-        raise FileNotFoundError(f"no sentinel2 mosaics in {window}")
+        raise FileNotFoundError(f"no peak-season sentinel2 mosaics in {window}")
     ndvis = []
     for tif in tifs:
         with rasterio.open(tif) as src:
@@ -59,26 +87,28 @@ def _label(window: Path) -> np.ndarray:
         return src.read(1)
 
 
-def main() -> int:
-    dataset = Path(sys.argv[1] if len(sys.argv) > 1 else "olmoearth_run_data/riparian_extent/dataset")
-    windows = sorted((dataset / "windows").glob("*/*/"))
-    logger.info("validating %d windows in %s", len(windows), dataset)
+Grid = tuple[np.ndarray, np.ndarray]  # (median NDVI, label mask) for one window
 
-    # Cache each window's NDVI + mask once; both the separability and the (global) shift test reuse
-    # them. Per-window shift testing is meaningless — a 32×32 tile has too few pixels, so AUC swings
-    # by ±0.3 on a 1 px shift purely from sampling. Registration is a *global* property (a CRS
-    # offset shifts every window the same way), so we pool across ALL windows per candidate shift.
-    grids = [(_median_ndvi(w), _label(w)) for w in windows]
 
+def _pooled_separability(grids: list[Grid]) -> validate_layer.Separability:
+    """Pool riparian vs corridor-negative NDVI across all windows and score one AUC."""
     pos = np.concatenate([ndvi[mask == validate_layer.POSITIVE_CLASS] for ndvi, mask in grids])
     neg = np.concatenate(
         [ndvi[np.isin(mask, validate_layer.CORRIDOR_NEGATIVE_CLASSES)] for ndvi, mask in grids]
     )
-    sep = validate_layer.separability(pos, neg)
+    return validate_layer.separability(pos, neg)
 
-    # Global shift test: for each offset, translate every window's mask the same way, pool the
-    # pixels, and score one AUC over ~140k samples. Noise averages out; a systematic offset does not.
-    shift_scores: dict[tuple[int, int], float] = {}
+
+def _global_shift_test(grids: list[Grid]) -> tuple[tuple[int, int], dict[tuple[int, int], float]]:
+    """Best registration offset over a POOLED score, not per-window.
+
+    Per-window shift testing is meaningless — a 32×32 tile has too few pixels, so AUC swings by
+    ±0.3 on a 1 px shift purely from sampling. Registration is a *global* property (a CRS offset
+    shifts every window the same way), so for each offset we translate every window's mask the same
+    way, pool the pixels, and score one AUC over ~140k samples. Noise averages out; a systematic
+    offset does not. Ties (and sub-tolerance wins) snap to ``(0, 0)`` — see ``validate_layer``.
+    """
+    scores: dict[tuple[int, int], float] = {}
     for dy in validate_layer.SHIFTS:
         for dx in validate_layer.SHIFTS:
             p, n = [], []
@@ -86,13 +116,26 @@ def main() -> int:
                 shifted = validate_layer._translate(mask, dy, dx)
                 p.append(ndvi[shifted == validate_layer.POSITIVE_CLASS])
                 n.append(ndvi[np.isin(shifted, validate_layer.CORRIDOR_NEGATIVE_CLASSES)])
-            shift_scores[(dy, dx)] = validate_layer.auc(np.concatenate(p), np.concatenate(n))
-    raw_best = min(shift_scores, key=lambda k: (-shift_scores[k], abs(k[0]) + abs(k[1])))
-    best_shift = (
-        (0, 0)
-        if shift_scores[raw_best] - shift_scores[(0, 0)] < validate_layer.ALIGNMENT_TOLERANCE
-        else raw_best
-    )
+            scores[(dy, dx)] = validate_layer.auc(np.concatenate(p), np.concatenate(n))
+    raw_best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
+    best = (0, 0) if scores[raw_best] - scores[(0, 0)] < validate_layer.ALIGNMENT_TOLERANCE else raw_best
+    return best, scores
+
+
+def main() -> int:
+    """Score the materialised label layer against its imagery and print a pass/fail gate.
+
+    Returns a process exit code: 0 if separability is not BROKEN and the global shift test finds no
+    above-tolerance offset, else 1.
+    """
+    dataset = Path(sys.argv[1] if len(sys.argv) > 1 else "olmoearth_run_data/riparian_extent/dataset")
+    windows = sorted((dataset / "windows").glob("*/*/"))
+    logger.info("validating %d windows in %s", len(windows), dataset)
+
+    # Cache each window's peak-season NDVI + label mask once; separability and the shift test reuse it.
+    grids: list[Grid] = [(_median_ndvi(w), _label(w)) for w in windows]
+    sep = _pooled_separability(grids)
+    best_shift, shift_scores = _global_shift_test(grids)
 
     logger.info("")
     logger.info("═══ HONEST separability (riparian vs agriculture+other, water EXCLUDED) ═══")

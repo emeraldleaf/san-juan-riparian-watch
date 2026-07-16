@@ -97,8 +97,8 @@ def build(
         What was built.
 
     Raises:
-        ValueError: If no window contains any riparian label — a dataset of pure negatives would
-            train happily and learn nothing.
+        EmptyDatasetError: If no window contains any riparian label — a dataset of pure negatives
+            would train happily and learn nothing.
     """
     import shapely
     from rasterio.crs import CRS
@@ -293,9 +293,13 @@ def verify_materialized(dest: Path, group: str = "train") -> int:
             silently training on the subset that happened to download is how you get a metric
             nobody can reproduce.
     """
-    windows = sorted((dest / "windows" / group).iterdir())
+    group_dir = dest / "windows" / group
+    if not group_dir.is_dir():
+        # iterdir() would raise a bare FileNotFoundError; callers expect the domain exception.
+        raise EmptyDatasetError(f"no windows under {group_dir} — it does not exist")
+    windows = sorted(group_dir.iterdir())
     if not windows:
-        raise EmptyDatasetError(f"no windows under {dest}/windows/{group}")
+        raise EmptyDatasetError(f"no windows under {group_dir}")
 
     missing = [w.name for w in windows if not list(w.glob("layers/sentinel2*/**/*.tif"))]
     if missing:
