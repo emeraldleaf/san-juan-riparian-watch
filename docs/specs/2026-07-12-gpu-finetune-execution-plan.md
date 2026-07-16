@@ -265,7 +265,7 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 > - `olmoearth-runner` imports, and **every** scaffold `class_path` resolves — checked mechanically
 >   by `./dev.sh --check-encoding`, not by eye. ✅ 23/23 (2026-07-13; five were broken).
 > - **The label layer passes `validate_layer.report()`** — NDVI separability is not BROKEN, and the
->   shift test finds no meaningful offset. ✅ AUC **0.740** (water excluded; 0.777 was inflated by it),
+>   shift test finds no meaningful offset. ✅ AUC **0.752** (peak-season, water-excluded; 0.777→0.740→0.752),
 >   with a marginal ~1 px offset to confirm by NAIP overlay — Farmington reach.
 > - The dataset materialises and `rslearn model fit` **completes one epoch without error**. ✅ 238
 >   windows materialised + verified on disk; NANO fit ran 3 epochs clean on CPU.

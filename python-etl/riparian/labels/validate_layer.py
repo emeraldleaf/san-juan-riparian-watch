@@ -107,6 +107,11 @@ def _translate(mask: np.ndarray, dy: int, dx: int) -> np.ndarray:
     """
     out = np.zeros_like(mask)
     h, w = mask.shape
+    if abs(dy) >= h or abs(dx) >= w:
+        # The shift moves the whole array off-grid: nothing overlaps, so the result is all-zero
+        # (all "no label"). Without this guard the slice bounds would cross and numpy would silently
+        # write a mis-sized or empty region.
+        return out
     src_y0, src_y1 = max(0, -dy), min(h, h - dy)
     src_x0, src_x1 = max(0, -dx), min(w, w - dx)
     dst_y0, dst_y1 = max(0, dy), min(h, h + dy)

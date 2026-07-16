@@ -33,7 +33,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import copy
 from pathlib import Path
 
 import yaml
