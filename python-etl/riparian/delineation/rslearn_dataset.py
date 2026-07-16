@@ -210,8 +210,6 @@ def rasterize_labels_and_split(dest: Path, group: str = "train", val_fraction: i
     Returns:
         ``(n_rasterized, n_val)``.
     """
-    import json
-
     import numpy as np
     import shapely
     from rasterio.features import rasterize

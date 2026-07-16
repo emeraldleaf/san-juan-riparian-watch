@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from rslearn.models.pooling_decoder import SegmentationPoolingDecoder
+from rslearn.models.pooling_decoder import PoolingDecoder, SegmentationPoolingDecoder
 from rslearn.train.tasks.segmentation import FeatureMaps
 
 
@@ -36,8 +36,11 @@ class TemporalSegmentationPoolingDecoder(SegmentationPoolingDecoder):
 
     def forward(self, intermediates: Any, context: Any) -> Any:
         """Broadcast the pooled vector to the input's true spatial extent (last two axes)."""
-        # PoolingDecoder.forward -> per-window FeatureVector.
-        output_probs = super(SegmentationPoolingDecoder, self).forward(intermediates, context)
+        # Call the GRANDPARENT PoolingDecoder.forward explicitly to get the per-window FeatureVector,
+        # deliberately skipping SegmentationPoolingDecoder.forward (whose shape[1:3] broadcast is the
+        # bug we exist to replace). Explicit over `super(SegmentationPoolingDecoder, self)` so the
+        # level-skip is legible and not mistaken for a typo.
+        output_probs = PoolingDecoder.forward(self, intermediates, context)
         image = context.inputs[0][self.image_key].image
         h, w = image.shape[-2], image.shape[-1]
         feat_map = output_probs.feature_vector[:, :, None, None].repeat([1, 1, h, w])
