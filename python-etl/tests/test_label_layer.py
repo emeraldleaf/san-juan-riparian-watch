@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from shapely.geometry import Polygon, box
+from shapely.geometry import box
 
 from riparian.labels import label_layer, validate_layer
 from riparian.labels.nmripmap import (
