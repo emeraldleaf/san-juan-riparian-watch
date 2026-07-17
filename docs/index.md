@@ -106,9 +106,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim
   about the literature, and a single paper can falsify it. This is the record of us trying to do
-  exactly that, **to ourselves, on purpose** — and of the three attacks that landed.
-  Paired with [Retractions](RETRACTIONS.md), which is **machine-checked**: once a claim is retracted,
-  CI fails any document still asserting it.
+  exactly that, **to ourselves, on purpose** — of the four attacks that landed on the *product*
+  claim, and of a fifth on the *method*: [riparian methods vs. the FM
+  fine-tune](audits/2026-07-14-riparian-methods-prior-art.md), where the foundation-model
+  contribution **survives** but the surrounding workflow turns out to be published practice we must
+  cite, not invent. Paired with [Retractions](RETRACTIONS.md), which is **machine-checked**: once a
+  claim is retracted, CI fails any document still asserting it.
 
 ## Reference
 
@@ -132,6 +135,10 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**Phase 0 — the record**](2026-07-14-phase-0-record.md) — what we built (label layer, imagery
+  validation, S2 cube, NANO dry-run), the **seven traps** it caught for $0 that would have failed on
+  a GPU, the methods that generalised, the trade-offs, and the **open decisions before Phase 1**
+  (chiefly: per-window vs per-pixel decoder). Exit gate MET — val_loss 1.455 → 1.428 → 1.401.
 - [OlmoEarth vs the RF baseline](olmoearth-vs-rf-baseline.md) — **a retraction, and a hypothesis
   that failed.** The published RF 0.73 / OlmoEarth 0.46 result is withdrawn: the ground truth was
   ~45% wrong, the model's time axis was averaged away, and the labels were four years older than
