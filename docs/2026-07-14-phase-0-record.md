@@ -211,10 +211,13 @@ Principles this phase reinforced, worth applying beyond it:
    transfer — not merely beat RF**, because a free 0.82 M-param CPU model already beats RF there
    (+0.04–0.08). If it cannot, the honest report is that the GPU bought nothing a laptop didn't.
 
-4. 🔴 **NEW — the target checkpoint does not exist.** The plan and the decision memo both name
-   `OLMOEARTH_V1_1_BASE`; the pinned stack (`olmoearth-runner 0.1.14` → `rslearn 0.0.27`) has only
-   `V1_{NANO,TINY,BASE,LARGE}`. Use `V1_BASE` and **re-cost at ~3×** (9,216 vs 3,072 tokens/window;
-   may not fit 24 GB at batch 8), or unpin `rslearn` — a Phase-0 exercise, not a GPU-clock discovery.
+4. ~~🔴 **the target checkpoint does not exist**~~ → **RESOLVED (#44, 2026-07-17): Phase 1 uses
+   `V1_BASE`.** `V1_1_BASE` lives only in `olmoearth_pretrain 0.1.1+`, but the runner hard-pins
+   `==0.0.2`, and the v1.1 HF weights are gated (401). Its only edge is cost (3× fewer tokens), and
+   our own test found **v1.1 ≈ v1 in quality** — not worth the pin-break + gated-access risk on a
+   $3–15 control run. `model.yaml` now names `V1_BASE` (verified to resolve); cost table re-costed at
+   ~3×. **v1.1 revisited at Phase 3** (basin-scale, where 3× compute is real money). See the
+   [plan's resolution](specs/2026-07-12-gpu-finetune-execution-plan.md#-resolved-44-2026-07-17-phase-1-uses-v1_base-v11-deferred-to-phase-3).
 
 ---
 

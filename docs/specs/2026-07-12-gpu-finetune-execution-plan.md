@@ -13,12 +13,12 @@ written **before** the money is spent.
 |---|---|
 | Control AOI (Animas + Malpais) | **428 km²** → 4.28 M px @ 10 m → **~4,180 windows** (32×32) |
 | Sentinel-2 cube | 12 monthly mosaics × 12 bands × uint16 ≈ **1.2 GB** |
-| Model | **`OLMOEARTH_V1_1_BASE`** — 207.5 M params (weights+grads+Adam ≈ **3.3 GB** fp32) |
-| Tokens/window | **3,072** on v1.1 — vs **9,216 on v1**. Measured, see below. |
-| VRAM | **24 GB is comfortable** (L4 / A10G). 16 GB workable at batch 4 + AMP. |
-| Training | batch 8, 60 epochs ≈ 31 k steps → **2–5 GPU-hours** |
-| **Cost of the control run** | **≈ $2–5** (RunPod L4 ≈ $0.43/hr, A10G ≈ $0.34/hr) |
-| **Realistic total** incl. debugging, invasives, inference | **$30–60** |
+| Model | **`OLMOEARTH_V1_BASE`** — 207.5 M params (weights+grads+Adam ≈ **3.3 GB** fp32). *v1.1 does not resolve in the pinned stack — see the resolution below; deferred to Phase 3.* |
+| Tokens/window | **9,216 on v1** (measured). v1.1's 3,072 is unavailable here. |
+| VRAM | 16 GB is tight on v1 — **use batch 4 + AMP** (v1's 3× token count vs v1.1's may not fit 24 GB at batch 8). |
+| Training | batch 4 + AMP, ~60 epochs → **~2–7 GPU-hours** (v1's 3× attention cost widens this) |
+| **Cost of the control run** | **≈ $3–15** (RunPod L4 ≈ $0.43/hr, A10G ≈ $0.34/hr) — up from the v1.1 estimate at ~3× tokens |
+| **Realistic total** incl. debugging, invasives, inference | **$40–90** |
 
 **Spending $40 is not the risk. Spending three days debugging `rslearn` on a rented GPU is.** The plan
 is built around that.
@@ -83,23 +83,30 @@ truth.
 
 ---
 
-## 🔴 Use v1.1-Base, not v1-Base — the scaffold is wrong
+## ✅ RESOLVED (#44, 2026-07-17): Phase 1 uses `V1_BASE`; v1.1 deferred to Phase 3
 
-`model.yaml` still says `OLMOEARTH_V1_BASE`. **Measured** on the actual config (32×32 window, 12
-monthly mosaics, `patch_size: 2`):
+The earlier recommendation here was "use v1.1-Base." **It does not resolve in the pinned stack, and
+after investigating the alternatives the decision is to use `V1_BASE` for the Phase-1 control.**
 
-| Checkpoint | Tokens/window |
-|---|---|
-| `OLMOEARTH_V1_BASE` | **9,216** |
-| **`OLMOEARTH_V1_1_BASE`** | **3,072** — v1.1 merges the S2 bands into single tokens (band-set axis 3 → 1) |
+| Checkpoint | Tokens/window | Available in the pinned stack? |
+|---|---|---|
+| **`OLMOEARTH_V1_BASE`** | **9,216** | ✅ yes — `olmoearth_pretrain 0.0.2`, public HF weights |
+| `OLMOEARTH_V1_1_BASE` | 3,072 (merges S2 bands into single tokens) | ❌ no — needs `olmoearth_pretrain ≥ 0.1.1`, and its HF weights are **gated (401)** |
 
-**3× fewer tokens, and attention is O(n²), so it compounds.** Every cost figure above assumes v1.1;
-on v1 the run is roughly 3× more expensive and **may not fit 24 GB at batch 8**. Our own fair test
-found **v1.1 ≈ v1 in quality** (within noise), so this is free.
+**Why V1_BASE, not the effort to get v1.1:**
+- v1.1 exists only in `olmoearth_pretrain 0.1.1+`, but `olmoearth-runner 0.1.14` **hard-pins
+  `olmoearth-pretrain==0.0.2`**. Upgrading breaks the runner pin (the 0.1.1 API *looks* compatible —
+  `Config`, `Modality`, `flexihelios`, identical `load_model_from_id` — but that is unverified against
+  the 23 scaffold class paths), **and** the v1.1 weights are HF-gated (needs Ai2 approval + a token).
+- v1.1's only advantage is **cost** (3× fewer tokens). Our own fair test found **v1.1 ≈ v1 in
+  quality** (within noise). On a **$3–15** control run, saving 3× compute is not worth three
+  compounding risks (pin break, unverified API, gated access).
+- **v1.1's payoff is at SCALE — Phase 3** (basin-wide inference across the full archive), where 3×
+  compute is real money *and* we will already know the approach is worth scaling. Revisit it then;
+  by then, upgrading the whole runner stack can be tested properly. Tracked in #44.
 
-> ⚠️ **Phase-0 check:** Ai2's `mangrove` recipe uses `V1_BASE`, so **rslearn 0.0.27 may not wire the
-> v1.1 model ID**. Verify it resolves *before* renting anything. If it does not: either patch the ID
-> or accept 3× the cost — but decide it on the ground, not on the clock.
+`model.yaml` now names `OLMOEARTH_V1_BASE` (was the non-resolving `V1_1_BASE`), verified to resolve.
+The cost table above is updated to v1's ~3× token count.
 
 ## 🎯 Two-stage supervision — use the out-of-AOI data. It is ~1000× our in-AOI supervision.
 
