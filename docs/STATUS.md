@@ -18,10 +18,10 @@ on extent and in-tile**. Verified against the raw JSONs on landing; the decisive
 reproduces exactly.
 
 **Three things changed as a result:**
-1. 🔴 **`OLMOEARTH_V1_1_BASE` DOES NOT EXIST** in the pinned stack (`rslearn 0.0.27` has only
-   `V1_{NANO,TINY,BASE,LARGE}`). The plan, the ADR and the memo all name it. Use **`V1_BASE` and
-   re-cost at ~3×** (9,216 vs 3,072 tokens/window; may not fit 24 GB at batch 8), or unpin `rslearn`.
-   **Settle this on a laptop, not on a GPU clock.**
+1. ✅ **Checkpoint RESOLVED (#44 → PR #55): Phase 1 uses `V1_BASE`.** `V1_1_BASE` doesn't resolve in
+   the pinned stack; it needs `olmoearth_pretrain 0.1.1+` (breaks the runner pin) and its HF weights
+   are gated (401). Its only edge is cost (3× fewer tokens) and our test found v1.1 ≈ v1 in quality —
+   not worth it on a $3–15 control run. `model.yaml` now names `V1_BASE`; **v1.1 revisited at Phase 3**.
 2. ✅ **Decoder decision RESOLVED → per-pixel (`UNetDecoder`).** The memo's bar is *pixel-level* ROC,
    which the scaffold's per-window pooling head cannot be scored against at all.
 3. **The GPU bar is now harder:** beat fine-tuned **Presto's ~0.75**, not RF — a free 0.82 M-param
@@ -31,6 +31,12 @@ reproduces exactly.
 is ~8 px at 10 m but ~3 px at 30 m where it blurs into irrigated agriculture (the native-vs-invasive
 confound), yet **only Landsat reaches the pre-beetle era**. Possibly two products, not one compromise.
 **To audit before Phase 1:** CropGlobe (the direct challenge to our FM premise) and the CSU/Walton report.
+
+**➡️ Future work is now tracked in issues.** The roadmap — sequenced as PR-sized waves, with the
+do-not-rent-a-GPU gate and the go/no-go bar — lives on the [**#9 umbrella**](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/9)
+and the [**Phase 1 milestone**](https://github.com/emeraldleaf/san-juan-riparian-watch/milestone/1).
+Blockers to clear first: **#44** (`V1_1_BASE` doesn't exist) and
+**#45** (build the per-pixel `UNetDecoder`), both laptop/$0. Pick up work there, not from this file.
 
 ## Phase 0 detail (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
 
@@ -46,8 +52,8 @@ is **met** — all four steps ran on a laptop for $0:
 **Seven traps caught for $0** (method receipts 13–19), each of which would have failed on a rented
 GPU. **The decoder decision is now RESOLVED → per-pixel `UNetDecoder`** (the CPU pre-flight's bar is
 a *pixel-level* ROC, which the scaffold's per-window pooling head cannot be scored against — see the
-top section). What remains open before Phase 1 is the **sensor choice** and the **missing
-`V1_1_BASE` checkpoint**. See the record's "Open decisions".
+top section). The checkpoint question is also resolved (#44 → `V1_BASE`). What remains open before
+Phase 1 is the **sensor choice** (S2 vs Landsat). See the record's "Open decisions".
 
 New/changed this session: `riparian/labels/{label_layer,validate_layer}.py`,
 `riparian/delineation/{rslearn_dataset,decoders}.py`, `make_dryrun_config.py`,
