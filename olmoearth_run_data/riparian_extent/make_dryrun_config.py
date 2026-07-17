@@ -7,16 +7,14 @@ smoke test exercises the same wiring the GPU run will, not a hand-built lookalik
 
 The overrides are exactly the deltas the dry-run needs, each one a finding the dry-run surfaced:
 
-  model_id   OLMOEARTH_V1_1_BASE -> OLMOEARTH_V1_NANO
-             The v1.1 id does not resolve in this rslearn (only V1_{NANO,TINY,BASE,LARGE}); the
-             canonical config's own comment predicted this. NANO also fits a laptop.
-  in_channels 768 -> 128
-             The pooling decoder's in_channels must match the encoder embedding. 768 is BASE; NANO
-             emits 128. A silent mismatch on a GPU; a $0 fix here.
-  decoder    SegmentationPoolingDecoder -> riparian.delineation.decoders.TemporalSegmentationPoolingDecoder
-             The stock decoder reads spatial dims as image.shape[1:3], which on our 4-D
-             [bands, timesteps, H, W] phenology cube grabs (timesteps, H). The adapter reads the
-             true last-two axes. See that module for the full account.
+  model_id   OLMOEARTH_V1_BASE -> OLMOEARTH_V1_NANO
+             NANO fits a laptop. (V1_BASE is the canonical Phase-1 model, #44; the non-resolving
+             V1_1_BASE was retired there.)
+  in_channels [[2, 768]] -> [[2, 128]]
+             UNetDecoder's in_channels is a list of (downsample-factor, channels): the encoder emits
+             one feature map at 1/patch_size (factor 2). 768 is V1_BASE's embedding; NANO emits 128.
+             Only the channel count changes — no class_path override, since UNetDecoder (unlike the
+             old pooling decoder) reads the encoder FeatureMaps, not the raw image.
   trainer    CPU, single device, no DDP, CSVLogger not W&B, few epochs
              A laptop has no DDP and no W&B project. FreezeUnfreeze STAYS: it keeps the encoder
              frozen until epoch 20, so the dry-run trains only the decoder and never needs the
@@ -41,7 +39,7 @@ HERE = Path(__file__).parent
 CANONICAL = HERE / "model.yaml"
 
 NANO_EMBEDDING = 128
-ADAPTER_DECODER = "riparian.delineation.decoders.TemporalSegmentationPoolingDecoder"
+PATCH_FACTOR = 2  # the encoder emits one feature map at 1/patch_size resolution
 
 
 def build(dataset_path: str, epochs: int, log_dir: str) -> dict:
@@ -52,9 +50,12 @@ def build(dataset_path: str, epochs: int, log_dir: str) -> dict:
     enc = mi["encoder"][0]["init_args"]
     enc["model_id"] = "OLMOEARTH_V1_NANO"
 
+    # The canonical decoder is UNetDecoder(in_channels=[[2, 768]]) for V1_BASE. NANO's embedding is
+    # 128, so only the channel count changes — UNetDecoder consumes the encoder's FeatureMaps and has
+    # none of the raw-image shape assumptions that forced the old pooling-decoder adapter, so no
+    # class_path override is needed.
     dec = mi["decoders"]["riparian_classification"][0]
-    dec["class_path"] = ADAPTER_DECODER
-    dec["init_args"]["in_channels"] = NANO_EMBEDDING
+    dec["init_args"]["in_channels"] = [[PATCH_FACTOR, NANO_EMBEDDING]]
 
     data = cfg["data"]["init_args"]
     data["path"] = dataset_path

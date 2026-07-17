@@ -12,15 +12,13 @@ model:
             patch_size: 2
         decoders:
           riparian_classification:
-          - class_path: rslearn.models.pooling_decoder.SegmentationPoolingDecoder
+          - class_path: rslearn.models.unet.UNetDecoder
             init_args:
-              in_channels: 768
+              in_channels:
+              - - 2
+                - 768
               out_channels: 5
-              num_conv_layers: 0
-              num_fc_layers: 0
-              conv_channels: 128
-              fc_channels: 512
-              image_key: sentinel2_l2a
+              conv_layers_per_resolution: 2
           - class_path: rslearn.train.tasks.segmentation.SegmentationHead
         lazy_decode: false
         loss_weights: null

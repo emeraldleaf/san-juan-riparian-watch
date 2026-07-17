@@ -174,8 +174,10 @@ Principles this phase reinforced, worth applying beyond it:
 
 ## Open decisions — before a GPU
 
-1. ~~**Per-window vs per-pixel decoder**~~ → **RESOLVED 2026-07-17: per-pixel (`UNetDecoder`).**
-   Three independent arguments converged, and the third is decisive:
+1. ~~**Per-window vs per-pixel decoder**~~ → **RESOLVED + WIRED 2026-07-17 (#45): per-pixel
+   `UNetDecoder`.** `model.yaml` now uses it (`in_channels=[[2, 768]]`, `out_channels=5`); a NANO
+   dry-run confirmed it fits — 2 epochs clean, val_loss 1.490 → 1.290, per-class pixel metrics
+   non-degenerate. Three independent arguments converged, and the third is decisive:
    - our 32×32 windows are **not single-class** (they hold riparian *and* upland);
    - the prior-art audit found CO-RIP / Furuya / Walton all map **pixel/area extent**, not
      one-class-per-window ([audit](audits/2026-07-14-riparian-methods-prior-art.md));
