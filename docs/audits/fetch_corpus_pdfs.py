@@ -50,7 +50,8 @@ def safe(doi: str) -> str:
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    rows = list(csv.DictReader(open(CSV)))
+    with open(CSV) as f:
+        rows = list(csv.DictReader(f))
     have_pdf = [r for r in rows if r.get("oa_pdf_url", "").strip()]
     closed = [r for r in rows if not r.get("oa_pdf_url", "").strip()]
     print(f"{len(rows)} papers | {len(have_pdf)} with OA-PDF | {len(closed)} closed")
@@ -65,7 +66,8 @@ def main():
             continue
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
-            data = urllib.request.urlopen(req, timeout=TIMEOUT).read()
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                data = resp.read()
             # sanity: PDFs start with %PDF; some OA links redirect to HTML paywalls
             if not data[:5].startswith(b"%PDF"):
                 raise ValueError("not a PDF (likely HTML redirect/paywall)")

@@ -7,7 +7,8 @@ import urllib.parse
 import urllib.request
 
 key = os.environ["OPENALEX_API_KEY"]
-rows = list(csv.DictReader(open("riparian_methods_corpus.csv")))
+with open("riparian_methods_corpus.csv") as f:
+    rows = list(csv.DictReader(f))
 dois = [r["doi"].strip().lower() for r in rows if r.get("doi", "").strip()]
 # map doi -> oa info
 info: dict[str, dict[str, object]] = {}
@@ -30,7 +31,8 @@ for i in range(0, len(dois), 50):
     )
     req = urllib.request.Request(url, headers={"User-Agent": "python-urllib"})
     try:
-        d = json.load(urllib.request.urlopen(req, timeout=90))
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            d = json.load(resp)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         print("batch", i, "FAIL", e)
         continue
@@ -69,11 +71,10 @@ for r in rows:
         n_pdf += 1
     if m.get("is_oa"):
         n_oa += 1
-w = csv.DictWriter(
-    open("riparian_methods_corpus_linked.csv", "w", newline=""), fieldnames=out_cols
-)
-w.writeheader()
-w.writerows(rows)
+with open("riparian_methods_corpus_linked.csv", "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=out_cols)
+    w.writeheader()
+    w.writerows(rows)
 print(
     f"DONE rows {len(rows)} | with DOI-url {sum(1 for r in rows if r['doi_url'])} | is_oa {n_oa} | with OA-PDF {n_pdf}",
     flush=True,
