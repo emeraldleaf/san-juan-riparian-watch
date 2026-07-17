@@ -105,8 +105,13 @@ CORRIDOR_NEGATIVE_CLASSES: Final[tuple[int, int]] = (3, 4)
 ALIGNMENT_TOLERANCE: Final[float] = 0.01
 
 
-def _translate(mask: np.ndarray, dy: int, dx: int) -> np.ndarray:
+def translate(mask: np.ndarray, dy: int, dx: int) -> np.ndarray:
     """Shift ``mask`` by (dy, dx), filling vacated cells with 0 (no label) — **no wrap**.
+
+    Public because it is part of the shift-test contract: the materialised validator
+    (``validate_materialized.py``) shifts every window the same way and must translate identically.
+    An underscore here would be a private symbol imported across the package boundary — a refactor
+    of it would silently break the materialised gate.
 
     ``np.roll`` wraps edge pixels onto the opposite side, so a label touching the tile boundary
     would be scored against unrelated imagery on the far edge and could inflate the AUC. A padded
@@ -237,6 +242,36 @@ def separability(ndvi_positive: np.ndarray, ndvi_negative: np.ndarray) -> Separa
     return result
 
 
+def best_shift(scores: dict[tuple[int, int], float]) -> tuple[int, int]:
+    """The offset the shift test reports, given each candidate offset's AUC — **the one rule**.
+
+    This is the gate's own pass/fail decision, so it is defined once and shared by both callers
+    (``alignment`` here and the pooled ``validate_materialized``), rather than copied — two copies of
+    a gate's decision rule are two rules free to drift.
+
+    Two things happen:
+
+    1. **Ties break toward the SMALLEST shift.** A corridor that runs straight for the length of the
+       window is invariant under translation ALONG its own axis, so every offset on that axis scores
+       identically. An arbitrary argmax there invents a displacement not in the data and reports a
+       registration bug on perfectly aligned labels. Among equals, no shift wins.
+    2. **The jitter tolerance is applied HERE, not in ``is_aligned``.** If the unshifted score is
+       within :data:`ALIGNMENT_TOLERANCE` of the raw best, the "displacement" is sampling jitter, so
+       we report ``(0, 0)``. This keeps ``best_shift``, ``is_aligned`` and the log message consistent
+       — a nonzero result now always means a real, above-jitter offset that should fail the gate.
+
+    Args:
+        scores: Map from ``(dy, dx)`` offset to its AUC. Must contain ``(0, 0)``.
+
+    Returns:
+        The reported offset — ``(0, 0)`` when aligned or within jitter of the best.
+    """
+    raw_best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
+    if scores[raw_best] - scores[(0, 0)] < ALIGNMENT_TOLERANCE:
+        return (0, 0)
+    return raw_best
+
+
 def alignment(
     ndvi: np.ndarray,
     label_mask: np.ndarray,
@@ -255,7 +290,7 @@ def alignment(
     scores: dict[tuple[int, int], float] = {}
     for dy in shifts:
         for dx in shifts:
-            shifted = _translate(label_mask, dy, dx)
+            shifted = translate(label_mask, dy, dx)
             pos = ndvi[shifted == POSITIVE_CLASS]
             neg = ndvi[np.isin(shifted, CORRIDOR_NEGATIVE_CLASSES)]
             if pos.size == 0 or neg.size == 0:
@@ -265,21 +300,7 @@ def alignment(
     if (0, 0) not in scores:
         raise ValueError("the unshifted labels score nothing — the mask and NDVI grid disagree")
 
-    # Break ties toward the SMALLEST shift. A corridor that runs straight for the length of the
-    # window is invariant under translation ALONG its own axis, so every offset on that axis scores
-    # identically. Taking an arbitrary argmax there invents a displacement that is not in the data
-    # and reports a registration bug on labels that are perfectly aligned — a false alarm that
-    # would send someone hunting a CRS bug that does not exist. Among equals, no shift wins.
-    raw_best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
-    # Apply the jitter tolerance HERE, not in is_aligned: if the unshifted score is within noise of
-    # the raw best, the "displacement" is sampling jitter, so report (0, 0). This keeps best_shift,
-    # is_aligned, and the log message consistent — a nonzero best_shift now always means a real,
-    # above-jitter offset that should fail the gate.
-    best = (
-        (0, 0)
-        if scores[raw_best] - scores[(0, 0)] < ALIGNMENT_TOLERANCE
-        else raw_best
-    )
+    best = best_shift(scores)
     result = Alignment(
         best_shift=best, best_auc=scores[best], unshifted_auc=scores[(0, 0)]
     )

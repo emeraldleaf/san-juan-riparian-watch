@@ -34,3 +34,10 @@ plugins:
 exclude:
   - STATUS.md
   - riparian-pipeline.excalidraw
+  # Executable tooling — reproducibility scripts, not documentation. Jekyll copies unrecognized
+  # static files (.py) verbatim into _site, so without this the corpus fetch/enrich scripts would be
+  # SERVED on the public Pages site, reading as project-endorsed reference. They belong in the repo
+  # for reproducibility; they do not belong on the site. (They are also outside every Python gate —
+  # ruff/pytest/Sonar/CodeRabbit all scope to python-etl — so they are hand-reviewed, not enforced.)
+  - "*.py"
+  - audits/*.py

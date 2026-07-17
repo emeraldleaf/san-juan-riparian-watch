@@ -75,6 +75,14 @@ reviews:
         planetary_computer.sign_inplace for STAC. odc-stac geographic (EPSG:4269) cubes name
         spatial dims latitude/longitude, not x/y — use stac_datacube.spatial_dims(), don't
         hardcode. No bare `except Exception`; functions < 25 lines. See CLAUDE.md "Python".
+        LABEL VINTAGE + PEAK SEASON ARE ONE DERIVED FACT, defined in riparian/labels/validate_layer
+        (IMAGERY_YEAR, PEAK_MONTHS, GROWING_SEASON). Flag any module re-hardcoding 2020 or
+        {6,7,8}/June-August instead of deriving from them — e.g. a datetime(2020, 6, 1) TIME_RANGE,
+        or a private PEAK_MONTHS copy (Must-fix). Two definitions of one fact are two facts free to
+        drift: rslearn_dataset's training window and validate_layer's scoring window MUST agree, and
+        the same class of drift already produced num_classes: 4 (dry-run crash) and a dormant-season
+        AUC of 0.740 instead of 0.752. Same rule for the class scheme — POSITIVE_CLASS /
+        CORRIDOR_NEGATIVE_CLASSES restate nmripmap.PHASE1_CLASS_IDS; prefer deriving.
 
     - path: "sql/**/*.sql"
       instructions: |

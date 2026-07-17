@@ -89,6 +89,29 @@ report. You do **not** write or edit code — you read, analyze, and report.
 - **odc-stac dim names**: geographic (EPSG:4269) cubes name spatial dims
   `latitude`/`longitude`, not `x`/`y` — use `stac_datacube.spatial_dims()`, don't hardcode.
 - **Functions < 25 lines; no bare `except Exception`** (custom/specific exceptions).
+- **Label vintage + peak season are ONE derived fact** — `validate_layer.IMAGERY_YEAR`,
+  `PEAK_MONTHS`, `GROWING_SEASON`. Flag any module re-hardcoding `2020` or `{6,7,8}` /
+  June–August instead of deriving (e.g. a `datetime(2020, 6, 1)` `TIME_RANGE`, a private
+  `PEAK_MONTHS` copy). The training window and the scoring window **must not be able to
+  disagree**. This exact drift class produced `num_classes: 4` and a dormant-contaminated
+  AUC of 0.740 instead of 0.752.
+
+### 🔴 Python OUTSIDE `python-etl/` — the ungated zone (`docs/**/*.py`, `olmoearth_run_data/**/*.py`, anywhere else)
+**Nothing watches these files.** Verified 2026-07-17: `ci-python.yml` runs
+`ruff check riparian tests` with `working-directory: python-etl`; `sonar.sources=python-etl,frontend/src,sql`;
+CodeRabbit's Python `path_instructions` match `python-etl/**/*.py` only. So a `.py` outside
+`python-etl/` is covered by **no linter, no type-checker, no Sonar rule, and no AI-review rule**.
+- Treat any new/changed `.py` there as **Must-review-by-hand against the full Python checklist above**
+  — nothing mechanical will catch it for you. (Two such scripts shipped with a bare
+  `except Exception` and untyped params straight through a CodeRabbit round.)
+- **Flag executable scripts placed under `docs/`**: it is the Jekyll-published Pages tree, and Jekyll
+  copies unrecognized static files (`.py`) verbatim into `_site` — tooling gets **served publicly**
+  and reads as project-endorsed reference. Require a `docs/_config.yml` `exclude` entry, or
+  relocation out of the published tree.
+- **Prefer the sanctioned home.** Reusable riparian logic belongs in `python-etl/riparian/`
+  (where the gates are), leaving only a thin CLI wrapper outside. "It imports rslearn/rasterio so it
+  can't live in the package" is **not** a reason — `riparian/validation/reference.py` already imports
+  `rasterio`, `requests` and `sqlalchemy`.
 
 ### SQL (`sql/**/*.sql`)
 - **Named columns, never `SELECT *`** in production queries (Must-fix in shipped ETL/service SQL).

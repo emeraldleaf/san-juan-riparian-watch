@@ -211,6 +211,29 @@ def test_a_straight_corridor_does_not_raise_a_FALSE_registration_alarm() -> None
     assert align.is_aligned
 
 
+def test_best_shift_snaps_within_jitter_and_breaks_ties_to_zero() -> None:
+    """The shared gate rule: sub-tolerance wins snap to (0,0); real offsets survive; ties → smallest."""
+    tol = validate_layer.ALIGNMENT_TOLERANCE
+    # A nonzero offset beats zero, but by less than tolerance → jitter, report (0,0).
+    assert validate_layer.best_shift({(0, 0): 0.90, (0, 1): 0.90 + tol / 2}) == (0, 0)
+    # A nonzero offset beats zero by MORE than tolerance → a real displacement, report it.
+    assert validate_layer.best_shift({(0, 0): 0.90, (0, 1): 0.90 + tol * 3}) == (0, 1)
+    # Exact tie between zero and a nonzero offset → zero wins (smallest shift).
+    assert validate_layer.best_shift({(0, 0): 0.90, (1, 0): 0.90}) == (0, 0)
+
+
+def test_translate_does_not_wrap_and_handles_off_grid_shifts() -> None:
+    """The shared translate: no wrap, and a fully off-grid shift yields all-zero (no label)."""
+    mask = np.zeros((4, 4), dtype=int)
+    mask[:, 0] = 1  # a stripe on the left edge
+    # shift right by 1: the stripe moves to col 1, col 0 becomes 0 (NOT wrapped from the right edge).
+    out = validate_layer.translate(mask, 0, 1)
+    assert out[:, 1].tolist() == [1, 1, 1, 1]
+    assert out[:, 0].tolist() == [0, 0, 0, 0]
+    # shift fully off-grid: everything is 0.
+    assert validate_layer.translate(mask, 0, 99).sum() == 0
+
+
 def test_broken_labels_are_a_hard_stop() -> None:
     """Labels uncorrelated with the imagery: AUC ~0.5. Never train on this."""
     rng = np.random.default_rng(1)

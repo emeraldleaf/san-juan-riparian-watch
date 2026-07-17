@@ -49,6 +49,7 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from shapely.geometry import shape
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
 from . import nmripmap
@@ -65,6 +66,7 @@ class LabeledPolygonReader(Protocol):
 
     def __call__(self, bbox: tuple[float, float, float, float]) -> list[LabeledPolygon]:
         """Return the labeled polygons intersecting ``bbox`` (EPSG:4326)."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,7 @@ class LayerStats:
         return self.negative_area_m2 / self.positive_area_m2
 
 
-def _area_m2(geom) -> float:
+def _area_m2(geom: BaseGeometry) -> float:
     """Approximate area in square metres for a lon/lat geometry.
 
     A local equal-area projection is overkill for a balance ratio; degrees-squared scaled by the
@@ -238,7 +240,7 @@ def _balance(
     return balanced, neg_area
 
 
-def _with_geometry(p: LabeledPolygon, geom) -> LabeledPolygon:
+def _with_geometry(p: LabeledPolygon, geom: BaseGeometry) -> LabeledPolygon:
     """A copy of ``p`` with a different geometry (LabeledPolygon is frozen)."""
     import dataclasses
 
