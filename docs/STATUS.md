@@ -32,6 +32,11 @@ is ~8 px at 10 m but ~3 px at 30 m where it blurs into irrigated agriculture (th
 confound), yet **only Landsat reaches the pre-beetle era**. Possibly two products, not one compromise.
 **To audit before Phase 1:** CropGlobe (the direct challenge to our FM premise) and the CSU/Walton report.
 
+**➡️ Future work is now tracked in issues.** The roadmap — sequenced as PR-sized waves, with the
+do-not-rent-a-GPU gate and the go/no-go bar — lives on the [**#9 umbrella**](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/9)
+and the **Phase 1 milestone**. Blockers to clear first: **#44** (`V1_1_BASE` doesn't exist) and
+**#45** (build the per-pixel `UNetDecoder`), both laptop/$0. Pick up work there, not from this file.
+
 ## Phase 0 detail (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
 
 Merged via PR **#39**. Phase 0 of the
