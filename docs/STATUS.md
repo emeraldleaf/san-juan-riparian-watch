@@ -34,7 +34,8 @@ confound), yet **only Landsat reaches the pre-beetle era**. Possibly two product
 
 **➡️ Future work is now tracked in issues.** The roadmap — sequenced as PR-sized waves, with the
 do-not-rent-a-GPU gate and the go/no-go bar — lives on the [**#9 umbrella**](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/9)
-and the **Phase 1 milestone**. Blockers to clear first: **#44** (`V1_1_BASE` doesn't exist) and
+and the [**Phase 1 milestone**](https://github.com/emeraldleaf/san-juan-riparian-watch/milestone/1).
+Blockers to clear first: **#44** (`V1_1_BASE` doesn't exist) and
 **#45** (build the per-pixel `UNetDecoder`), both laptop/$0. Pick up work there, not from this file.
 
 ## Phase 0 detail (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
