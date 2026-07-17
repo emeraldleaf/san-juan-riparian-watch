@@ -38,12 +38,13 @@ logger = logging.getLogger("validate_materialized")
 RED_BAND = 4  # B04, 1-indexed in the stacked geotiff
 NIR_BAND = 8  # B08
 
-#: Peak growing season for the San Juan Basin. The separability contract is about *peak-season*
-#: greenness — riparian phreatophytes staying green while the corridor browns — and the labels are
-#: NAIP-2020 peak vintage. The cube itself carries all 12 monthly mosaics (that seasonal trajectory
-#: is the phenology signal the model trains on), but scoring NDVI separability over the dormant
-#: months would drag riparian toward upland and understate the true signal.
-PEAK_MONTHS = frozenset({6, 7, 8})
+#: Peak season is defined ONCE, in validate_layer — imported, never re-declared. The separability
+#: contract is about *peak-season* greenness (riparian phreatophytes staying green while the corridor
+#: browns) and the labels are NAIP-2020 peak vintage. The cube carries all 12 monthly mosaics — that
+#: seasonal trajectory is the phenology signal the model trains on — but scoring NDVI separability
+#: over the dormant months drags riparian toward upland and understates the signal. It did: this
+#: file averaged all 12 and reported AUC 0.740 instead of 0.752.
+PEAK_MONTHS = validate_layer.PEAK_MONTHS
 
 
 def _peak_season_tifs(window: Path) -> list[Path]:
