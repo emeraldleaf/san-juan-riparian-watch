@@ -58,7 +58,7 @@ data drive (`TMPDIR`+`CPL_TMPDIR`, finding 17). Everything below predates this a
 **READ THIS FIRST if you are a coding agent picking up the repo.**
 
 ### Branches
-- Working tree is on **`main`**. The ETL/label work merged via **PR #13** (`a0bb842`): the 3 HIGH
+- Working tree is on **`main`**. The ETL/label work merged via **PR #13** (`4d3a258`): the 3 HIGH
   ETL fixes, the NMRipMap class crosswalk, SMP scoring, the OlmoEarth task scaffold, and the
   25-source corpus (`docintel/corpus/seed_sources.yaml`).
 - `feat/docintel-private-split` and `feat/etl-fixes-and-labels` are both **fully merged into
@@ -120,7 +120,7 @@ the whole build, serving the `.md` files as raw text).
     it by ~0.2 F1 and manufacture a win.
 
 ### Ultracode review (2026-07-11) — 25 confirmed (3 high / ~11 med / ~11 low), 6 refuted
-All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `ad89b67`: buffer_wetlands rebuilt
+All 3 HIGH + the load-bearing MEDIUM ETL/scorer bugs are fixed in `5157323`: buffer_wetlands rebuilt
 on full run (was wiped by CASCADE); ArcGIS HTTP-200 error bodies now raise + paginator stops at first
 gap (no gapped bronze); LANDFIRE EVH `32767` fill filtered from continuous stats; NLCD wired via EROS
 ImageServer + GeoServer WMS fallback in `main()`; `health_scorer` aligned height/lifeform pairs +
