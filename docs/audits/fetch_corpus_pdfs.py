@@ -9,7 +9,13 @@ Safe to re-run: already-downloaded files are skipped (resumable). Polite:
 one request at a time with a delay. Closed-access papers (no oa_pdf_url) are
 listed at the end with their DOI landing page so you can grab them manually.
 
+Set CORPUS_CONTACT_EMAIL before running — publishers want a contact in the user-agent for an
+automated fetch, and it is not hardcoded here on purpose: this repo is public, and the next person
+should supply their own address rather than inherit (or silently keep sending) someone else's. Same
+convention as enrich_corpus.py's OPENALEX_API_KEY.
+
 Usage:
+    export CORPUS_CONTACT_EMAIL="you@example.org"
     python3 fetch_corpus_pdfs.py                       # uses ./riparian_methods_corpus.csv
     python3 fetch_corpus_pdfs.py path/to/corpus.csv    # explicit path
 """
@@ -19,7 +25,16 @@ CSV = sys.argv[1] if len(sys.argv) > 1 else "riparian_methods_corpus.csv"
 OUT = "corpus_pdfs"
 DELAY = 1.0          # seconds between requests (be polite to publishers)
 TIMEOUT = 90
-UA = "Mozilla/5.0 (research corpus fetch; contact: joshua.dell@outlook.com)"
+
+CONTACT = os.environ.get("CORPUS_CONTACT_EMAIL")
+if not CONTACT:
+    # Fail loud, not silently anonymous: an unattributed crawler is what gets an IP blocked.
+    sys.exit(
+        "CORPUS_CONTACT_EMAIL is not set.\n"
+        '  export CORPUS_CONTACT_EMAIL="you@example.org"\n'
+        "Publishers expect a contact in the User-Agent for automated fetching."
+    )
+UA = f"Mozilla/5.0 (research corpus fetch; contact: {CONTACT})"
 
 def safe(doi):
     return re.sub(r"[^A-Za-z0-9._-]", "_", doi.strip().lower()) or "no_doi"
