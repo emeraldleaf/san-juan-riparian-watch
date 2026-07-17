@@ -19,11 +19,18 @@ Usage:
     python3 fetch_corpus_pdfs.py                       # uses ./riparian_methods_corpus.csv
     python3 fetch_corpus_pdfs.py path/to/corpus.csv    # explicit path
 """
-import csv, os, re, sys, time, urllib.request, urllib.error
+
+import csv
+import os
+import re
+import sys
+import time
+import urllib.request
+import urllib.error
 
 CSV = sys.argv[1] if len(sys.argv) > 1 else "riparian_methods_corpus.csv"
 OUT = "corpus_pdfs"
-DELAY = 1.0          # seconds between requests (be polite to publishers)
+DELAY = 1.0  # seconds between requests (be polite to publishers)
 TIMEOUT = 90
 
 CONTACT = os.environ.get("CORPUS_CONTACT_EMAIL")
@@ -36,14 +43,16 @@ if not CONTACT:
     )
 UA = f"Mozilla/5.0 (research corpus fetch; contact: {CONTACT})"
 
-def safe(doi):
+
+def safe(doi: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", doi.strip().lower()) or "no_doi"
+
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     rows = list(csv.DictReader(open(CSV)))
     have_pdf = [r for r in rows if r.get("oa_pdf_url", "").strip()]
-    closed   = [r for r in rows if not r.get("oa_pdf_url", "").strip()]
+    closed = [r for r in rows if not r.get("oa_pdf_url", "").strip()]
     print(f"{len(rows)} papers | {len(have_pdf)} with OA-PDF | {len(closed)} closed")
     ok = skip = fail = 0
     failures = []
@@ -52,7 +61,8 @@ def main():
         url = r["oa_pdf_url"].strip()
         dest = os.path.join(OUT, safe(doi) + ".pdf")
         if os.path.exists(dest) and os.path.getsize(dest) > 1024:
-            skip += 1; continue
+            skip += 1
+            continue
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             data = urllib.request.urlopen(req, timeout=TIMEOUT).read()
@@ -62,8 +72,13 @@ def main():
             with open(dest, "wb") as f:
                 f.write(data)
             ok += 1
-            print(f"[{i}/{len(have_pdf)}] OK  {safe(doi)}.pdf  ({len(data)//1024} KB)")
-        except Exception as e:
+            print(
+                f"[{i}/{len(have_pdf)}] OK  {safe(doi)}.pdf  ({len(data) // 1024} KB)"
+            )
+        # Catch the retrieval/validation failure modes explicitly — NOT a bare Exception. OSError
+        # covers URLError and TimeoutError (both subclass it); ValueError is our own "not a PDF"
+        # raise above. Both belong in fetch_failures.csv, listed on purpose, not swallowed blindly.
+        except (OSError, ValueError) as e:
             fail += 1
             failures.append((doi, url, str(e)[:80]))
             print(f"[{i}/{len(have_pdf)}] FAIL {doi}: {str(e)[:80]}")
@@ -71,14 +86,24 @@ def main():
     print(f"\nDONE  downloaded {ok} | skipped(existing) {skip} | failed {fail}")
     if failures:
         with open("fetch_failures.csv", "w", newline="") as f:
-            w = csv.writer(f); w.writerow(["doi", "url", "error"]); w.writerows(failures)
-        print(f"  {len(failures)} failures written to fetch_failures.csv (retry or grab manually)")
+            w = csv.writer(f)
+            w.writerow(["doi", "url", "error"])
+            w.writerows(failures)
+        print(
+            f"  {len(failures)} failures written to fetch_failures.csv (retry or grab manually)"
+        )
     if closed:
         with open("closed_access.csv", "w", newline="") as f:
-            w = csv.writer(f); w.writerow(["title", "year", "doi_url"])
+            w = csv.writer(f)
+            w.writerow(["title", "year", "doi_url"])
             for r in closed:
-                w.writerow([r.get("title", ""), r.get("year", ""), r.get("doi_url", "")])
-        print(f"  {len(closed)} closed-access papers → closed_access.csv (DOI landing pages)")
+                w.writerow(
+                    [r.get("title", ""), r.get("year", ""), r.get("doi_url", "")]
+                )
+        print(
+            f"  {len(closed)} closed-access papers → closed_access.csv (DOI landing pages)"
+        )
+
 
 if __name__ == "__main__":
     main()

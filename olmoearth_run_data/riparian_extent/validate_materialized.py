@@ -114,13 +114,13 @@ def _global_shift_test(grids: list[Grid]) -> tuple[tuple[int, int], dict[tuple[i
         for dx in validate_layer.SHIFTS:
             p, n = [], []
             for ndvi, mask in grids:
-                shifted = validate_layer._translate(mask, dy, dx)
+                shifted = validate_layer.translate(mask, dy, dx)
                 p.append(ndvi[shifted == validate_layer.POSITIVE_CLASS])
                 n.append(ndvi[np.isin(shifted, validate_layer.CORRIDOR_NEGATIVE_CLASSES)])
             scores[(dy, dx)] = validate_layer.auc(np.concatenate(p), np.concatenate(n))
-    raw_best = min(scores, key=lambda k: (-scores[k], abs(k[0]) + abs(k[1])))
-    best = (0, 0) if scores[raw_best] - scores[(0, 0)] < validate_layer.ALIGNMENT_TOLERANCE else raw_best
-    return best, scores
+    # The tie-break + jitter-tolerance rule is the gate's decision; use the shared definition, not a
+    # copy, so the pooled test and the per-window alignment() can never disagree on what "aligned" is.
+    return validate_layer.best_shift(scores), scores
 
 
 def main() -> int:

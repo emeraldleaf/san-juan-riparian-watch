@@ -1,0 +1,25 @@
+name: "CodeQL config — riparian"
+
+# Why this file exists
+# --------------------
+# The workflow runs `security-and-quality`, a deliberate choice: we would rather see maintainability
+# findings than curate a query list nobody revisits. The cost is noise, and noise has a failure mode
+# this project cares about — an alert list that is a quarter machine-generated is a list people stop
+# reading, which is the same way a gate nobody runs becomes decoration.
+#
+# Measured 2026-07-17: 13 of 54 open alerts (24%) were in generated C#. Nobody wrote that code and
+# nobody can fix it — the fix would be overwritten on the next build. Excluding it does not hide a
+# real finding; it stops burying real findings under ones that are structurally unactionable.
+#
+# ZERO of the 54 were security alerts. This file removes noise, not security coverage.
+
+paths-ignore:
+  # Roslyn / ASP.NET source generators — regenerated on every build.
+  - "**/*.generated.cs"
+  - "**/*.g.cs"
+  - "**/obj/**"
+  - "**/bin/**"
+  # Vendored dependencies — upstream's code, upstream's findings.
+  - "**/node_modules/**"
+  - "**/.venv*/**"
+  - "**/site-packages/**"

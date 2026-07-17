@@ -31,6 +31,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
 
+from riparian.labels.validate_layer import IMAGERY_YEAR, PEAK_MONTHS
+
 logger = logging.getLogger(__name__)
 
 #: Window side in pixels. 32 px x 10 m = 320 m. The corridor is 50-200 m wide, so a window holds
@@ -42,9 +44,12 @@ WINDOW_PX: Final[int] = 32
 RESOLUTION_M: Final[float] = 10.0
 
 #: Fit on the label's own vintage. NMRipMap v2.0 Plus was photo-interpreted from NAIP 2020.
+#: DERIVED, not re-hardcoded: the year and the peak-season window are owned by ``validate_layer``,
+#: so the imagery this trains on and the imagery the validator scores against cannot drift apart —
+#: the same single-source discipline that PEAK_MONTHS and num_classes had to learn the hard way.
 TIME_RANGE: Final[tuple[datetime, datetime]] = (
-    datetime(2020, 6, 1, tzinfo=timezone.utc),
-    datetime(2020, 8, 31, tzinfo=timezone.utc),
+    datetime(IMAGERY_YEAR, min(PEAK_MONTHS), 1, tzinfo=timezone.utc),
+    datetime(IMAGERY_YEAR, max(PEAK_MONTHS), 31, tzinfo=timezone.utc),
 )
 
 #: A window with no riparian pixels costs a full S2 download and teaches nothing.

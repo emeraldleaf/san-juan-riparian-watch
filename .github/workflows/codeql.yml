@@ -69,6 +69,9 @@ jobs:
           # security-and-quality is a superset of the default security suite. We would rather see the
           # maintainability findings too than curate a query list nobody will revisit.
           queries: security-and-quality
+          # ...but that only works if the list stays readable. The config excludes generated and
+          # vendored code, which was 24% of open alerts and 0% actionable. See the file for why.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
         if: matrix.build
