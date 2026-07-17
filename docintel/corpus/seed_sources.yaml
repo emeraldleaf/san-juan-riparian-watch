@@ -463,6 +463,100 @@ sources:
     fetch: auto
     topics: [prior-art, riparian-extent, novelty, beetle]
 
+  # -------------------------------------------------------------------------
+  # Method prior art for the FM decision (added 2026-07-17 from the CPU
+  # pre-flight handoff — docs/audits/2026-07-16-DECISION-MEMO-olmoearth-gpu.md).
+  #
+  # DELIBERATELY FIVE, NOT 320. The handoff ships a 320-paper index
+  # (docs/audits/riparian_methods_corpus_linked.csv, 306 with OA PDFs). It is an
+  # index to SEARCH, not a pile to ingest: only 8 of 320 score >=7 on
+  # method_relevance, and the top-ranked paper is Spartina in the Yangtze Estuary —
+  # method-similar, wrong biome. This corpus is San Juan *watershed documents*
+  # with geo_focus for geo-mention testing; bulk-loading global RS methods papers
+  # would flip it into a generic remote-sensing pile and hurt the RAG's actual job.
+  # These five are here because the decision memo LEANS on them. The other 315
+  # stay searchable in the CSV until something needs them.
+  # -------------------------------------------------------------------------
+
+  - id: presto-tseng-2023-lightweight-rs-timeseries
+    title: "Lightweight, Pre-trained Transformers for Remote Sensing Timeseries (Presto)"
+    url: https://arxiv.org/pdf/2304.14065
+    agency: academic
+    year: 2023
+    doc_type: paper
+    format: pdf
+    license: verify            # arXiv preprint — check the author licence before redistribution
+    geo_focus: false
+    fetch: auto                # arxiv.org resolves fine (unlike mdpi/researchgate)
+    topics: [foundation-model, timeseries, presto, prior-art, method]
+    # THE model behind every number in the CPU pre-flight. Its fine-tuned form — 0.82M
+    # params, free, on a laptop — is the bar OlmoEarth-Base (207.5M, GPU) must beat:
+    # ~0.75 ROC on hard-source species transfer. Beating RF is not enough; a free CPU
+    # model already does that. Verified 2026-07-17: arXiv title matches.
+
+  - id: cropglobe-tong-2025-invariant-features-crop-type
+    title: "Invariant Features for Global Crop Type Classification (CropGlobe)"
+    url: https://arxiv.org/pdf/2509.03497
+    agency: academic
+    year: 2025
+    doc_type: paper
+    format: pdf
+    license: verify
+    geo_focus: false
+    fetch: auto
+    topics: [foundation-model, transfer, prior-art, method, threat]
+    # 🔴 THE DIRECT CHALLENGE TO OUR CONTRIBUTION, and not yet audited. Finds simple
+    # spectral-temporal features MATCH FM embeddings on cross-geography transfer — which
+    # is exactly what our own in-tile ties reproduce (FM ties RF). If it generalises to
+    # riparian, the FM premise weakens. It is why fine-tuning (not frozen embeddings) is
+    # the operative variable. Queued in docs/audits/README.md "Still to audit".
+    # NB: "CropGlobe" is the memo's shorthand; the arXiv title is as above (verified).
+
+  - id: prithvi-jakubik-2023-geospatial-foundation-model
+    title: "Foundation Models for Generalist Geospatial Artificial Intelligence (Prithvi)"
+    url: https://arxiv.org/pdf/2310.18660
+    agency: academic
+    year: 2023
+    doc_type: paper
+    format: pdf
+    license: verify
+    geo_focus: false
+    fetch: auto
+    topics: [foundation-model, prithvi, prior-art, method]
+    # Highest-ranked FM paper in the 320-corpus (method_relevance 7.0) and the closest
+    # published analogue to the fine-tune design: multi-temporal EO pretraining + downstream
+    # fine-tuning. Supports the design pattern; does not answer the riparian question.
+
+  - id: csu-tamarisk-russianolive-occurrence-2017-dataset
+    title: "Tamarisk and Russian Olive Occurrence and Absence Dataset Collected in Select Tributaries of the Colorado River for 2017"
+    url: https://www.mdpi.com/2306-5729/3/4/42/pdf?version=1539769949
+    agency: academic
+    year: 2018
+    doc_type: paper
+    format: pdf
+    license: verify            # MDPI Data, CC BY — attribute on any derived product
+    geo_focus: true
+    fetch: manual              # mdpi.com 403s automated fetch (see header note)
+    topics: [tamarisk, russian-olive, field-data, species-labels, prior-art]
+    # Citable PROVENANCE for the Phase-2 species labels — published explicitly for species
+    # distribution modelling + RS detection. Does NOT prove S2 can separate tamarisk /
+    # Russian-olive / native / defoliated in our AOI; it licenses the label source only.
+
+  - id: meng-2012-tamarisk-defoliation-san-juan
+    title: "Detection of Tamarisk Defoliation by the Northern Tamarisk Beetle (Diorhabda carinulata)"
+    url: https://doi.org/10.2747/1548-1603.49.4.510
+    agency: academic
+    year: 2012
+    doc_type: paper
+    format: html
+    license: verify            # closed access — OpenAlex finds no OA route (is_oa=False)
+    geo_focus: true
+    fetch: manual              # paywalled; landing page only
+    topics: [tamarisk, diorhabda, defoliation, san-juan, prior-art]
+    # AOI-SPECIFIC and closed-access. Motivates the defoliation confound that makes the
+    # beetle problem hard on our own river: it is why "Tamarix senesces late" cannot be
+    # separated from "defoliated Tamarix browns early" without a pre-2004 (Landsat) baseline.
+
 # ---------------------------------------------------------------------------
 # Crawl seeds — pages whose linked PDFs should be discovered + added (shallow,
 # 1 hop), then re-listed above with concrete ids before ingest for reproducibility.

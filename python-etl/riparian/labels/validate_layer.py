@@ -69,9 +69,17 @@ logger = logging.getLogger(__name__)
 #: Fit against the label's own vintage. NMRipMap v2.0 Plus = NAIP 2020.
 IMAGERY_YEAR: Final[int] = 2020
 
-#: Peak growing season for the San Juan Basin. Outside it, riparian NDVI collapses toward upland
-#: and the whole test goes mute — a dormant reading is not a bare one.
-GROWING_SEASON: Final[str] = f"{IMAGERY_YEAR}-06-01/{IMAGERY_YEAR}-08-31"
+#: Peak growing season for the San Juan Basin — **the one definition**. Outside it, riparian NDVI
+#: collapses toward upland and the whole test goes mute: a dormant reading is not a bare one.
+#: Callers that score NDVI must filter to these months. `validate_materialized.py` imports this
+#: rather than keeping its own copy — peak season defined twice is peak season that drifts, which is
+#: how `num_classes` ended up wrong (see docs/method.md receipt 18).
+PEAK_MONTHS: Final[frozenset[int]] = frozenset({6, 7, 8})
+
+#: The same window as a STAC date range, derived so the two cannot disagree.
+GROWING_SEASON: Final[str] = (
+    f"{IMAGERY_YEAR}-{min(PEAK_MONTHS):02d}-01/{IMAGERY_YEAR}-{max(PEAK_MONTHS):02d}-31"
+)
 
 #: Below this, the labels are not describing anything the sensor can see. Hard stop.
 MIN_SEPARABILITY_AUC: Final[float] = 0.65

@@ -64,7 +64,7 @@ class LabeledPolygonReader(Protocol):
     """
 
     def __call__(self, bbox: tuple[float, float, float, float]) -> list[LabeledPolygon]:
-        ...
+        """Return the labeled polygons intersecting ``bbox`` (EPSG:4326)."""
 
 logger = logging.getLogger(__name__)
 
