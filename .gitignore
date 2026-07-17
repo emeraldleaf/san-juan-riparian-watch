@@ -37,3 +37,7 @@ __pycache__/
 .venv-olmoearth/
 olmoearth_run_data/riparian_extent/dataset/
 .tmp/
+docs/audits/corpus_pdfs/
+docs/audits/fetch_failures.csv
+docs/audits/closed_access.csv
+docs/audits/fetch.log

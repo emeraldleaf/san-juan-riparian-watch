@@ -61,7 +61,73 @@ Each qualifier is there because an audit put it there:
 The incumbent's own stated limits are, in effect, the specification for this project. That is a far
 stronger position than the one we started with, and we only reached it by being wrong in public.
 
+## CPU pre-flight — the GPU go/no-go evidence (2026-07-16, external session)
+
+**A different category from the audits above.** These are not prior-art falsifications; they are
+**CPU benchmarks that answer "is the GPU worth renting?"** with evidence instead of hope. They live
+here because the decision memo consolidates them and they carry the same burden of proof.
+
+> ⚠️ **All six benchmarks use Presto (0.82 M params) as a CPU stand-in for OlmoEarth (207.5 M).**
+> They tell you *where to look and what bar to beat* — **not** what OlmoEarth will score. The §5
+> caveats (S2+NDVI only, light CPU fine-tune, 3 seeds, NM lowland only, temporal transfer
+> **unmeasured**) must travel with every number quoted from them.
+
+- [**DECISION MEMO — should we rent a GPU?**](2026-07-16-DECISION-MEMO-olmoearth-gpu.md) — **start
+  here.** *Yes, conditionally.* A fine-tuned FM beats RF **only** on hard/label-scarce transfer to
+  unseen ground (**+0.04–0.08 ROC**), and ties RF on extent and in-tile. The bar for OlmoEarth-Base:
+  **beat fine-tuned Presto's ~0.75, not merely RF** — a free CPU model already beats RF there.
+  🔴 **Carries a landing correction**: its `OLMOEARTH_V1_1_BASE` target **does not exist** in the
+  pinned stack, which makes §7.2 unexecutable and §7.4's cost ~3× optimistic.
+- [Methods review — riparian FM landscape](2026-07-16-riparian-fm-methods-review.md) + the searchable
+  corpus — [raw](riparian_methods_corpus.csv) and [OA-linked](riparian_methods_corpus_linked.csv)
+  (`+ doi_url, oa_pdf_url, landing_url, openalex_url, is_oa`), built by
+  [`enrich_corpus.py`](enrich_corpus.py) (OpenAlex) and fetched by
+  [`fetch_corpus_pdfs.py`](fetch_corpus_pdfs.py) (stdlib, resumable, validates `%PDF`).
+  **Read the ranking honestly**: only **8 of 320 score ≥7** on method-relevance, and the top-ranked
+  paper is *Spartina* in the Yangtze Estuary — method-similar, wrong biome. It is an index to search,
+  not a pile to ingest. It also does **not** contain Presto or CropGlobe, the memo's own two
+  load-bearing citations (both now added to `docintel/corpus/seed_sources.yaml` by hand).
+
+  > 🔴 **`is_oa` is not `is_fetchable` — measured 2026-07-17.** OpenAlex reports **306 of 320** open
+  > with a PDF URL. An actual fetch got **93 (30%)**, 584 MB. The papers really are open (CC BY); the
+  > *publishers* block robots. **MDPI alone was 102 of the 213 failures** — and this repo's own
+  > `seed_sources.yaml` header had already documented it on 2026-07-11: *"mdpi.com, researchgate.net
+  > and www.usgs.gov all return 403 to curl even with a browser User-Agent."* We re-learned it at 213
+  > requests.
+  >
+  > | fetch succeeded | | fetch 403'd / HTML-paywalled | |
+  > |---|---|---|---|
+  > | arxiv.org | 31 | **mdpi.com** | **102** |
+  > | ieeexplore.ieee.org | 23 | doi.org | 21 |
+  > | frontiersin.org | 6 | onlinelibrary.wiley.com | 20 |
+  > | pubs.usgs.gov · plos · copernicus | 9 | link.springer.com | 15 |
+  >
+  > An OA licence is a *legal* fact; a 403 is an *access-control* fact. Conflating them is what makes
+  > "306 open-access PDFs" read as "306 downloadable PDFs". PDFs, `fetch_failures.csv` (213) and
+  > `closed_access.csv` (14) are **gitignored** — the CSV is the reproducible artifact, not 584 MB of
+  > publisher PDFs in git.
+- [Malpais reach — separability & corridor resolvability](2026-07-16-malpais-reach-generalization-note.md)
+  — a second reach against Phase 0's "one reach, not the basin" caveat, and the best evidence yet on
+  **S2 10 m vs Landsat 30 m**: the corridor is ~8 px at 10 m but **~3 px at 30 m**, where it blurs
+  into irrigated agriculture — *precisely* the confound for the native-vs-invasive split.
+  ⚠️ Ad-hoc harness, **not** `validate_layer.py` — not comparable to Phase 0's AUC 0.752 until re-run.
+
+Benchmark result notes (the arc the memo consolidates):
+[extent, in-tile](2026-07-16-presto-arm-results.md) ·
+[species, in-tile](2026-07-16-presto-species-results.md) ·
+[cross-tile transfer](2026-07-16-cross-tile-transfer-results.md) ·
+[label-budget sweep](2026-07-16-label-budget-sweep-results.md) ·
+[fine-tune transfer](2026-07-16-finetune-transfer-results.md) ·
+[**three-tile transfer**](2026-07-16-three-tile-transfer-results.md) (the decisive control).
+
 ## Still to audit
 
+- **CropGlobe (Tong et al. 2025)** — the decision memo names it as *"the direct challenge our in-tile
+  ties reproduce"*: simple spectral-temporal features matching FM embeddings on cross-geography
+  transfer. That is a claim about **our** contribution, from a paper we have not audited, and it is
+  not in the corpus CSV. Audit it before Phase 1.
+- **CSU/Walton report** — carried over from the
+  [methods audit](2026-07-14-riparian-methods-prior-art.md): the closest procedural analogue for the
+  invasives half, still only known to us second-hand.
 - Anything the `/paper-audit` command is pointed at. Run it before building on a novelty claim, not
   after.

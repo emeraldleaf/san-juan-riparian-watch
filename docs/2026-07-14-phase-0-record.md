@@ -174,23 +174,46 @@ Principles this phase reinforced, worth applying beyond it:
 
 ## Open decisions — before a GPU
 
-1. **Per-window vs per-pixel decoder — the one that changes what we measure.** The scaffold mirrors
-   mangrove with `SegmentationPoolingDecoder` (one prediction broadcast to every pixel). Extent is
-   inherently *per-pixel*, and our 32×32 windows hold riparian *and* upland — so a per-window head is
-   coarse for this task. `rslearn` ships `UNetDecoder` for per-pixel segmentation. **Decide before
-   Phase 1.** Moving to per-pixel also makes the deferred prediction-overlay alignment check
-   meaningful (a per-window prediction overlays uniformly and proves nothing). The dry-run
-   deliberately did *not* make this call — it fixed the mechanical shape bug and kept the modelling
-   choice intact.
+1. ~~**Per-window vs per-pixel decoder**~~ → **RESOLVED 2026-07-17: per-pixel (`UNetDecoder`).**
+   Three independent arguments converged, and the third is decisive:
+   - our 32×32 windows are **not single-class** (they hold riparian *and* upland);
+   - the prior-art audit found CO-RIP / Furuya / Walton all map **pixel/area extent**, not
+     one-class-per-window ([audit](audits/2026-07-14-riparian-methods-prior-art.md));
+   - **the CPU pre-flight's bar is a *pixel-level* ROC** at 100–400 px/class
+     ([decision memo §6](audits/2026-07-16-DECISION-MEMO-olmoearth-gpu.md)). The scaffold's
+     `SegmentationPoolingDecoder` emits one prediction per window broadcast to all pixels, so it
+     **cannot be scored against that bar at all**. Per-pixel is now *required to measure the thing
+     we defined*, not merely preferable.
 
-2. **Sensor: Sentinel-2 (10 m, ~2015→) vs Landsat (30 m, 1984→).** Decided *after* the extent
-   control lands, on evidence. 30 m may be too coarse for a 50–200 m corridor; but only Landsat
-   reaches the ~20-year pre-beetle era that separates "Tamarix senesces late" from "defoliated
-   Tamarix browns early". Not a Phase-0 question.
+   This also un-blocks the deferred prediction-overlay alignment check (a per-window prediction
+   overlays uniformly and proves nothing). The dry-run deliberately did not make this call; the
+   evidence did.
 
-3. **Phase 1 go / no-go gate (already written).** If extent lands *well below* the pixel-level RF
-   baseline (F1 0.90–0.92 — **not** the 0.701 patch-level number), **stop and debug**. Compute is
-   ~$2–5; the discipline is the point.
+2. **Sensor: Sentinel-2 (10 m, ~2015→) vs Landsat (30 m, 1984→).** Still open — but the Malpais
+   reach note ([here](audits/2026-07-16-malpais-reach-generalization-note.md)) supplies the first
+   real measurement and **sharpens it into a genuine dilemma rather than a preference**:
+   - the corridor is ~80–100 m wide → **~8 px at 10 m, but only ~3 px at 30 m**;
+   - aggregate corridor-vs-upland NDVI *contrast* is nearly resolution-invariant (0.338 → 0.333),
+     so **Landsat can track corridor greenness trends**;
+   - but at 30 m the corridor **blurs into adjacent irrigated fields** — and irrigated agriculture is
+     *precisely* the confound for the native-vs-invasive split.
+
+   So: **only Landsat reaches the pre-beetle era (1984)** that separates "Tamarix senesces late" from
+   "defoliated Tamarix browns early" — yet 30 m cannot cleanly delineate the corridor or keep
+   phreatophytes out of the cropland it must be distinguished from. These may be **two products, not
+   one compromise**. Decided after the extent control lands.
+
+3. **Phase 1 go / no-go gate — now has a second, harder bar.** The original still stands: if extent
+   lands *well below* the pixel-level RF baseline (F1 0.90–0.92 — **not** the 0.701 patch-level
+   number), stop and debug. But the CPU pre-flight adds the bar that actually matters:
+   **fine-tuned OlmoEarth-Base must beat fine-tuned *Presto*'s ~0.75 ROC on hard-source species
+   transfer — not merely beat RF**, because a free 0.82 M-param CPU model already beats RF there
+   (+0.04–0.08). If it cannot, the honest report is that the GPU bought nothing a laptop didn't.
+
+4. 🔴 **NEW — the target checkpoint does not exist.** The plan and the decision memo both name
+   `OLMOEARTH_V1_1_BASE`; the pinned stack (`olmoearth-runner 0.1.14` → `rslearn 0.0.27`) has only
+   `V1_{NANO,TINY,BASE,LARGE}`. Use `V1_BASE` and **re-cost at ~3×** (9,216 vs 3,072 tokens/window;
+   may not fit 24 GB at batch 8), or unpin `rslearn` — a Phase-0 exercise, not a GPU-clock discovery.
 
 ---
 

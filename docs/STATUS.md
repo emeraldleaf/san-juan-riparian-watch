@@ -1,13 +1,40 @@
 # Project Status
 
-**Last updated:** 2026-07-14
+**Last updated:** 2026-07-17
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩ Latest: Phase 0 of the GPU fine-tune is DONE (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
+## ⏩⏩ Latest (2026-07-17): Phase 0 MERGED (#39) · CPU pre-flight says **GPU = yes, conditionally**
 
-On branch **`feat/label-layer-and-imagery-validation`** (PR **#39**, open). Phase 0 of the
+**Phase 0 is on `main`.** PR #39 merged after three CodeRabbit rounds (all substantive findings
+fixed; merged past subjective function-length ones by owner decision).
+
+**A CPU pre-flight arrived from an external session** — six Presto benchmarks answering "is the GPU
+worth it?" with evidence. Start at
+[**the decision memo**](audits/2026-07-16-DECISION-MEMO-olmoearth-gpu.md). Headline: a fine-tuned FM
+beats RF **only** on hard/label-scarce transfer to unseen ground (**+0.04–0.08 ROC**), and **ties RF
+on extent and in-tile**. Verified against the raw JSONs on landing; the decisive three-tile table
+reproduces exactly.
+
+**Three things changed as a result:**
+1. 🔴 **`OLMOEARTH_V1_1_BASE` DOES NOT EXIST** in the pinned stack (`rslearn 0.0.27` has only
+   `V1_{NANO,TINY,BASE,LARGE}`). The plan, the ADR and the memo all name it. Use **`V1_BASE` and
+   re-cost at ~3×** (9,216 vs 3,072 tokens/window; may not fit 24 GB at batch 8), or unpin `rslearn`.
+   **Settle this on a laptop, not on a GPU clock.**
+2. ✅ **Decoder decision RESOLVED → per-pixel (`UNetDecoder`).** The memo's bar is *pixel-level* ROC,
+   which the scaffold's per-window pooling head cannot be scored against at all.
+3. **The GPU bar is now harder:** beat fine-tuned **Presto's ~0.75**, not RF — a free 0.82 M-param
+   CPU model already beats RF there.
+
+**Still open:** sensor (S2 10 m vs Landsat 30 m) — the Malpais note makes it a real dilemma: corridor
+is ~8 px at 10 m but ~3 px at 30 m where it blurs into irrigated agriculture (the native-vs-invasive
+confound), yet **only Landsat reaches the pre-beetle era**. Possibly two products, not one compromise.
+**To audit before Phase 1:** CropGlobe (the direct challenge to our FM premise) and the CSU/Walton report.
+
+## Phase 0 detail (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
+
+Merged via PR **#39**. Phase 0 of the
 [GPU fine-tune plan](specs/2026-07-12-gpu-finetune-execution-plan.md) is complete and its exit gate
 is **met** — all four steps ran on a laptop for $0:
 1. Stack installed; **all 23 scaffold class paths import** (5 were broken fiction).
