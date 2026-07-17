@@ -189,9 +189,10 @@ Principles this phase reinforced, worth applying beyond it:
    overlays uniformly and proves nothing). The dry-run deliberately did not make this call; the
    evidence did.
 
-2. **Sensor: Sentinel-2 (10 m, ~2015→) vs Landsat (30 m, 1984→).** Still open — but the Malpais
-   reach note ([here](audits/2026-07-16-malpais-reach-generalization-note.md)) supplies the first
-   real measurement and **sharpens it into a genuine dilemma rather than a preference**:
+2. **Sensor: Sentinel-2 (10 m, ~2015→) vs Landsat (30 m, 1984→).** Still open — but the
+   [Malpais reach resolvability note](audits/2026-07-16-malpais-reach-generalization-note.md)
+   supplies the first real measurement and **sharpens it into a genuine dilemma rather than a
+   preference**:
    - the corridor is ~80–100 m wide → **~8 px at 10 m, but only ~3 px at 30 m**;
    - aggregate corridor-vs-upland NDVI *contrast* is nearly resolution-invariant (0.338 → 0.333),
      so **Landsat can track corridor greenness trends**;

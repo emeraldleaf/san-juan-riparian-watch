@@ -44,9 +44,10 @@ is **met** — all four steps ran on a laptop for $0:
 4. NANO dry-run: `rslearn model fit` ran 3 epochs, **val_loss 1.455 → 1.428 → 1.401**.
 
 **Seven traps caught for $0** (method receipts 13–19), each of which would have failed on a rented
-GPU. **Two decisions are open before Phase 1** — chiefly **per-window vs per-pixel decoder**
-(the scaffold's pooling head is coarse for per-pixel extent; `rslearn` ships `UNetDecoder`). See the
-record's "Open decisions". **Do not rent a GPU until the decoder choice is made.**
+GPU. **The decoder decision is now RESOLVED → per-pixel `UNetDecoder`** (the CPU pre-flight's bar is
+a *pixel-level* ROC, which the scaffold's per-window pooling head cannot be scored against — see the
+top section). What remains open before Phase 1 is the **sensor choice** and the **missing
+`V1_1_BASE` checkpoint**. See the record's "Open decisions".
 
 New/changed this session: `riparian/labels/{label_layer,validate_layer}.py`,
 `riparian/delineation/{rslearn_dataset,decoders}.py`, `make_dryrun_config.py`,
