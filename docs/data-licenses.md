@@ -83,8 +83,81 @@ released on, and ground the incumbent claims. Just not as training data for us.
   required** (we cite it anyway, because not citing it would be indefensible). **This matters:**
   CO-RIP-derived products are **not** bound by CC BY-SA. Only the CSU/NREL datasets impose ShareAlike.
 
+## 🔴 The RAG corpus — a different licence problem from the training data
+
+Everything above is about **geospatial data we train on**. The document-intelligence corpus
+(`docintel/corpus/seed_sources.yaml`) is **documents we ingest and quote**, which is a different legal
+act with a different answer. This section exists because that had never been written down.
+
+**Three acts, three different risks. Do not collapse them.**
+
+| act | what it is | position |
+|---|---|---|
+| **Fetch + read locally** | ordinary research use | fine |
+| **Ingest into the *private* harness** | TDM/fair-use-shaped; jurisdiction-dependent | defensible, **not a settled question** |
+| **Serve chunks to the public** | **reproduction + distribution** of the source | **only for licensed sources — gate it** |
+
+**The harness being private is what currently keeps us out of act 3.** Per the
+[docintel spec](specs/2026-07-04-document-intelligence-rag.md) *Revision 2026-07-04b*, the harness is a
+private project and **must not be published**. That decision is load-bearing for licensing, not just
+for IP — a private RAG serves no one, so it reproduces nothing.
+
+### If we publish the app with RAG over the ingested docs
+
+**Not "no" — "yes, over the licensed subset, enforced by a gate."** The `license:` field in
+`seed_sources.yaml` already encodes the answer; it just is not enforced anywhere yet. Measured
+2026-07-17 across 37 sources:
+
+| licence | n | serveable? |
+|---|---|---|
+| `public-domain-us-gov` (USGS 4 · USBR 2 · EPA 2 · USFWS 1) | 9 | ✅ US federal works — no copyright |
+| `cc-by` | 3 | ✅ with attribution |
+| `project` (our own docs) | 5 | ✅ ours |
+| **`verify`** | **20** | 🔴 **unverified — NOT cleared** |
+
+> **`verify` means nobody checked. It does not mean permitted.** This file already says it better, one
+> section down, about NMRipMap: *"An unanswered licensing question is a risk, not an absence of one."*
+> The same sentence governs 20 of our 37 sources.
+
+**So, concretely:**
+- **Serve** `public-domain-us-gov | cc-by | project`. That is the watershed-document corpus the RAG was
+  built for, and most of it is federal → public domain. **The app can be published over it.**
+- **Do not serve** `verify` until each is checked. Several are probably fine — the SJRIP reports are a
+  Bureau-of-Reclamation recovery program and likely federal — and **verifying them is cheap, high-value
+  work** that would expand the serveable set materially.
+- **Never serve the academic methods papers.** See below.
+- **Make the field a gate, not a comment.** The ingest/serve path should filter on `license` and refuse
+  anything unrecognised. This repo's whole thesis is that a rule nobody enforces is documentation, not
+  a control — a licence field nobody checks is exactly that.
+
+### The 320-paper methods corpus — index yes, PDFs no
+
+From the [CPU pre-flight handoff](audits/README.md): a 320-paper index, of which a fetch retrieved
+**93 PDFs (584 MB)**.
+
+- ✅ **The metadata is publishable** — title/DOI/venue/author are facts, and it derives from OpenAlex
+  (CC0). It is committed as `docs/audits/riparian_methods_corpus*.csv`.
+- 🔴 **The PDFs are not.** They are **gitignored and must stay local.** The mix is worse than
+  "open access" implies:
+  - **17 of the 23 IEEE PDFs** are *JSTARS* (16) and *TNNLS* (1) — **hybrid/subscription** journals, not
+    born-OA. They served to an anonymous request, which suggests the OA subset, but **ungated ≠ licensed
+    for redistribution**. (The other 6 are *IEEE Access* — genuinely CC BY.)
+  - **arXiv licences are per-author.** The default arXiv non-exclusive licence lets *arXiv* distribute;
+    it grants **us** nothing. Some are CC BY; most are not.
+- **`is_oa` is a licensing fact; a 403 is an access fact; neither is redistribution.** OpenAlex called
+  306/320 open. Reality returned 93. Conflating the three is how "open access" becomes a copyright
+  incident.
+
 ## Still open
 
+- 🔴 **The corpus `license:` field is a comment, not a gate.** Nothing in the ingest or serve path
+  reads it. Until it does, "we only serve licensed sources" is an intention, and this project's own
+  method file is a list of what happens to intentions. **Before the app serves RAG answers publicly:**
+  filter on `license ∈ {public-domain-us-gov, cc-by, project}` and **fail closed** on anything else.
+- ⚠️ **20 of 37 corpus sources are `verify` — i.e. nobody has checked.** Cheap, high-value work, and
+  several are probably clearable: the **SJRIP** reports belong to a Bureau-of-Reclamation recovery
+  program and are plausibly federal → public domain, and **NMED**/state works need one look each.
+  Each one verified is one more document the published app may quote.
 - ⚠️ **NMRipMap states no explicit licence.** The MapServer's metadata carries a **citation** and no
   terms of use. It is publicly served by UNM + USDA Forest Service (whose own contributions would
   normally be public domain), but the University's are not automatically so. Our position:
