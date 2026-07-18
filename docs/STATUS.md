@@ -45,7 +45,8 @@ Merged via PR **#39**. Phase 0 of the
 is **met** — all four steps ran on a laptop for $0:
 1. Stack installed; **all 23 scaffold class paths import** (5 were broken fiction).
 2. Label layer built + **validated against S2 2020 imagery**: separability AUC **0.752** (peak-season,
-   water-excluded — CodeRabbit caught both contaminations; 0.777→0.740→0.752), marginal ~1px offset to confirm by eye.
+   water-excluded — CodeRabbit caught both contaminations; 0.777→0.740→0.752). The marginal ~1px offset was
+   **eye-checked on NAIP (#46): aligned, accept** — labels sit on the woody canopy; the shift fits worse.
 3. S2 cube materialised: **238 windows, 2,856 GeoTIFFs, verified on disk** (not by exit code).
 4. NANO dry-run: `rslearn model fit` ran 3 epochs, **val_loss 1.455 → 1.428 → 1.401**.
 

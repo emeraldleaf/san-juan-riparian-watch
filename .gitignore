@@ -41,3 +41,5 @@ docs/audits/corpus_pdfs/
 docs/audits/fetch_failures.csv
 docs/audits/closed_access.csv
 docs/audits/fetch.log
+olmoearth_run_data/riparian_extent/naip_chips/
+.codacy/
