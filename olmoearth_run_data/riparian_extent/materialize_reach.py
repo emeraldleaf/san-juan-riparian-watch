@@ -116,6 +116,9 @@ def materialize_reach(
     result = build(dest, SCAFFOLD_CONFIG, bbox, fc)
     logger.info("windows: %d built, %d skipped (no riparian)",
                 result.n_windows, result.n_windows_skipped_empty)
+    if result.n_windows == 0:
+        logger.warning("no windows contain riparian label for this bbox — nothing to materialize")
+        return 0
     if skip_download:
         logger.info("--skip-download: stopping after windows (no S2 materialize)")
         return 0

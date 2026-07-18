@@ -50,9 +50,12 @@ The model is the *smaller* risk. Plan accordingly.
 
 ### Phase 3A — the cross-sensor test (make-or-break, $0 laptop)
 Can a model trained on Sentinel-2 hold on Landsat? Test where ground truth exists: build **S2 2020 and
-Landsat 2020** cubes on **one grid, the 6 shared bands** (blue/green/red/NIR/SWIR-1/SWIR-2), converted
-to reflectance so they're comparable. Train RF on the S2 side, predict the **same held-out pixels'
-Landsat** side. The **AUC drop is the sensor penalty.**
+Landsat 2020** cubes on **one enforced common footprint** — the same AOI, reprojected to a single
+10 m EPSG grid, restricted to the **6 shared bands** (blue/green/red/NIR/SWIR-1/SWIR-2), each converted
+from its own DN scaling to **surface reflectance (0–1)** so the values are comparable. (Landsat's true
+30 m resolution is the effective floor — resampling to 10 m aligns the grids without inventing detail.)
+Train RF on the S2 side, predict the **same held-out pixels' Landsat** side. The **AUC drop is the
+sensor penalty** — it isolates band + radiometry + resolution, because pixels and labels are identical.
 
 > ### 🚦 GATE. If RF's cross-sensor AUC holds (≈ in-domain), RF may suffice for the archive — no GPU.
 > If it fragments, that is the first *measured* justification for the FM, and we run the FM
@@ -72,11 +75,13 @@ No pre-2017 labels will ever exist. Split the product by what is defensible:
   *both* live and defoliated states — the one shot at extending species backward, and the FM's
   label-scarce home turf.
 
-### Phase 3D — validation without ground truth
-You cannot check 1990 against 1990 labels. Validate by **consistency with known events**: tamarisk
-stress should appear in the right places at the right time (beetle release 2004–07, saturation by
-2014); trajectories should agree with **CO-RIP** and **Perkins et al. (Canyonlands, 1940–2022)**.
-Agreement-with-history *is* the validation when ground truth is gone.
+### Phase 3D — plausibility checks, *not* validation (no ground truth)
+You cannot **validate** 1990 predictions — there are no 1990 labels to validate against. What you can
+do is **corroborate**: check that the output is *consistent with independent evidence*. Tamarisk stress
+should appear in the right places at the right time (beetle release 2004–07, saturation by 2014);
+trajectories should agree with **CO-RIP** and **Perkins et al. (Canyonlands, 1940–2022)**. Call this
+what it is — **plausibility / corroboration**, not validation. It raises or lowers confidence; it never
+proves correctness, and the writeup must say so.
 
 ### Phase 3E — produce the archive (mostly CPU)
 Roll the calibrated model across the Landsat + S2 archive: annual extent (full record) + annual

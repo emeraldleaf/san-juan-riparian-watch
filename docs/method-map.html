@@ -136,9 +136,10 @@ sitemap: false
   footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);font-size:14px;}
   .k-list{list-style:none;padding:0;margin:8px 0;} .k-list li{padding:3px 0;}
   .k-list li::before{content:"›";color:var(--teal);font-weight:700;margin-right:8px;}
-  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease;}
-  .reveal.in{opacity:1;transform:none;}
-  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none;}}
+  /* gated on .js-reveal so content stays visible when scripting is unavailable */
+  .js-reveal .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease;}
+  .js-reveal .reveal.in{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){.js-reveal .reveal{opacity:1;transform:none;transition:none;}}
 </style>
 </head>
 <body>
@@ -283,7 +284,7 @@ sitemap: false
   <div class="qa">
     <div class="qa-head"><div class="av">◑</div>
       <div><div class="t">Method guide</div><div class="s">Grounded in the findings above</div></div></div>
-    <div class="chat" id="chat">
+    <div class="chat" id="chat" role="log" aria-live="polite" aria-atomic="false">
       <div class="msg a">Ask me about the models, the metrics, or why the foundation model keeps losing.
         Tap a question below, or type your own.</div>
     </div>
@@ -313,6 +314,7 @@ sitemap: false
 <script>
 (function(){
   var root=document.documentElement, tog=document.getElementById('tog');
+  root.classList.add('js-reveal');  // enable scroll-reveal only when scripting runs
   function cur(){var t=root.getAttribute('data-theme'); if(t)return t;
     return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
   tog.addEventListener('click',function(){root.setAttribute('data-theme',cur()==='dark'?'light':'dark');});

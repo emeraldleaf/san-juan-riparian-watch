@@ -6,7 +6,7 @@ fitting, and — the part that separates a credible result from a plausible one 
 protocol makes the comparison fair.**
 
 **There are two classification tasks, and they share all the same machinery** (the same RF and FM
-models, the same 144-D features, the same metrics):
+models, the same Sentinel-2 imagery, the same metrics):
 
 1. **Extent / delineation — "riparian vs other."** Per pixel: is this **riparian vegetation** or the
    surrounding corridor (water / agriculture / other)? This is the calibration control — extent is a
@@ -133,7 +133,9 @@ A number is only as trustworthy as the split that produced it. Three disciplines
 3. **Head-to-head, same footing.** This is the correction we made against ourselves: the published RF
    "0.90–0.92" was a *binary, threshold-tuned, cross-validated* number, not comparable to the FM's
    *5-class, argmax, single-split* number. The honest comparison re-runs **both models on the same
-   pixels, the same features, and the same scoring**. Only same-footing numbers get compared.
+   pixels, the same imagery, and the same scoring** (RF flattens each pixel's cube to 144 values; the
+   FM consumes the same cube with spatial context — same evidence, different reach into it). Only
+   same-footing numbers get compared.
 
 **In-domain vs transfer.** An in-domain score (train and test in the same reach) measures *fit*; a
 **transfer** score (train Farmington, test Malpais) measures *generalisation* — what a deployed model
@@ -145,7 +147,7 @@ actually faces. In-domain always flatters. The transfer number is the one that d
 
 ### Task 1 — extent (riparian vs other), head-to-head, identical scoring
 
-| Model (same pixels, same 144-D features, same all-pixel F1) | riparian F1 |
+| Model (same pixels, same imagery, same all-pixel F1) | riparian F1 |
 |---|---|
 | **RF, class-balanced** | **0.83** |
 | FM (fine-tuned, per-pixel decoder) | 0.76–0.77 |
@@ -167,7 +169,7 @@ free — but extent was only ever the control.
 | in-domain reference (RF, 5-fold CV) | AUC 0.85 | — |
 | mis-composited shortcut (broken control) | AUC 0.37 (artifact) | — |
 
-**On AUC — the fair, prevalence-invariant metric — RF and the FM tie exactly (0.799 vs 0.802).** Their
+**On AUC — the fair, prevalence-invariant metric — RF and the FM tie within noise (0.799 vs 0.802).** Their
 *ranking* ability transferred equally across a real 50 km + 47%→82% prevalence gap. The FM's low argmax
 F1 (0.56) is **not** a representation failure — it is **threshold miscalibration**: the FM learned
 Farmington's 47%-prevalence boundary and under-predicts on Malpais's 82% at the default cut; recalibrate
