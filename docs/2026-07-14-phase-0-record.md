@@ -48,7 +48,7 @@ and you find out after you've paid.
 |---|---|---|
 | **Separability** | does peak-season NDVI (S2 2020, the labels' own vintage) separate riparian from corridor negatives? | **AUC 0.752** — in the plausible band; not <0.65 (broken) nor >0.95 (leaking) |
 | **Shift** | does a *translated* label mask score better — i.e. are they aligned, or merely correlated? | best offset **(1, 0)**, +0.013 — a marginal ~1 px (10 m) offset; see caveat |
-| **Eyes** | overlay on NAIP 2020, the imagery NMRipMap was drawn from | (manual — **do this before Phase 1**, see caveat) |
+| **Eyes** | overlay on NAIP 2020, the imagery NMRipMap was drawn from | ✅ **done (#46): aligned, accept** — woody boundaries sit on the canopy at true position; the +10 m-S shift fits *worse* |
 
 > **Corrected twice, against ourselves — 0.777 → 0.740 → 0.752.** The first pass reported **AUC
 > 0.777, shift (0,0)** from an ad-hoc harness. CodeRabbit's review caught **two** contaminations:
@@ -68,8 +68,16 @@ and you find out after you've paid.
 > pooled-across-windows** one, which surfaces a **marginal ~1 px (10 m) offset**: pooled AUC 0.765 at
 > (1,0) vs 0.752 unshifted. **Not a code bug** — a rasterisation convention flip would crater the AUC
 > to ~0.5, not nudge it by 0.013. It is the sub-pixel registration slack of fusing 0.6 m NAIP-drawn
-> polygons onto a 10 m grid. **Confirm with the NAIP overlay before Phase 1**: a real 1 px label
-> offset blurs a segmentation boundary, and only the eyes-on check settles whether this is that or slack.
+> polygons onto a 10 m grid.
+>
+> **✅ RESOLVED by the NAIP overlay (#46, 2026-07-17): labels are aligned — accept, no correction.**
+> `naip_overlay.py` rendered woody-riparian boundaries (cyan) on NAIP 2020 — the exact imagery
+> NMRipMap was drawn from — at true position vs shifted 10 m south (the direction `(1,0)` prefers).
+> Across the river-corridor windows, the **woody canopy boundaries sit on the vegetation at true
+> position, and the south shift fits *worse***. So the +0.013 is slack, not a systematic offset —
+> exactly what a real 1 px error would *not* look like. (Aside the check surfaced: riparian is not
+> all green — `riparian_herbaceous` floodplain grass reads *tan* on NAIP, so the overlay colour-codes
+> woody vs herbaceous to keep grassland from looking like a misplaced label.)
 
 The shift test exists because we've been burned by its cousin: the AUC-0.23 incident *looked*
 exactly like a misalignment and was an unshuffled CV split. A real one looks identical — so measure
@@ -161,8 +169,12 @@ Principles this phase reinforced, worth applying beyond it:
 - **Ran without the VBET corridor clip.** The negatives are NMRipMap's own non-riparian classes —
   already corridor-ish, but not the tight valley-bottom clip the design calls for. The clip should
   *tighten* separability, not loosen it, but **we haven't measured that**, so we don't claim it.
-- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.752
-  holds on the narrow headwater corridors, where a 320 m window is mostly upland.
+- ~~**One reach, not the basin.**~~ → **Two reaches now (#51): it holds.** Farmington 0.752;
+  **Malpais Arroyo–San Juan 0.802** — a spatially-independent reach (S2 tile 12SXF vs Farmington's
+  12SYF), scored the *same* way (`validate_reach.py`, `validate_layer` contract, peak-season,
+  water-excluded), both with a clean **(0,0)** shift. Separability doesn't just survive a second
+  reach, it improves. (Still NM lowland/mid-valley; the high-elevation headwater regime, where a
+  320 m window is mostly upland, remains untested — but the "one well-behaved reach" worry is retired.)
 - **Pooling decoder = one label per window.** The smoke test kept the scaffold's mangrove-style
   per-window classifier. Our windows are *not* single-class, so this is a real modelling limitation
   we accepted *for the dry-run only* — see below.
@@ -174,8 +186,10 @@ Principles this phase reinforced, worth applying beyond it:
 
 ## Open decisions — before a GPU
 
-1. ~~**Per-window vs per-pixel decoder**~~ → **RESOLVED 2026-07-17: per-pixel (`UNetDecoder`).**
-   Three independent arguments converged, and the third is decisive:
+1. ~~**Per-window vs per-pixel decoder**~~ → **RESOLVED + WIRED 2026-07-17 (#45): per-pixel
+   `UNetDecoder`.** `model.yaml` now uses it (`in_channels=[[2, 768]]`, `out_channels=5`); a NANO
+   dry-run confirmed it fits — 2 epochs clean, val_loss 1.490 → 1.290, per-class pixel metrics
+   non-degenerate. Three independent arguments converged, and the third is decisive:
    - our 32×32 windows are **not single-class** (they hold riparian *and* upland);
    - the prior-art audit found CO-RIP / Furuya / Walton all map **pixel/area extent**, not
      one-class-per-window ([audit](audits/2026-07-14-riparian-methods-prior-art.md));

@@ -11,6 +11,14 @@ All free, no API key. Study area: **San Juan Basin, HUC8 `14080101`**. See CLAUD
     ~45% of positive labels wrong. Use `riparian/labels/nmripmap.py`, never a raw fetch.
   - 🔴 **Label vintage = 2020** (photo-interpreted from NAIP 2020). **Fit on 2020 imagery; predict
     any year.** New Mexico only — CO tiles have no NMRipMap.
+  - ⚠️ **The ArcGIS query backend intermittently 500s** (`Error performing query operation` on
+    *every* query — MapServer and FeatureServer both, they share the geodatabase; verified down
+    2026-07-17). **Robust alternative: the File Geodatabase download**, static ZIPs off
+    `nhnm.unm.edu/riparian/NMRipMap` — for the San Juan use *Gila Region San Juan North*
+    (`.../sites/default/files/2023-09/GilaRegionSanJuan_Version2.0Plus_North_0.zip`, ~21 MB,
+    EPSG:26913, covers Farmington + Malpais). `validate_reach.py --gdb <path>` loads it through the
+    **same `nmripmap` crosswalk** (`_to_labeled`), so it is not a raw fetch. Prefer the GDB for
+    batch/repeat work; the live query is fine for a one-off when it is up.
 - **CO-RIP** (Woodward et al. 2018) — basin-wide riparian extent, κ 0.80. A *baseline to beat and a
   label source for Colorado*, not something to re-derive: https://doi.org/10.5061/dryad.3g55sv8
 - **CSU/NREL invasive occurrence points** (2018) — 3,000+ tamarisk *and* Russian-olive occurrence +

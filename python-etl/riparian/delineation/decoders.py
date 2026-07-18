@@ -3,6 +3,16 @@
 Separate from ``pooling.py`` on purpose: that module is deliberately free of any rslearn/FM
 import so its phenology-pooling proof runs on plain CPU torch in CI. This module *does* import
 rslearn, so it only loads where rslearn is installed (the training venv), not in the unit-test path.
+
+> **Not the active decoder (design change, #45, 2026-07-17 — not a retraction).** The extent control
+> now uses ``rslearn.models.unet.UNetDecoder`` (per-pixel). Nothing here was *wrong*: this adapter
+> correctly fixed the pooling decoder's temporal-shape bug (method-receipt 19), and the pooling
+> approach still works — it was simply the wrong *altitude* for a pixel-level task, so a design choice
+> changed. No claim was withdrawn (nothing for ``docs/RETRACTIONS.md``); ``UNetDecoder`` consumes the
+> encoder's ``FeatureMaps`` and so never had the raw-image ``shape[1:3]`` assumption this adapter
+> works around. ``TemporalSegmentationPoolingDecoder`` is retained as (a) the receipt-19 artifact and
+> (b) the per-window-classification alternative, should a future sub-task want one prediction per
+> window rather than per pixel.
 """
 
 from __future__ import annotations
