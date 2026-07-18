@@ -36,6 +36,7 @@ __pycache__/
 .DS_Store
 .venv-olmoearth/
 olmoearth_run_data/riparian_extent/dataset/
+olmoearth_run_data/riparian_extent/dataset_*/
 .tmp/
 docs/audits/corpus_pdfs/
 docs/audits/fetch_failures.csv
