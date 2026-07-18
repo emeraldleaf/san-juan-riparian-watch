@@ -5,7 +5,23 @@
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-07-17): Phase 0 MERGED (#39) · CPU pre-flight says **GPU = yes, conditionally**
+## ⏩⏩ Latest (2026-07-17): laptop pre-flight COMPLETE — **do-not-rent-a-GPU gate is GREEN**
+
+**Every $0/laptop blocker is cleared and on `main`.** Four PRs merged this session — #56 (#45
+per-pixel `UNetDecoder`, wired + validated), #57 (#46 NAIP eye-check → labels **aligned, accept**),
+#58 (#51 second reach: **Malpais AUC 0.802**, "one reach" caveat retired), #60 (#48 CropGlobe audit
+→ 🟡 GAP, not a product threat). Together with #55 (#44 → `V1_BASE`), the pre-flight gate the CPU
+memo demanded — *don't rent a GPU until the checkpoint, decoder, registration and generalization
+questions are answered for free* — is now **green**.
+
+**The next move is a spend decision: [#47](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/47)
+— rent the GPU and run the extent control** (fine-tune OlmoEarth-Base, reproduce three-tile transfer
+vs the fine-tuned-Presto ~0.75 bar). Everything upstream of it is done. Remaining $0 work runs in
+parallel or before Phase 2: **#59** (CropNet-style simple baseline for an honest transfer bar),
+**#50** (add Sentinel-1 SAR — highest-value data improvement), **#49** (CSU/Walton first-hand audit,
+before Phase 2 invasives), **#52** (validate_materialized refactor), **#53** (corpus license gate).
+
+---
 
 **Phase 0 is on `main`.** PR #39 merged after three CodeRabbit rounds (all substantive findings
 fixed; merged past subjective function-length ones by owner decision).
@@ -30,13 +46,14 @@ reproduces exactly.
 **Still open:** sensor (S2 10 m vs Landsat 30 m) — the Malpais note makes it a real dilemma: corridor
 is ~8 px at 10 m but ~3 px at 30 m where it blurs into irrigated agriculture (the native-vs-invasive
 confound), yet **only Landsat reaches the pre-beetle era**. Possibly two products, not one compromise.
-**To audit before Phase 1:** CropGlobe (the direct challenge to our FM premise) and the CSU/Walton report.
+**Audits:** CropGlobe (the direct challenge to our FM premise) is **done** (#48 → 🟡 GAP); the
+CSU/Walton report (#49) remains, due before Phase 2 invasives.
 
 **➡️ Future work is now tracked in issues.** The roadmap — sequenced as PR-sized waves, with the
 do-not-rent-a-GPU gate and the go/no-go bar — lives on the [**#9 umbrella**](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/9)
 and the [**Phase 1 milestone**](https://github.com/emeraldleaf/san-juan-riparian-watch/milestone/1).
-Blockers to clear first: **#44** (`V1_1_BASE` doesn't exist) and
-**#45** (build the per-pixel `UNetDecoder`), both laptop/$0. Pick up work there, not from this file.
+The laptop blockers (#44 checkpoint, #45 decoder, #46 eye-check, #51 second reach) are **all cleared**
+— see the top section. The next gated item is **#47** (the GPU run, a spend decision).
 
 ## Phase 0 detail (2026-07-14) — full record in [`2026-07-14-phase-0-record.md`](2026-07-14-phase-0-record.md)
 
