@@ -261,18 +261,20 @@ sitemap: false
 
   <h3 style="margin-top:22px">Invasives (invasive vs native) — the transfer test</h3>
   <div class="stats">
-    <div class="stat teal"><div class="num mono">0.85</div><div class="lab">RF in-domain (spatial CV) — AUC</div></div>
-    <div class="stat win"><div class="num mono">0.80</div><div class="lab">RF <b>transfer</b> Farmington→Malpais — AUC, across a real 50 km + 47%→82% prevalence gap</div></div>
+    <div class="stat win"><div class="num mono">0.80</div><div class="lab"><b>RF</b> transfer AUC — Farmington→Malpais</div></div>
+    <div class="stat teal"><div class="num mono">0.80</div><div class="lab"><b>FM</b> transfer AUC — a dead tie with RF</div></div>
     <div class="stat lose"><div class="num mono">0.37</div><div class="lab">the mis-composited shortcut — an artifact, not a result</div></div>
   </div>
-  <p style="font-size:15px;color:var(--muted)">RF drops only 0.05 AUC from in-domain to a genuine
-    cross-reach transfer — it <b>generalises well</b>. The foundation model has to beat that 0.80 on the
-    same test to justify its cost. <span id="fm-verdict">On every cheaper test so far — extent, and a
-    within-reach transfer proxy — it has not, and its failure mode is <b>overfitting</b> the small
-    training set: the very thing pretraining is supposed to rescue.</span></p>
+  <p style="font-size:15px;color:var(--muted)"><span id="fm-verdict">Across a real 50 km + 47%→82%
+    prevalence gap, <b>RF and the fine-tuned foundation model tie exactly on AUC (0.80)</b> — their
+    ranking ability transferred equally. The FM's low F1 at the default threshold (0.56 vs RF's 0.68)
+    is <em>threshold miscalibration</em> under the prevalence shift, not a representation failure —
+    recalibrated, it's 0.84. So the GPU buys <b>no transfer advantage</b> (the whole premise of the
+    bet), but the model doesn't fail either.</span></p>
   <div class="note"><b>Why this is the verdict.</b> In-domain scores always flatter. <b>Cross-reach
-    transfer</b> — train one reach, test a geographically distinct one — is the only setting where
-    overfitting has nowhere to hide. That's the number that decides whether the GPU was worth it.</div>
+    transfer</b> is the only setting where overfitting has nowhere to hide — and here it's a <b>tie</b>.
+    RF stays the pragmatic choice (same ranking, cheaper, better-calibrated out of the box); "RF beats
+    FM" would overstate it.</div>
 </div></section>
 
 <section class="reveal"><div class="wrap">
@@ -329,8 +331,8 @@ sitemap: false
      a:"<b>Precision = TP/(TP+FP)</b> — of pixels called invasive, the fraction actually invasive (false-alarm cost). <b>Recall = TP/(TP+FN)</b> — of the invasive that's really there, the fraction found (missed-detection cost). You usually trade one for the other; F1 balances them, AUC sidesteps the threshold entirely."},
     {q:"Why does accuracy lie?",k:["accuracy","accura"],
      a:"Malpais is <b>82% invasive</b>. A model that predicts “invasive everywhere” scores 82% accuracy while being useless. Under class imbalance, accuracy rewards guessing the majority — so we don't headline it; we use AUC (balance-invariant) and F1."},
-    {q:"Why did the FM lose?",k:["fm lose","lose","foundation","beat rf","worse"],
-     a:"On every test measured on identical footing, the fine-tuned foundation model has come in <b>at or below RF</b>: extent F1 0.76 vs 0.83, and a within-reach transfer proxy 0.50 vs 0.62. Its tell is <b>overfitting</b> — training loss collapsed toward 0.01 while validation loss rose. A 207-million-parameter network memorises a few hundred training windows; the per-pixel Random Forest can't. Extent was only ever the control — the deciding test is cross-reach invasive transfer."},
+    {q:"Does the FM beat RF?",k:["fm lose","lose","beat","foundation","worse","tie","win","better"],
+     a:"On the transfer test that was supposed to decide it, <b>they tie on AUC (0.80 each)</b> — the foundation model's ranking transferred as well as RF's. It shows <em>no</em> transfer advantage (the bet's whole premise), but it doesn't lose either. Its low F1 at the default threshold (0.56 vs RF 0.68) is threshold miscalibration under the 47%→82% prevalence shift, not a representation failure — recalibrated it's 0.84. On extent it was 0.76 vs 0.83, within the label-noise band. Net: RF is the pragmatic pick (same ranking, cheaper, better-calibrated), but it's a tie, not a rout."},
     {q:"What is overfitting?",k:["overfit","memoriz","fitting"],
      a:"<b>Overfitting</b> = the model learns the training set's noise and specifics instead of the generalisable signal. The signature is unmistakable: <b>training error keeps falling while validation error rises</b> — exactly what the foundation model did. RF resists it because bagging averages many high-variance trees into a low-variance ensemble."},
     {q:"What's the phenology thing?",k:["phenolog","senescen","ndvi","swir","season"],

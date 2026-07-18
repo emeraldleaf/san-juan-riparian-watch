@@ -159,17 +159,27 @@ free — but extent was only ever the control.
 
 ### Task 2 — invasives (invasive vs native)
 
-| Setting | What it measures | RF |
+| Farmington → Malpais transfer (aligned cube), invasive | RF | FM (fine-tuned) |
 |---|---|---|
-| in-domain, 5-fold spatial CV | fit + modest generalisation | AUC 0.85 |
-| **transfer, Farmington → Malpais** (aligned) | true cross-reach generalisation | **AUC 0.80 / F1 0.68** |
-| transfer on a **mis-composited** cube | *nothing* — a broken control | AUC 0.37 (artifact) |
+| **AUC** — threshold-free ranking | **0.80** | **0.80** |
+| F1 at default threshold (argmax) | 0.68 | 0.56 |
+| F1 at best threshold | — | 0.84 |
+| in-domain reference (RF, 5-fold CV) | AUC 0.85 | — |
+| mis-composited shortcut (broken control) | AUC 0.37 (artifact) | — |
 
-The RF drops only 0.05 AUC from in-domain to a real cross-reach transfer across a 47%→82% prevalence
-gap — it **generalises well**. The FM must beat that 0.80 on the same test to justify its cost; on
-every cheaper test so far it has not, and its failure mode has been **overfitting** the small training
-set — which is exactly the quantity a foundation model's pretraining is *supposed* to rescue, and the
-reason the transfer test is the one that matters.
+**On AUC — the fair, prevalence-invariant metric — RF and the FM tie exactly (0.799 vs 0.802).** Their
+*ranking* ability transferred equally across a real 50 km + 47%→82% prevalence gap. The FM's low argmax
+F1 (0.56) is **not** a representation failure — it is **threshold miscalibration**: the FM learned
+Farmington's 47%-prevalence boundary and under-predicts on Malpais's 82% at the default cut; recalibrate
+and its F1 is 0.84. This is a **textbook illustration of §3** — why AUC (ranking) and F1 (operating
+point) can diverge under a prevalence shift, and why we report both.
+
+**The honest verdict:** the foundation model **ties** RF on the transfer test — it does *not* show the
+transfer *advantage* the whole bet was predicated on, but it does *not* lose either. That tie is exactly
+what the CPU pre-flight predicted (*FM ties RF; wins only on hard/label-scarce transfer* — and this gap
+wasn't hard enough to separate them). **RF stays the pragmatic choice** — same ranking, cheaper, and
+better-calibrated out of the box — but "RF beats FM" overstates it. On the metric that decides, they are
+even.
 
 > **The one-sentence version:** we score with **AUC** (threshold-free, prevalence-invariant ranking)
 > and **F1** (deployed operating point) on **spatially-held-out** data, compare models **on identical
