@@ -169,8 +169,12 @@ Principles this phase reinforced, worth applying beyond it:
 - **Ran without the VBET corridor clip.** The negatives are NMRipMap's own non-riparian classes —
   already corridor-ish, but not the tight valley-bottom clip the design calls for. The clip should
   *tighten* separability, not loosen it, but **we haven't measured that**, so we don't claim it.
-- **One reach, not the basin.** Farmington is well-behaved. The number to watch is whether AUC 0.752
-  holds on the narrow headwater corridors, where a 320 m window is mostly upland.
+- ~~**One reach, not the basin.**~~ → **Two reaches now (#51): it holds.** Farmington 0.752;
+  **Malpais Arroyo–San Juan 0.802** — a spatially-independent reach (S2 tile 12SXF vs Farmington's
+  12SYF), scored the *same* way (`validate_reach.py`, `validate_layer` contract, peak-season,
+  water-excluded), both with a clean **(0,0)** shift. Separability doesn't just survive a second
+  reach, it improves. (Still NM lowland/mid-valley; the high-elevation headwater regime, where a
+  320 m window is mostly upland, remains untested — but the "one well-behaved reach" worry is retired.)
 - **Pooling decoder = one label per window.** The smoke test kept the scaffold's mangrove-style
   per-window classifier. Our windows are *not* single-class, so this is a real modelling limitation
   we accepted *for the dry-run only* — see below.
