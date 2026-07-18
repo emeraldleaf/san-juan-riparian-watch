@@ -284,18 +284,20 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
 >   and prove nothing. Label↔imagery alignment is already established (shift test above); prediction
 >   overlay becomes meaningful once Phase 1 runs a per-pixel decoder. **See "open modelling call".**
 >
-> **Open modelling call for Phase 1 (not a Phase-0 blocker).** The scaffold mirrors mangrove with
-> `SegmentationPoolingDecoder` — one label per window, broadcast to all pixels. Our windows are
-> *not* single-class (a 32×32 window holds riparian *and* upland), and extent is inherently
-> per-pixel. `rslearn` ships `UNetDecoder` for exactly that. Decide before Phase 1 whether the
-> control stays pooling (simpler, matches mangrove, but coarse) or moves to per-pixel (right for
-> extent, and makes the prediction-overlay check meaningful). The dry-run deliberately did **not**
-> make this call — it kept the scaffold's choice and only fixed the mechanical shape bug.
+> **✅ RESOLVED + WIRED (#45, 2026-07-17): per-pixel `UNetDecoder`.** The scaffold mirrored mangrove
+> with `SegmentationPoolingDecoder` — one label per window, broadcast to all pixels. Our windows are
+> *not* single-class (a 32×32 window holds riparian *and* upland), extent is inherently per-pixel,
+> and — decisively — the CPU pre-flight's bar is a *pixel-level* ROC that a per-window head cannot be
+> scored against. `model.yaml` now uses `UNetDecoder(in_channels=[[2, 768]], out_channels=5)`
+> (one feature map at 1/patch_size, V1_BASE embedding 768 → per-pixel logits). Validated by a NANO
+> dry-run: 2 epochs clean, val_loss 1.490 → 1.290, and the per-class pixel metrics are now
+> non-degenerate (`riparian_precision 0.35`, `riparian_recall 0.24` — real, spatially-varying, not
+> the uniform broadcast). This also un-blocks the prediction-overlay alignment check.
 
 ## Phase 1 — the extent control (GPU)
 
-Per the ADR: `OLMOEARTH_V1_BASE`, `FreezeUnfreeze` (unfreeze @ epoch 20, 10× LR),
-`SegmentationPoolingDecoder`, **12 monthly S2 mosaics**, spatial split.
+Per the ADR + the resolved decisions: `OLMOEARTH_V1_BASE` (#44), **per-pixel `UNetDecoder`** (#45),
+`FreezeUnfreeze` (unfreeze @ epoch 20, 10× LR), **12 monthly S2 mosaics**, spatial split.
 
 - **AOI: Animas + Malpais only. Turkey Creek is HELD OUT** — its only reference is CO-RIP, which
   over-predicts in the Southern Rockies (confidence 0.55). A control fed weak, biased labels cannot
