@@ -148,6 +148,12 @@ That is what this project is for — and their recommendation is, in effect, its
 - [**GPU fine-tune execution plan**](specs/2026-07-12-gpu-finetune-execution-plan.md) — costed, with
   the abort criteria written *before* the money is spent. **Compute is not the constraint** (~$2–5 for
   the control run); the `rslearn` data build is, so it happens locally and for free first.
+- [**Phase 3 — deep-time, cross-sensor, beetle-aware change**](specs/2026-07-18-phase3-deeptime-change.md)
+  — the actual contribution: annual extent + native-vs-invasive back into the **Landsat era (1984→)**,
+  past the pre-beetle baseline. Reopens the RF-vs-FM decision (cross-sensor is the FM's one structural
+  edge) and settles it on a **measured** cross-sensor test, not the single-epoch tie. Names the three
+  hard truths — no pre-2017 labels, the beetle signal inversion, the 30 m resolution wall — that are
+  bigger risks than the model choice.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
