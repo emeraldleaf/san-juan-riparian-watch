@@ -139,6 +139,12 @@ That is what this project is for — and their recommendation is, in effect, its
   validation, S2 cube, NANO dry-run), the **seven traps** it caught for $0 that would have failed on
   a GPU, the methods that generalised, the trade-offs, and the **open decisions before Phase 1**
   (chiefly: per-window vs per-pixel decoder). Exit gate MET — val_loss 1.455 → 1.428 → 1.401.
+- [**GPU extent control — the result**](2026-07-18-gpu-extent-control-result.md) — the Phase-1 control
+  ran on a rented A6000: fine-tuned OlmoEarth-Base reaches **riparian F1 ≈ 0.82** (reproduced ×2),
+  below RF (0.90–0.92) but above the fine-tuned-Presto bar. A per-pixel diagnostic (confusion matrix +
+  NAIP overlays) traces the ceiling to real over-prediction + a coarse decoder; `patch_size: 2 → 1`
+  sharpens it and lifts precision, though the size of the F1 gain is **not yet settled** across eval
+  protocols. Pipeline validated end-to-end.
 - [OlmoEarth vs the RF baseline](olmoearth-vs-rf-baseline.md) — **a retraction, and a hypothesis
   that failed.** The published RF 0.73 / OlmoEarth 0.46 result is withdrawn: the ground truth was
   ~45% wrong, the model's time axis was averaged away, and the labels were four years older than
