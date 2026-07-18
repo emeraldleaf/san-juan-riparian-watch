@@ -139,9 +139,12 @@ Reading them honestly — it is a **mix**, and it **does not** reduce to "the la
 The blockiness is the patch grid, not decoder capacity, so we tested the direct lever: drop the
 encoder `patch_size` from 2 to 1 (per-pixel tokenisation) with `UNetDecoder(in_channels=[[1, 768]])`.
 
-**It ran cleanly** — no context-length blow-up (the 4× token count fit V1_BASE fine), same ~8 s/epoch
-on the A6000, best again 2 epochs after the unfreeze. So the finer config is **viable**, which was not
-a given (I had expected the 12-timestep × 1024-patch token count to exceed the context limit).
+**It ran cleanly** — no context-length blow-up, same ~8 s/epoch on the A6000, best again 2 epochs after
+the unfreeze. So the finer config is **viable**, which was not a given. patch_size=1 quadruples the raw
+spatial-patch count (32×32 = 1024 patches vs 16×16 = 256 at patch_size=2); against `V1_BASE`'s
+`patch_size:2` baseline of ~9,216 tokens/window that scales to ~**36,864**, and I'd expected it to
+exceed the context window. Whatever the exact effective tokenisation, it fit — the 12,288 figure I
+first reached for was the raw `1024 patches × 12 timesteps` spatial count, not the model's token count.
 
 **It genuinely sharpens the model — but the size of the F1 win is not settled.** Two evaluations of
 the *same* checkpoints disagree on magnitude:
