@@ -20,15 +20,28 @@ it → labels are aligned, accept. If panel 3 fits BETTER → a real offset; shi
 from __future__ import annotations
 
 import json
+import signal
+import socket
 import sys
 import time
 from pathlib import Path
+
+socket.setdefaulttimeout(60)  # bound the STAC search HTTP reads
+
+
+class _FetchTimeout(Exception):
+    """A single NAIP fetch attempt blew its deadline (GDAL/CURL can hang on a stalled PC gateway)."""
+
+
+def _raise_timeout(signum, frame):  # SIGALRM handler signature
+    raise _FetchTimeout
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Polygon as MplPolygon
 import planetary_computer
 import pystac_client
 import rasterio
@@ -61,8 +74,15 @@ def _window_utm_bounds(meta: dict) -> tuple[float, float, float, float, str]:
     return xs[0], ys[0], xs[1], ys[1], crs
 
 
-def _riparian_polys_utm(window: Path, meta: dict) -> list[shapely.geometry.base.BaseGeometry]:
-    """Riparian (class 1) label polygons for the window, in UTM metres."""
+def _riparian_polys_utm(window: Path, meta: dict) -> list[tuple[shapely.geometry.base.BaseGeometry, str]]:
+    """Riparian (class 1) label polygons, in UTM metres, tagged 'woody' or 'herb'.
+
+    The distinction matters for the eye-check: **woody** riparian (native + introduced trees/shrubs)
+    shows as green canopy on NAIP and is what an alignment offset would be visible against.
+    **Herbaceous** riparian (floodplain grass/sedge) shows as *tan grassland*, not green — so a
+    herbaceous polygon over pale ground is correct, not a misplacement. Hatching it keeps that from
+    reading as an error.
+    """
     fc = json.loads((window / "layers/label/data.geojson").read_text())
     xr = meta["projection"]["x_resolution"]
     yr = meta["projection"]["y_resolution"]
@@ -70,9 +90,10 @@ def _riparian_polys_utm(window: Path, meta: dict) -> list[shapely.geometry.base.
     for feat in fc["features"]:
         if int(feat["properties"].get("class", 0)) != 1:
             continue
+        kind = "herb" if "herbaceous" in (feat["properties"].get("label") or "") else "woody"
         geom = shapely.geometry.shape(feat["geometry"])  # in the window's pixel grid
         # pixel grid → UTM metres: the data.geojson coords are pixel indices in the window projection.
-        out.append(shapely.ops.transform(lambda x, y, z=None: (x * xr, y * yr), geom))
+        out.append((shapely.ops.transform(lambda x, y, z=None: (x * xr, y * yr), geom), kind))
     return out
 
 
@@ -84,9 +105,11 @@ def _fetch_naip(minx: float, miny: float, maxx: float, maxy: float, utm_crs: str
     """
     lon0, lat0, lon1, lat1 = transform_bounds(utm_crs, "EPSG:4326", minx, miny, maxx, maxy)
     last: Exception | None = None
-    env = rasterio.Env(GDAL_HTTP_MAX_RETRY="5", GDAL_HTTP_RETRY_DELAY="3", GDAL_HTTP_TIMEOUT="120")
+    env = rasterio.Env(GDAL_HTTP_MAX_RETRY="2", GDAL_HTTP_RETRY_DELAY="2", GDAL_HTTP_TIMEOUT="45")
+    signal.signal(signal.SIGALRM, _raise_timeout)
     for attempt in range(8):
         try:
+            signal.alarm(75)  # hard per-attempt deadline — GDAL_HTTP_TIMEOUT does not always fire
             cat = pystac_client.Client.open(STAC, modifier=planetary_computer.sign_inplace)
             items = list(cat.search(collections=["naip"], bbox=[lon0, lat0, lon1, lat1],
                                     datetime="2020-01-01/2020-12-31").items())
@@ -96,20 +119,27 @@ def _fetch_naip(minx: float, miny: float, maxx: float, maxy: float, utm_crs: str
             with env, rasterio.open(href) as src:
                 win = rasterio.windows.from_bounds(minx, miny, maxx, maxy, transform=src.transform)
                 rgb = src.read([1, 2, 3], window=win).transpose(1, 2, 0)
+            signal.alarm(0)
             return rgb, (minx, miny, maxx, maxy)
-        except Exception as e:  # noqa: BLE001 — retry any fetch failure (gateway timeouts, expiry)
+        except Exception as e:  # retry gateway timeouts, hangs (_FetchTimeout), url expiry
             last = e
             time.sleep(5 * (attempt + 1))  # PC blob gateway blips clear within minutes
+        finally:
+            signal.alarm(0)
     raise RuntimeError(f"NAIP fetch failed after retries: {str(last)[:80]}")
 
 
 def _panel(ax, rgb, extent, polys, title, shift_m=0.0):
     ax.imshow(rgb, extent=[extent[0], extent[2], extent[1], extent[3]])
-    for g in polys:
+    for g, kind in polys:
         gg = translate(g, yoff=shift_m) if shift_m else g
         for geom in (gg.geoms if hasattr(gg, "geoms") else [gg]):
-            x, y = geom.exterior.xy
-            ax.plot(x, y, color="cyan", linewidth=1.5)
+            xy = np.asarray(geom.exterior.coords)
+            if kind == "woody":  # green canopy — the alignment target: solid cyan outline
+                ax.plot(xy[:, 0], xy[:, 1], color="cyan", linewidth=1.5)
+            else:  # herbaceous (grass/sedge) — hatched so tan-over-grassland doesn't read as an error
+                ax.add_patch(MplPolygon(xy, closed=True, facecolor="none", edgecolor="gold",
+                                        hatch="///", linewidth=0.8, alpha=0.9))
     # Clip to the NAIP extent so a shifted polygon can't expand the axes (stray edge lines / white bands).
     ax.set_xlim(extent[0], extent[2])
     ax.set_ylim(extent[1], extent[3])
@@ -129,9 +159,10 @@ def main() -> int:
             polys = _riparian_polys_utm(w, meta)
         except FileNotFoundError:
             continue
-        area = sum(g.area for g in polys)
-        if area > 0:
-            scored.append((area, w, meta, polys))
+        # rank by WOODY area — those are the green-canopy boundaries the eye-check is about
+        woody_area = sum(g.area for g, kind in polys if kind == "woody")
+        if woody_area > 0:
+            scored.append((woody_area, w, meta, polys))
     scored.sort(reverse=True, key=lambda t: t[0])
     picked = scored[:n]
     print(f"rendering {len(picked)} riparian-heavy windows of {len(scored)} labelled")
@@ -140,7 +171,7 @@ def main() -> int:
         minx, miny, maxx, maxy, crs = _window_utm_bounds(meta)
         try:
             rgb, extent = _fetch_naip(minx, miny, maxx, maxy, crs)
-        except Exception as e:  # noqa: BLE001 — a chip that won't fetch just gets skipped
+        except Exception as e:  # a chip that won't fetch just gets skipped
             print(f"  [{i}] {w.name}: SKIP ({e})")
             continue
         fig, axes = plt.subplots(1, 3, figsize=(12, 4.4))
@@ -148,8 +179,12 @@ def main() -> int:
         _panel(axes[1], rgb, extent, polys, "2. label boundary — TRUE position")
         _panel(axes[2], rgb, extent, polys, "3. label shifted +1px S (shift-test's preferred fix)",
                shift_m=SHIFT_M)
-        fig.suptitle(f"{w.name} — does the cyan sit on the green?  panel 2 (as-is) vs 3 (shifted 10 m S)",
-                     fontsize=10)
+        fig.suptitle(
+            f"{w.name} — does CYAN (woody) sit on the green?  panel 2 (as-is) vs 3 (10 m S)\n"
+            "cyan line = woody riparian (green canopy — judge this)   ·   "
+            "gold hatch = herbaceous (grass/sedge — tan on NAIP, not an error)",
+            fontsize=9,
+        )
         fig.tight_layout()
         dest = OUT / f"chip_{i:02d}_{w.name}.png"
         fig.savefig(dest, dpi=130, bbox_inches="tight")
