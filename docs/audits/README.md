@@ -23,6 +23,7 @@ record: the paper, the claims extracted, a coverage map against our encoding sur
 
 | Date | Source | Verdict | What it did to us |
 |---|---|---|---|
+| 2026-07-17 | [CropGlobe (Tong & Wang 2025)](2026-07-17-cropglobe-tong-2025.md) — *Invariant Features for Global Crop Type Classification* | 🟡 **GAP** | **The FM premise's strongest published challenge — but it does not land as a threat.** Finds simple spectral-temporal features *beat FM embeddings* on cross-geography transfer. **Not** riparian/invasives (crop type), and it tests **frozen embeddings**, not a fine-tuned backbone — the variable our own pre-flight found load-bearing. So it validates our in-tile ties, hardens the go/no-go bar (beat a strong *simple* baseline, not just RF), and names a CropNet-style baseline to add to Phase 1 — but concedes nothing about the product. |
 | 2026-07-14 | [Riparian methods vs. the FM fine-tune](2026-07-14-riparian-methods-prior-art.md) — CO-RIP, CSU/Walton, 2017 dataset, Prithvi/SatMAE | 🟡 **GAP + SURVIVES** | **No analogue of the FM weak→strong fine-tune for riparian was found — the contribution survives, narrowly framed.** But the *workflow* (corridor negatives, year-matched labels, overlay-and-look) is **published practice**, not ours: cite it, don't imply we invented it. GAP items: per-pixel decoder (independent support), 30 m→10 m boundary weighting, beetle-state is a *riskier extension*. **Secondary synthesis — the CSU/Walton report still needs a direct `/paper-audit` before Phase 2.** |
 | 2026-07-12 | [Perkins et al. (2025)](2026-07-12-perkins-2025-canyonlands.md) — *Riparian Vegetated Area in Canyonlands NP, 1940–2022* | 🟠 **RETRACTS** | **Extent over time is not novel *on its own*.** They mapped riparian vegetated area back to **1940** — further than Landsat reaches. It survives only **qualified**: theirs is aerial, discrete dates, 152 km of one park, *area* not species, **no beetle**. Ours must say *annual, automated, wall-to-wall, satellite, species-level, beetle-aware*. **Confirms the beetle gap a third time** — a 2025 riparian-change paper that never mentions *Diorhabda*. |
 | 2026-07-12 | [Evangelista et al. (2018)](2026-07-12-evangelista-2018-csu-nrel.md) — CSU/NREL, *Mapping Native and Non-Native Riparian Vegetation in the Colorado River Watershed* | 🟠 **RETRACTS** | **Falsified Novelty Claim 1.** We said CSU produced "points but no map" and that "nobody has produced a native-vs-invasive cover + change product". They shipped riparian maps for **2006, 2016 and the change between them**, and **Russian-olive maps on the San Juan** for both years. We had read their web page, never the report. Claim rewritten: **annual, 10 m, beetle-aware**. |
@@ -122,10 +123,10 @@ Benchmark result notes (the arc the memo consolidates):
 
 ## Still to audit
 
-- **CropGlobe (Tong et al. 2025)** — the decision memo names it as *"the direct challenge our in-tile
-  ties reproduce"*: simple spectral-temporal features matching FM embeddings on cross-geography
-  transfer. That is a claim about **our** contribution, from a paper we have not audited, and it is
-  not in the corpus CSV. Audit it before Phase 1.
+- ~~**CropGlobe (Tong et al. 2025)**~~ → **audited 2026-07-17** (🟡 GAP, above): a real challenge to
+  the FM *premise* (simple features beat FM *embeddings* on transfer), but not a product threat — it
+  tests frozen embeddings, not the fine-tuned backbone our bet rides on, and it is crop type, not
+  riparian. Left us a Phase-1 baseline to add (issue below).
 - **CSU/Walton report** — carried over from the
   [methods audit](2026-07-14-riparian-methods-prior-art.md): the closest procedural analogue for the
   invasives half, still only known to us second-hand.
