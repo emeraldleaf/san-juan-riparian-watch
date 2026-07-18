@@ -8,6 +8,8 @@ experiment and a garbage one. We learned that empirically, and the receipt is at
 
 **Diagram:** [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg) draws the whole flow.
 **Code:** [`olmoearth_run_data/riparian_extent/materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py) — one command, any reach.
+**Canon:** the one-line rule ("every reach uses identical compositing") is in *CLAUDE.md → Reach-cube
+materialization*; this doc is its detail. See CLAUDE.md.
 
 ---
 

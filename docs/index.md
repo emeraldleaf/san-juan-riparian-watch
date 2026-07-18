@@ -111,6 +111,13 @@ That is what this project is for — and their recommendation is, in effect, its
   [`materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py); the flow is
   drawn in [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg).
 
+- [**Methods & metrics**](2026-07-18-methods-and-metrics.md) — the companion to the results: what the
+  two models (RF, foundation model) *are*, what every number means (**AUC, F1, precision, recall,
+  accuracy** — and why accuracy lies under class imbalance), what **overfitting** is and what we're
+  fitting, and why the evaluation is fair (spatial splits, prevalence-invariant AUC, head-to-head on
+  identical footing, **cross-reach transfer as the verdict**). Covers both tasks — extent
+  (riparian-vs-other) and invasives (invasive-vs-native).
+
 ## Prior-art audits — the falsification log
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim
