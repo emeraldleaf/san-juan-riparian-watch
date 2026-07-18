@@ -88,9 +88,10 @@ def _riparian_polys_utm(window: Path, meta: dict) -> list[tuple[shapely.geometry
     yr = meta["projection"]["y_resolution"]
     out = []
     for feat in fc["features"]:
-        if int(feat["properties"].get("class", 0)) != 1:
+        props = feat.get("properties") or {}
+        if int(props.get("class", 0) or 0) != 1:
             continue
-        kind = "herb" if "herbaceous" in (feat["properties"].get("label") or "") else "woody"
+        kind = "herb" if "herbaceous" in (props.get("label") or "") else "woody"
         geom = shapely.geometry.shape(feat["geometry"])  # in the window's pixel grid
         # pixel grid → UTM metres: the data.geojson coords are pixel indices in the window projection.
         out.append((shapely.ops.transform(lambda x, y, z=None: (x * xr, y * yr), geom), kind))
@@ -122,10 +123,9 @@ def _fetch_naip(minx: float, miny: float, maxx: float, maxy: float, utm_crs: str
             signal.alarm(0)
             return rgb, (minx, miny, maxx, maxy)
         except Exception as e:  # retry gateway timeouts, hangs (_FetchTimeout), url expiry
+            signal.alarm(0)  # cancel FIRST — else the 75s deadline could fire during the sleep below
             last = e
             time.sleep(5 * (attempt + 1))  # PC blob gateway blips clear within minutes
-        finally:
-            signal.alarm(0)
     raise RuntimeError(f"NAIP fetch failed after retries: {str(last)[:80]}")
 
 
