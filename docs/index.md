@@ -105,9 +105,9 @@ That is what this project is for — and their recommendation is, in effect, its
 - [**The data-cube technique**](2026-07-18-reach-cube-materialization.md) — how a bare bounding box
   becomes a **phenologically-aligned Sentinel-2 time-series cube** per reach: STAC indexing + COG
   range-reads + **12-month median mosaics** + label-driven windowing + verify-don't-trust. Includes
-  the honest tooling positioning for a client (`odc-stac`/dask as the portable core, rslearn as the
-  ML adapter, GEE as the prototyping alternative) and the **receipt** — a mis-composited shortcut
-  collapsed a transfer to AUC 0.37. Reusable via
+  an honest tooling assessment (`odc-stac`/dask as the portable core, rslearn as the ML adapter, GEE
+  as the server-side alternative) and the **receipt** — a mis-composited shortcut collapsed a transfer
+  to AUC 0.37. Reusable via
   [`materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py); the flow is
   drawn in [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg).
 

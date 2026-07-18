@@ -105,27 +105,25 @@ and inference read.
 
 ---
 
-## Is this current and pragmatic? (for a client conversation)
+## Is this current and pragmatic?
 
-**The method is state-of-the-art; be deliberate about the tool.**
+**The method is current; the tool choice is deliberate, and the alternatives are worth knowing.**
 
 - **The techniques** — STAC indexing, COG range-reads, phenological median compositing, label-driven
-  windowing, verify-don't-trust — are exactly how modern EO/ML data pipelines are built in 2026.
-  Nothing here is legacy.
-- **The portable, sellable core is STAC + `odc-stac`/`stackstac` + xarray/dask.** That stack builds
-  the same cube lazily as a chunked xarray, scales from a laptop to a dask cluster, and is
-  vendor-neutral and recognizable to any geospatial team. If this were a productized deliverable,
-  that is the framing to lead with.
+  windowing, verify-don't-trust — are how modern EO/ML data pipelines are built in 2026. Nothing here
+  is legacy.
+- **The portable core is STAC + `odc-stac`/`stackstac` + xarray/dask.** That stack builds the same
+  cube lazily as a chunked xarray, scales from a laptop to a dask cluster, and is vendor-neutral. It
+  is the natural choice for a general-purpose cube builder.
 - **We used `rslearn`** (Ai2's ML-dataset builder) because it materializes windows in exactly the
-  shape our OlmoEarth fine-tune consumes. It is a fine **ML adapter**, but it couples you to Ai2's
-  ecosystem; it is not what you'd hand a client as a general cube-builder.
-- **Google Earth Engine** is the dominant *prototyping* alternative — server-side compositing, no
-  download — at the cost of vendor lock-in and egress. Worth naming so you can answer "why not GEE?":
-  *control over exact preprocessing, no lock-in, and reproducible local artifacts.*
+  shape our OlmoEarth fine-tune consumes — a good **ML adapter**, but it couples to Ai2's ecosystem,
+  so it is not the general-purpose choice.
+- **Google Earth Engine** is the dominant server-side alternative — no local download — at the cost of
+  vendor lock-in and egress. The reason to prefer local materialization here: control over the exact
+  preprocessing, no lock-in, and reproducible local artifacts.
 
-**One-line pitch:** *"STAC-indexed, COG-streamed Sentinel-2 cubes with reproducible phenological
-compositing — portable across cloud (dask) or laptop, with the imagery pipeline decoupled from the
-model."*
+**In short:** STAC-indexed, COG-streamed Sentinel-2 cubes with reproducible phenological compositing —
+portable across cloud (dask) or laptop, with the imagery pipeline decoupled from the model.
 
 ---
 
