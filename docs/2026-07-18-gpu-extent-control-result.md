@@ -5,9 +5,10 @@ RTX A6000 · **WandB:** `models-n-a6901/san-juan-riparian` (`extent-honest-diag`
 
 > **Bottom line.** The fine-tuned OlmoEarth-Base extent control lands at **riparian F1 ≈ 0.82**
 > (precision 0.76, recall 0.89), **reproduced identically across two runs** and unchanged when the
-> fine-tuning was given 25 extra epochs of room — so it is **not** under-training. It **does not beat
-> the RF baseline (0.90–0.92)**, but it **beats the fine-tuned-Presto stand-in (~0.75)** the CPU
-> pre-flight set as the real bar. A per-pixel diagnostic (confusion matrix + NAIP overlays) shows the
+> fine-tuning was given 25 extra epochs of room — so it is **not** under-training. A **head-to-head** RF
+> on the same split and scoring gets **0.827** — so the published "RF 0.90–0.92" was an inflated,
+> non-comparable bar, and the honest result is **RF beats the FM on extent by ~0.06 (0.83 vs 0.77),
+> not ~0.10**. The FM clears the **fine-tuned-Presto stand-in (~0.75)**. A per-pixel diagnostic (confusion matrix + NAIP overlays) shows the
 > ceiling is **mostly genuine model behaviour — over-prediction of riparian onto other vegetation and
 > bare ground, plus a spatially coarse decoder — not primarily a label-quality artifact.** A follow-up
 > (`patch_size: 2 → 1`, below) **confirms the coarse decoder was a real cause** — it sharpens
@@ -40,17 +41,50 @@ Both runs converge at **epoch 22 — two epochs after the encoder unfreezes** �
 fine-tuning 25 epochs of room changed nothing. **0.82 is the ceiling, not an artifact of too little
 training.** (Deterministic seed ⇒ the two best checkpoints are byte-identical.)
 
-### The gate
+### The gate — and why the published RF number was the wrong bar
 
-| | riparian F1 |
+The scaffold held the FM to **"RF spatial-CV F1 0.90–0.92."** That number is **not a fair
+comparison**, and treating it as the gate was a mistake this run exposed. The published RF is a
+**binary, class-balanced, threshold-tuned, 5-fold-CV** riparian-vs-rest classifier; the FM control is
+**5-class, unbalanced, argmax, single-split**. Different task, different scoring — and we already
+watched our *own* two metrics swing 0.13 on identical predictions (`validate` 0.82 vs direct-compare
+0.759), so a cross-harness 0.08 gap proves nothing.
+
+**So we ran the head-to-head** — RF on the *same* 158/80 split, the *same* 144-feature S2 cube, scored
+the *identical* way as the FM (per-pixel riparian one-vs-rest over valid pixels):
+
+| model — **all scored identically, same 80 val windows** | riparian F1 |
 |---|---|
-| Fine-tuned OlmoEarth-Base (this run) | **0.82** |
-| RF baseline — the extent gate | 0.90–0.92 |
-| Fine-tuned Presto — the pre-flight's stand-in bar | ~0.75 |
+| **RF, 5-class, class-balanced** | **0.827** |
+| RF, binary, class-balanced | 0.824 |
+| FM `patch_size=1` + **balanced loss** | 0.764 |
+| FM `patch_size=1` (per-pixel decoder) | 0.768 |
+| FM `patch_size=2` (blocky decoder) | 0.759 |
+| *(published RF, different harness — NOT comparable)* | *0.90–0.92* |
+| Fine-tuned Presto — the pre-flight stand-in | ~0.75 |
 
-Below RF, above Presto. The **strict** "beat RF on extent" gate is not cleared; the **pre-flight's**
-"beat fine-tuned Presto" bar is. Both are true, and the tension is the point: extent was always the
-*control*, never the deliverable.
+**Two corrections:**
+1. The **real, comparable RF is ~0.83, not 0.90–0.92.** The published number came from a more
+   favourable setup (threshold-tuned, CV-averaged, binary). The gate was inflated by ~0.07.
+2. **The FM still loses to RF on extent, fairly measured (0.77 vs 0.83)** — a ~0.06 gap, not the
+   0.08–0.10 the inflated baseline implied. And RF gets there **with no spatial context** (a per-pixel
+   classifier) while the FM has full attention. That is an unflattering result for the FM on extent.
+
+We then closed the last unequal knob — gave the FM the **same class-balanced cross-entropy** RF gets
+(`SegmentationHead(weights=...)`, balanced from the train distribution). **It did not help:** confmat
+F1 **0.764**, flat vs the 0.768 unbalanced run (it shifted a little recall into precision, no net
+gain). So with **every knob equalised — same split, same 144-feature cube, same all-pixel scoring, the
+per-pixel decoder, and class-balancing on both — RF (0.827) still beats the FM (0.76) by ~0.06.**
+
+The conclusion is now **robust, not an artifact**: on extent, a per-pixel Random Forest with *no
+spatial context* beats a fine-tuned 207 M-param foundation model with full attention, measured fairly.
+Extent was always the *control*, never the deliverable, and the FM clears the fine-tuned-Presto bar —
+but on the one thing we have actually measured head-to-head, **RF wins, and it is cheaper and simpler.**
+
+**Verdict for extent: use RF.** The foundation model's entire remaining case rides on **transfer to
+scarce-label invasives** (Phase 2) — untested, seen only with Presto in the pre-flight, and challenged
+on that exact axis by [CropGlobe](audits/2026-07-17-cropglobe-tong-2025.md). Having *lost* the
+measurable task raises, not lowers, the bar for spending more GPU to chase the hypothetical one.
 
 ## Why 0.82 — the per-pixel diagnostic
 
