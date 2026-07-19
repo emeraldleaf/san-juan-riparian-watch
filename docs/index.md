@@ -158,6 +158,13 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**Phase 3A — the cross-sensor gate**](2026-07-18-phase3a-cross-sensor-result.md) — the first
+  deep-time measurement: an RF trained on **Sentinel-2 2020** and scored on the **same held-out
+  pixels' Landsat 2020** loses only **+0.046 AUC** (0.942 → 0.896). On the one axis where the
+  foundation model has a structural edge — multi-sensor pretraining — a plain per-pixel RF crosses
+  sensors cheaply, so the FM edge is **not decisive** here. Isolates the sensor axis only; temporal
+  drift (3B) and the beetle inversion (3C) are separate, unsolved and **model-agnostic**. Reproducible
+  via [`phase3a_cross_sensor.py`](../olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py).
 - [**Phase 0 — the record**](2026-07-14-phase-0-record.md) — what we built (label layer, imagery
   validation, S2 cube, NANO dry-run), the **seven traps** it caught for $0 that would have failed on
   a GPU, the methods that generalised, the trade-offs, and the **open decisions before Phase 1**
