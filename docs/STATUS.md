@@ -9,7 +9,7 @@ Cross-session entry point. Surfaced automatically at session start by the
 
 **Every $0/laptop blocker is cleared and on `main`.** Four PRs merged this session — #56 (#45
 per-pixel `UNetDecoder`, wired + validated), #57 (#46 NAIP eye-check → labels **aligned, accept**),
-#58 (#51 second reach: **Malpais AUC 0.802**, "one reach" caveat retired), #60 (#48 CropGlobe audit
+**#58** (#51 second reach: **Malpais AUC 0.802**, "one reach" caveat retired), #60 (#48 CropGlobe audit
 → 🟡 GAP, not a product threat). Together with #55 (#44 → `V1_BASE`), the pre-flight gate the CPU
 memo demanded — *don't rent a GPU until the checkpoint, decoder, registration and generalization
 questions are answered for free* — is now **green**.
