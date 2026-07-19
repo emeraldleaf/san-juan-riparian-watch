@@ -189,3 +189,53 @@ even.
 > and **F1** (deployed operating point) on **spatially-held-out** data, compare models **on identical
 > footing**, and treat **cross-reach transfer** — not in-domain fit — as the verdict, because that is
 > the only setting where overfitting has nowhere to hide.
+
+---
+
+## 7. The signal, seen — the deciduous phenology the extent model learns
+
+Why does extent work at all, and why does it need **twelve** monthly mosaics rather than one clear
+summer scene? Because the thing that separates riparian from everything around it is not its greenness
+on any single day — it is its **seasonality**. Riparian woody vegetation (cottonwood, willow) is
+**deciduous**: bare in winter, fully leafed in midsummer. The surrounding semi-arid upland — juniper,
+sagebrush, bare ground — is effectively **evergreen or non-vegetated**: nearly flat all year. So the
+riparian corridor traces a tall seasonal **arch** that its surroundings do not.
+
+![The deciduous signature: riparian NDVI arch vs a flat upland line across 12 months](figures/2026-07-18-riparian-phenology-signature.png)
+
+Measured on the Farmington reach (median NDVI per class, per month):
+
+| | Riparian | Upland / non-riparian |
+|---|---|---|
+| Winter (Jan) | +0.259 | +0.162 |
+| Peak (Jul) | **+0.494** | +0.194 |
+| **Seasonal amplitude** (max − min) | **0.284** | **0.060** |
+
+The riparian seasonal swing is **~5× the upland's** — a textbook deciduous curve against a flat line.
+That is the physical signal, and it is unambiguous.
+
+But it carries a lesson that is easy to get wrong, and it is the same lesson as **§3**: **a clean
+separation of medians is not the same as a good classifier.** Two non-obvious consequences:
+
+- **The seasonal *amplitude*, used alone, is a weaker feature than a single date.** As a standalone
+  index, `NDVI(Jun) − NDVI(Jan)` scores **AUC 0.729** — *worse* than single-date NDVI (June 0.783,
+  January **0.818**), because a difference of two noisy measurements compounds their variance. The
+  medians separate cleanly; the distributions overlap more.
+- **Winter separates riparian *better* than summer** (Jan 0.818 > Jul 0.764). In the growing season
+  upland grasses and agriculture green up too and eat the contrast; in January only the riparian
+  corridor holds structure and moisture. April is the *worst* month (0.674) — mid-transition, every
+  class overlaps.
+
+The practical upshot: the extent model reads the **whole 12-month cube**, so it sees the entire arch —
+the winter baseline, the green-up, the midsummer peak, the senescence — and can weigh each month by how
+much it actually discriminates, rather than betting on one scene. That is why a single hand-crafted
+index tops out near 0.82 while the full multi-month RF reaches **0.94** in-sensor (§6; the cross-sensor
+gate, Phase 3A): the model has already internalised the deciduous test. This also clarifies a convention: **extent uses
+the full-year cube on purpose**; the "peak growing season only" rule in `CLAUDE.md` is a separate
+constraint for the *invasive* task, where the discriminating signal is late-season *Tamarix*
+senescence, not the deciduous arch.
+
+This section is not a new result so much as a **sanity check that paid off**: the model's high extent
+score is driven by real, physically-interpretable phenology — not by a spurious artifact of the labels
+or the harness. When a number looks good, the honest next question is *what is it keying on* — and here,
+the answer is exactly the ecology.
