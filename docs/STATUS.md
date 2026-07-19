@@ -1,11 +1,52 @@
 # Project Status
 
-**Last updated:** 2026-07-17
+**Last updated:** 2026-07-18
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-07-17): laptop pre-flight COMPLETE — **do-not-rent-a-GPU gate is GREEN**
+## ⏩⏩ Latest (2026-07-18): pre-flight PRs merged · **Phase 3A cross-sensor gate RUN** · merge-gate bug fixed
+
+**All four Phase-1 pre-flight PRs are on `main`** — #61 (status pre-flight), #62 (GPU launch kit),
+#63 (GPU extent-control result), #64 (reusable reach-cube pipeline + technique/methods docs +
+Phase-3 spec). #64 merged by **owner decision** (CodeRabbit held a single Trivial data-URL nitpick;
+every substantive finding was verified-fixed — markdownlint clean, token-aware matching, a CI-run
+test, the short-circuit).
+
+**Phase 3A — the cross-sensor gate is RUN (the first deep-time measurement).** An RF trained on
+**Sentinel-2 2020** and scored on the **same spatially-held-out pixels' Landsat 2020** (6 shared
+bands, 12 monthly composites, one enforced 10 m reflectance grid) loses only **+0.046 AUC**
+(in-sensor 0.942 → cross-sensor 0.896, on 180 k pixels). On the foundation model's one structural
+edge — multi-sensor pretraining — a plain per-pixel RF crosses sensors cheaply, so **the FM edge is
+not decisive on the sensor axis** and RF stays the pragmatic pick for the archive roll-out. It
+isolates the sensor axis only; **3B (temporal) and 3C (beetle) are separate, unsolved, and
+model-agnostic.** Result + caveats in `docs/2026-07-18-phase3a-cross-sensor-result.md`, reproducible
+end-to-end via `olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py` — both land with **PR #66**.
+
+**The merge gate itself was broken — found and fixed.** `check-coderabbit.sh` passed jq's `--arg` to
+`gh api --jq`, which silently ignores it; `REVIEW` came back empty and the gate false-blocked *every*
+approved-with-findings PR (it blocked #61, which CodeRabbit had **approved**, and stalled the merge
+poller). Fixed by piping to real `jq`. Method **receipt #21** (**PR #65**). GPU VM **hibernated** — no
+FM run is warranted (3A shows RF transfers cross-sensor).
+
+**Open right now:** **#65** (gate fix) and **#66** (3A result) — awaiting CodeRabbit review, a poller
+merges each on approval. Receipt #22 (fetch-hardening: a transient STAC timeout must not masquerade as
+a no-data month) folds in after #65 lands.
+
+### ➡️ Next — Phase 3B (the temporal test), scouted 2026-07-18
+The premise 3A did **not** test: does a 2020-trained model survive a *year* change, not just a sensor
+change? Train on 2020, predict **2017** (Landsat), validate against the CSU 2017 field points.
+- ✅ **Loader built** — `riparian/labels/csu_points.py` (handles the `Virgin_River` x/y transpose +
+  species crosswalk). Ground truth `TabletData_2017.csv` (CSU, 2017, CC BY-SA) — **but not on disk**
+  (326 KB download from mountainscholar).
+- ⚠️ **167 points in the San Juan AOI** (~135 riparian-woody positives, ~23 real absences) — enough to
+  **validate**, not to train. AUC will be noisier than 3A's 180 k pixels.
+- ⚠️ Needs **Landsat 2017** peak-season imagery + a **point-sampling** eval harness (different shape
+  than 3A's dense pixels). The 2017 data is **beetle-era** — a real confound for extent, smaller than
+  for species (3C).
+- **Verdict: runnable — a data pull + a point-eval harness, ~½ day; not a trivial rerun of 3A.**
+
+## Latest (2026-07-17): laptop pre-flight COMPLETE — **do-not-rent-a-GPU gate is GREEN**
 
 **Every $0/laptop blocker is cleared and on `main`.** Four PRs merged this session — #56 (#45
 per-pixel `UNetDecoder`, wired + validated), #57 (#46 NAIP eye-check → labels **aligned, accept**),
