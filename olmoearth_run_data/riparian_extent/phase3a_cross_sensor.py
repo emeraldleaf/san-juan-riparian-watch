@@ -78,8 +78,8 @@ def _grid(bbox: tuple[float, float, float, float]) -> tuple[Affine, int, int]:
 
 def _read_band(href: str, scale: float, off: float, affine: Affine, h: int, w: int) -> np.ndarray:
     """Reproject one COG band onto the common grid, as reflectance; NaN where out of range."""
-    dst = np.full((h, w), np.nan, np.float32)
     for attempt in range(3):
+        dst = np.full((h, w), np.nan, np.float32)  # fresh buffer per attempt — a retry must not keep partial data
         try:
             with rasterio.open(href) as src:
                 reproject(rasterio.band(src, 1), dst, src_transform=src.transform, src_crs=src.crs,
@@ -90,7 +90,7 @@ def _read_band(href: str, scale: float, off: float, affine: Affine, h: int, w: i
         except Exception as ex:  # noqa: BLE001 — a COG read is best-effort; retry then give up
             if attempt == 2:
                 logger.warning("    band read failed: %s", str(ex)[:50])
-    return dst
+    return np.full((h, w), np.nan, np.float32)
 
 
 def _fetch(coll: str, bands: list[str], scale: float, off: float, bbox, affine, h, w,
@@ -135,10 +135,11 @@ def fetch_cubes(bbox, dest: Path) -> None:
     s2, s2_fail = _fetch("sentinel-2-l2a", S2_BANDS, S2_SCALE, S2_OFF, bbox, affine, h, w)
     ls, ls_fail = _fetch("landsat-c2-l2", LS_BANDS, LS_SCALE, LS_OFF, bbox, affine, h, w,
                          platform="landsat-8")
+    if s2_fail or ls_fail:
+        # Refuse to write a poisoned cache: a NaN-from-timeout month must not be reused by --score-only.
+        raise RuntimeError(f"transient search failures — rerun: s2={s2_fail} ls={ls_fail}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     np.savez(dest, s2=s2, ls=ls, affine=np.array(affine).reshape(-1)[:6], h=h, w=w)
-    if s2_fail or ls_fail:
-        raise RuntimeError(f"transient search failures — rerun: s2={s2_fail} ls={ls_fail}")
     logger.info("saved %s (clean: every month populated or genuinely empty)", dest)
 
 
