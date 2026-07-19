@@ -158,6 +158,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**Phase 3B — the temporal gate**](2026-07-18-phase3b-temporal-result.md) — going back three years
+  is essentially **free**: an RF trained on 2020 and scored at the same 167 CSU points on **Landsat
+  2020 vs Landsat 2017** loses only **+0.003 AUC**. With 3A, both model-agnostic deep-time axes are now
+  measured and cheap (sensor +0.046, time +0.003); the binding constraint is **spatial coverage of
+  training**, not the year or sensor — so it does not reopen RF-vs-FM. Reproducible via
+  [`phase3b_temporal.py`](../olmoearth_run_data/riparian_extent/phase3b_temporal.py).
 - [**Phase 3A — the cross-sensor gate**](2026-07-18-phase3a-cross-sensor-result.md) — the first
   deep-time measurement: an RF trained on **Sentinel-2 2020** and scored on the **same held-out
   pixels' Landsat 2020** loses only **+0.046 AUC** (0.942 → 0.896). On the one axis where the
