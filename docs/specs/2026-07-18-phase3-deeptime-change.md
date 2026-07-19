@@ -49,6 +49,7 @@ The model is the *smaller* risk. Plan accordingly.
 ## The plan — cheapest-decisive-first (the method that's worked all along)
 
 ### Phase 3A — the cross-sensor test (make-or-break, $0 laptop)
+
 Can a model trained on Sentinel-2 hold on Landsat? Test where ground truth exists: build **S2 2020 and
 Landsat 2020** cubes on **one enforced common footprint** — the same AOI, reprojected to a single
 10 m EPSG grid, restricted to the **6 shared bands** (blue/green/red/NIR/SWIR-1/SWIR-2), each converted
@@ -63,10 +64,12 @@ sensor penalty** — it isolates band + radiometry + resolution, because pixels 
 > tie.**
 
 ### Phase 3B — the temporal test ($-cheap)
+
 Train on 2020, predict **2017** (Landsat), score against the CSU 2017 points — the only other-year
 labels that exist. Holds across a sensor swap *and* three years → the archive is plausible.
 
 ### Phase 3C — the beetle strategy (decide the scope now)
+
 No pre-2017 labels will ever exist. Split the product by what is defensible:
 - **Extent (riparian vs not) — the full record, 1984→.** More stable across the beetle; the honest
   deep-time layer.
@@ -76,6 +79,7 @@ No pre-2017 labels will ever exist. Split the product by what is defensible:
   label-scarce home turf.
 
 ### Phase 3D — plausibility checks, *not* validation (no ground truth)
+
 You cannot **validate** 1990 predictions — there are no 1990 labels to validate against. What you can
 do is **corroborate**: check that the output is *consistent with independent evidence*. Tamarisk stress
 should appear in the right places at the right time (beetle release 2004–07, saturation by 2014);
@@ -84,6 +88,7 @@ what it is — **plausibility / corroboration**, not validation. It raises or lo
 proves correctness, and the writeup must say so.
 
 ### Phase 3E — produce the archive (mostly CPU)
+
 Roll the calibrated model across the Landsat + S2 archive: annual extent (full record) + annual
 native-vs-invasive (post-beetle, caveated earlier). Inference is embarrassingly parallel and needs no
 training GPU — on-demand batch, zero idle cost (hosting ADR).
@@ -101,6 +106,7 @@ training GPU — on-demand batch, zero idle cost (hosting ADR).
 | FM cross-sensor edge is *also* only a tie | Medium | Then RF + per-sensor harmonization is the pragmatic archive — cheaper, and 3A/3B will have said so. |
 
 ## What we are NOT doing
+
 - **No committing the archive architecture before 3A/3B.** The cross-sensor number decides RF vs FM.
 - **No un-caveated species product pre-beetle.** The inversion + label gap forbid it.
 - **No always-on GPU** — inference is batch (hosting ADR); the GPU appears only if 3A says the FM earns it.

@@ -36,6 +36,7 @@ SWIR/red-edge, which is why the models get the full 144-D vector, not a vegetati
 ## 2. The two models
 
 ### Random Forest (RF) — the baseline
+
 An **ensemble of ~300 decision trees**. Each tree is trained on a **bootstrap sample** of the pixels
 (sampling with replacement) and, at each split, considers a **random subset of the 144 features**.
 Each tree votes; the forest averages the votes into a probability. Two properties matter:
@@ -45,6 +46,7 @@ Each tree votes; the forest averages the votes into a probability. Two propertie
 - `class_weight="balanced"` re-weights the loss so the minority class isn't ignored.
 
 ### Foundation model (FM) — OlmoEarth, fine-tuned
+
 A **pretrained vision transformer** (≈207 M parameters) trained by Ai2 on huge amounts of unlabelled
 satellite imagery, then **fine-tuned** on our labels. Unlike RF it sees a **32×32-pixel window with
 spatial context** (self-attention across pixels and months) and predicts a **per-pixel** map through a

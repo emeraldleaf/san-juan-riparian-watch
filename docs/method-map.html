@@ -285,7 +285,7 @@ sitemap: false
     <div class="qa-head"><div class="av">◑</div>
       <div><div class="t">Method guide</div><div class="s">Grounded in the findings above</div></div></div>
     <div class="chat" id="chat" role="log" aria-live="polite" aria-atomic="false">
-      <div class="msg a">Ask me about the models, the metrics, or why the foundation model keeps losing.
+      <div class="msg a">Ask me about the models, the metrics, or why RF and the foundation model tie.
         Tap a question below, or type your own.</div>
     </div>
     <div class="qs" id="qs"></div>
@@ -352,14 +352,18 @@ sitemap: false
     b.addEventListener('click',function(){answer(item.q);});qs.appendChild(b);});
   function bubble(cls,html){var d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;
     chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+  function bubbleText(cls,text){var d=document.createElement('div');d.className='msg '+cls;d.textContent=text;
+    chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+  function esc(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
   function match(text){var t=text.toLowerCase(),best=null,bs=0;
-    QA.forEach(function(it){var s=0;it.k.forEach(function(k){if(t.indexOf(k)>=0)s+=k.length;});
-      if(t.toLowerCase()===it.q.toLowerCase())s+=100; if(s>bs){bs=s;best=it;}});
+    QA.forEach(function(it){var s=0;it.k.forEach(function(k){
+      if(new RegExp('\\b'+esc(k)+'\\b','i').test(t))s+=k.length;});
+      if(t===it.q.toLowerCase())s+=100; if(s>bs){bs=s;best=it;}});
     return bs>0?best:null;}
-  function answer(text){bubble('u',text.replace(/</g,'&lt;'));
+  function answer(text){bubbleText('u',text);
     var m=match(text);
     setTimeout(function(){ if(m){bubble('a',m.a);}
-      else{bubble('a',"I can speak to the parts of the method shown here — try <b>AUC</b>, <b>F1</b>, <b>precision vs recall</b>, <b>overfitting</b>, <b>the phenology signal</b>, <b>why the foundation model loses</b>, <b>the transfer test</b>, or <b>what's next</b>.");}
+      else{bubble('a',"I can speak to the parts of the method shown here — try <b>AUC</b>, <b>F1</b>, <b>precision vs recall</b>, <b>overfitting</b>, <b>the phenology signal</b>, <b>whether the FM beats RF</b>, <b>the transfer test</b>, or <b>what's next</b>.");}
     },220);}
   function go(){var v=ask.value.trim(); if(!v)return; ask.value=''; answer(v);}
   send.addEventListener('click',go);
