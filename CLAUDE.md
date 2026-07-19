@@ -408,3 +408,12 @@ The three that decide whether the science is right:
   Colorado, not something to re-derive.
 - **Planetary Computer STAC** — Sentinel-2 (10 m, 2015→), **Landsat (30 m, 1984→ — the only sensor
   reaching the pre-beetle era)**, Sentinel-1, 3DEP, NAIP.
+
+### Reach-cube materialization (`materialize_reach.py`)
+Turn any reach bbox into a **phenologically-aligned** S2 cube: STAC index → COG range-reads → **12
+monthly median mosaics** → label-driven windows → `verify_materialized` (never trust its exit code).
+**Every reach MUST use the identical compositing** — a mis-composited single-scene shortcut collapsed
+a Farmington→Malpais transfer to **AUC 0.37** (vs 0.80 aligned); aligned compositing *is* the
+experiment. Technique from scratch + tooling alternatives (odc-stac/dask · rslearn · GEE):
+**docs/2026-07-18-reach-cube-materialization.md**. Metric/model definitions (AUC, F1, RF vs FM,
+overfitting): **docs/2026-07-18-methods-and-metrics.md**.

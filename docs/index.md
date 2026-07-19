@@ -20,6 +20,7 @@ question that actually matters to a watershed manager:
 
 | Document | What it is |
 |---|---|
+| **[▸ Interactive method map](method-map.html)** | The whole method, made explorable — inputs → the phenology data cube → RF vs a fine-tuned foundation model → the output maps (with the real chips) → the honest findings, plus a guided Q&A. **Start here for the visual tour.** |
 | **[Engineering & methodology walkthrough](engineering-review.html)** | How the pipeline works end to end — STAC satellite ETL, weak-label and reference-trained delineation, spatial cross-validation, RF vs OlmoEarth, the PostGIS medallion schema, the C# API and the MapLibre map — with **verbatim code** and a *"where a reviewer should attack this"* section. |
 | **[Literature review](literature-review.md)** | What has already been done, and why this project is not duplicating it. Written so the novelty claim can be **falsified**, not just asserted. |
 | **[Stage 2 spec — invasive vs native cover (Tamarix)](specs/2026-07-11-stage2-invasives-tamarix.md)** | The product thesis, the phased class schema, the trade-offs accepted, and what was **cut and why**. |
@@ -102,6 +103,22 @@ That is what this project is for — and their recommendation is, in effect, its
   without crashing). Ends with **the gaps**, which is the useful part: **the subsystem with the worst
   defect record is the one with the weakest gate.**
 
+- [**The data-cube technique**](2026-07-18-reach-cube-materialization.md) — how a bare bounding box
+  becomes a **phenologically-aligned Sentinel-2 time-series cube** per reach: STAC indexing + COG
+  range-reads + **12-month median mosaics** + label-driven windowing + verify-don't-trust. Includes
+  an honest tooling assessment (`odc-stac`/dask as the portable core, rslearn as the ML adapter, GEE
+  as the server-side alternative) and the **receipt** — a mis-composited shortcut collapsed a transfer
+  to AUC 0.37. Reusable via
+  [`materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py); the flow is
+  drawn in [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg).
+
+- [**Methods & metrics**](2026-07-18-methods-and-metrics.md) — the companion to the results: what the
+  two models (RF, foundation model) *are*, what every number means (**AUC, F1, precision, recall,
+  accuracy** — and why accuracy lies under class imbalance), what **overfitting** is and what we're
+  fitting, and why the evaluation is fair (spatial splits, prevalence-invariant AUC, head-to-head on
+  identical footing, **cross-reach transfer as the verdict**). Covers both tasks — extent
+  (riparian-vs-other) and invasives (invasive-vs-native).
+
 ## Prior-art audits — the falsification log
 
 - [**Prior-art audits**](audits/) — every claim this project makes about being *novel* is a claim
@@ -131,6 +148,12 @@ That is what this project is for — and their recommendation is, in effect, its
 - [**GPU fine-tune execution plan**](specs/2026-07-12-gpu-finetune-execution-plan.md) — costed, with
   the abort criteria written *before* the money is spent. **Compute is not the constraint** (~$2–5 for
   the control run); the `rslearn` data build is, so it happens locally and for free first.
+- [**Phase 3 — deep-time, cross-sensor, beetle-aware change**](specs/2026-07-18-phase3-deeptime-change.md)
+  — the actual contribution: annual extent + native-vs-invasive back into the **Landsat era (1984→)**,
+  past the pre-beetle baseline. Reopens the RF-vs-FM decision (cross-sensor is the FM's one structural
+  edge) and settles it on a **measured** cross-sensor test, not the single-epoch tie. Names the three
+  hard truths — no pre-2017 labels, the beetle signal inversion, the 30 m resolution wall — that are
+  bigger risks than the model choice.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
