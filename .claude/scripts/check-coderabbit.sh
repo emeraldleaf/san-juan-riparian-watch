@@ -112,9 +112,14 @@ FINDINGS=$(gh api "repos/{owner}/{repo}/pulls/$PR/comments" --paginate \
     --jq '[.[] | select(.user.login|test("coderabbit";"i")) | select(.in_reply_to_id == null)] | length' 2>/dev/null || echo 0)
 
 # 3. Did CodeRabbit review THIS head? A review on an older commit has not seen your fix.
-REVIEW=$(gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --paginate \
-    --jq --arg h "$HEAD" '[.[] | select(.user.login|test("coderabbit";"i"))] | last
-         | if . == null then "none" elif .commit_id == $h then "current:\(.state)" else "stale" end' 2>/dev/null)
+#    NOTE: `gh api --jq` does NOT accept jq's `--arg`; passing it makes gh error ("accepts 1
+#    arg(s), received 4"), so REVIEW came back EMPTY and every findings-bearing PR fell through
+#    to the "*)" case as "unaddressed" — even ones CodeRabbit had APPROVED on the head. It
+#    false-negatived #61 (approved) and stalled the merge poller. Pipe to real `jq`, which does
+#    support `--arg` (and matches the `jq` usage further down). `--paginate` merges the array.
+REVIEW=$(gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --paginate 2>/dev/null \
+    | jq -r --arg h "$HEAD" '[.[] | select(.user.login|test("coderabbit";"i"))] | last
+         | if . == null then "none" elif .commit_id == $h then "current:\(.state)" else "stale" end')
 
 if [[ "$FINDINGS" -gt 0 ]]; then
     case "$REVIEW" in
