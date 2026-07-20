@@ -35,22 +35,77 @@ Two FM properties are irrelevant in-domain but bite exactly where a deployed pro
 **The current single-scene RF (0.527) is not the baseline.** It is the receipt-#20 artifact and would
 rig the comparison in the FM's favour. The RF baseline for this decision is **median-mosaic RF** —
 the same 12-month aligned compositing `materialize_reach.py` produces, which took Farmington→Malpais
-from 0.37 to 0.80. **Step 0 of this experiment is to rebuild the RF baseline on median mosaics.** The
-FM must beat *that*, not the strawman.
+from 0.37 to 0.80. **Step 0 — rebuild the RF baseline on median mosaics — is done** (PR #71: LORO
+macro-mean AUC **0.798**, the bar tabulated below). The FM must beat *that*, not the strawman.
 
-## What gets measured (both models, identical footing)
+## The one task this gate controls
 
-Train on **N pooled NM reaches** (Farmington + Malpais + ≥1 more), predict a **held-out reach**, on
-identical aligned median-mosaic cubes:
+**Extent, and only extent.** The gate is the **`silver.riparian_extent` binary pixel task** — riparian
+woody vegetation vs not, the deployment-target product. It is decided on that task **alone**: invasives
+(Stage 2, native-vs-invasive) is **out of scope for this decision** and does not enter GO/NO-GO. The
+deployable map is an extent product; the FM earns the GPU on extent or it does not earn it here.
 
-| Claim | Metric | FM must show |
+- **Positive labels:** NMRipMap v2.0 Plus riparian-woody polygons, via the `L2_Code` filter in
+  `riparian/labels/nmripmap.py` — never raw NMRipMap. **Negatives:** pixels sampled outside the positive
+  polygons within each reach bbox (the same sampling `baseline.py` uses).
+- **Footing (identical for both models):** 12-month aligned median-mosaic cubes from
+  `materialize_reach.py` — *not* `deploy_extent_map.py`'s single-scene fetch. Same cubes, same pixels,
+  same spatial folds feed RF and FM.
+- **Aggregation:** **leave-one-reach-out (LORO)** across the **4 diverse reaches** (Farmington · Aztec/
+  Animas · Kirtland · Malpais). Report **per-reach held-out AUC** and the **unweighted macro-mean** across
+  the 4 folds. The macro-mean weights the arroyo equally with the three river corridors on purpose — it is
+  the one under-represented morphology and the pre-flight's predicted FM-win setting.
+
+## The bar is measured, not hypothetical — median-mosaic RF, LORO
+
+Step 0 is **done** (PR #71, `docs/2026-07-20-diverse-reach-transfer.md`). The honest RF baseline:
+
+| Held-out fold | Morphology | RF median-mosaic AUC |
 |---|---|---|
-| **Transfer** | held-out-reach AUC (rotate each reach out) | **≥ +0.04 over median-mosaic RF** (the pre-flight's own predicted margin) |
-| **Coherence** | edge/speckle: fraction of isolated single-pixel predictions; corridor connectivity (largest-component share); Moran's *I* of the probability field | **materially cleaner** than RF at matched recall — quantified, not eyeballed |
-| **Calibration** | reliability curve on held-out reach | no worse than RF |
+| Farmington | wide river | 0.905 |
+| Aztec/Animas | tributary | 0.886 |
+| Kirtland | mainstem | 0.845 |
+| **Malpais** | **arroyo** | **0.557** |
+| **macro-mean** | — | **0.798** |
 
-A **visual side-by-side** (FM vs RF extent over the held-out reach, on NAIP) accompanies the numbers —
-because the coherence claim is ultimately a product-quality claim.
+Pooling diverse reaches closes river-corridor transfer to ~0.88; the arroyo stays 0.557 because it is the
+sole example of its type. **That gap is the FM's opening** — and the number it must beat.
+
+## Acceptance contract (both models, identical footing)
+
+The FM's prediction is scored against the RF numbers above under these **reproducible** rules. No
+qualitative language decides the gate.
+
+**1. Transfer — the primary criterion.** Metric: LORO held-out-reach **ROC-AUC** on the extent task, per
+fold and macro-mean. Significance via **DeLong 95% CI** on the paired FM−RF AUC difference (same held-out
+pixels, so paired). A fold *passes* iff the FM−RF difference CI lower bound **> 0**. The FM clears Transfer
+iff **either**:
+  - **(a) broad win** — macro-mean AUC improvement **≥ +0.04** (FM macro-mean **≥ 0.838**) **and** the
+    macro-mean improvement is significant (paired CI excludes 0); **or**
+  - **(b) arroyo win** — the **Malpais fold** improves by **≥ +0.04** (FM **≥ 0.597**), significant by
+    DeLong, **and** no other fold regresses by **> 0.01 AUC**. This is the pre-flight's exact prediction —
+    a win confined to the hard, under-represented morphology still counts, and is the more *interesting*
+    result.
+
+**2. Coherence — the secondary criterion, at matched recall.** First fix the operating point: threshold
+each model's probability field per held-out reach so **recall on held-out positives = 0.80** (identical
+recall removes the "cleaner because it predicts less" confound). At that threshold, compute:
+  - **Speckle** — fraction of predicted-positive pixels with **no 4-connected positive neighbour**. FM must
+    be **≤ 0.5× RF's**.
+  - **Connectivity** — **largest-connected-component share** of predicted-positive area. FM must be
+    **≥ RF's + 0.10**.
+  - **Moran's *I*** of the probability field (spatial autocorrelation). FM must be **≥ RF's**.
+
+  Coherence *passes* iff **≥ 2 of these 3** clear their thresholds. This is what replaces "materially
+  cleaner."
+
+**3. Calibration — a guard, not a gate.** Metric: **Expected Calibration Error** (ECE, 10 equal-width
+bins) on the held-out reach. FM ECE must be **≤ RF ECE + 0.02**. A larger regression does **not** by
+itself abort — a transfer-winning FM can be recalibrated (isotonic/Platt) before ship — but it is
+**flagged as required recalibration work**, not waved through.
+
+A **visual side-by-side** (FM vs RF extent over each held-out reach, on NAIP, at the matched-recall
+threshold) accompanies the numbers, because the coherence claim is ultimately a product-quality claim.
 
 ## Why 1.1 specifically
 
@@ -62,21 +117,27 @@ efficiency is the deploy-time reason to pay that cost now (it was explicitly par
 
 ## Go / abort — written before the spend
 
-- **GO (FM ships for the map):** FM beats median-mosaic RF by **≥ +0.04 AUC on held-out-reach transfer**
-  **OR** delivers materially cleaner maps (speckle ↓, connectivity ↑) at matched recall with no AUC
-  regression. Either alone justifies it for the *map product*; both is the strong case.
-- **ABORT (RF ships):** FM ties or trails median-mosaic RF on transfer **and** shows no coherence edge.
-  Then RF is the deploy model, the map gets cheap morphological cleanup, and we record — again, with a
-  number — that the FM did not earn it here either. That is a publishable result, not a failure.
-- **Cost guard:** the median-mosaic data build + RF baseline are **laptop/$0** and happen first. Only
-  after the RF baseline is in hand does the GPU come out of hibernation for the FM fine-tune (control-run
-  scale, single reach-set — a few dollars, per the [GPU plan](2026-07-12-gpu-finetune-execution-plan.md)).
+Decided on the **extent task only**, against the measured RF bar (macro-mean 0.798; arroyo 0.557):
+
+- **GO (FM ships for the map):** **Transfer passes** — criterion **(a)** *broad win* (macro-mean ≥ 0.838,
+  significant) **or** **(b)** *arroyo win* (Malpais ≥ 0.597, significant, no other fold −0.01) — **OR**
+  Transfer is a statistical tie **and Coherence passes** (≥ 2 of 3 at matched recall) with no fold
+  regressing significantly. Calibration must not be flagged, or its recalibration work is scoped into the
+  ship. A Transfer win **and** Coherence pass is the strong case.
+- **ABORT (RF ships):** Transfer fails **both** (a) and (b) — macro-mean improvement < +0.04 or its CI
+  includes 0, **and** the arroyo fold does not clear (b) — **and** Coherence fails (< 2 of 3). Then RF is
+  the deploy model, the map gets cheap morphological cleanup, and we record — with a number — that the FM
+  did not earn it here either. **That is a publishable result, not a failure.**
+- **Cost guard:** the median-mosaic data build + RF baseline are **laptop/$0 and already done** (PR #71).
+  Only now does the GPU come out of hibernation for the FM fine-tune (control-run scale, the 4-reach set —
+  a few dollars, per the [GPU plan](2026-07-12-gpu-finetune-execution-plan.md)).
 
 ## Sequence
 
-1. **$0, laptop:** rebuild median-mosaic cubes for the train reaches + a held-out reach
-   (`materialize_reach.py` compositing, not `deploy_extent_map.py`'s single-scene fetch); train
-   median-mosaic RF; record transfer AUC + coherence metrics + the visual. **This is the bar.**
+1. **$0, laptop — DONE (PR #71):** median-mosaic cubes for the 4 diverse reaches, LORO median-mosaic RF,
+   transfer AUC table (macro-mean 0.798). **This is the bar.** Still to add on the FM run: the coherence
+   metrics + calibration at matched recall on the same folds (the RF side of those tables is computed in
+   the same harness when the FM prediction lands).
 2. **$0, laptop:** resolve the OlmoEarth 1.1 stack (`olmoearth_pretrain ≥ 0.1.1`, HF gate) and dry-run
    the fine-tune config on CPU/NANO — no GPU yet.
 3. **~$3–15, GPU:** fine-tune OlmoEarth 1.1 on the same pooled reaches; predict the held-out reach;

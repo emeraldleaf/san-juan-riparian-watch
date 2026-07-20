@@ -155,10 +155,13 @@ That is what this project is for — and their recommendation is, in effect, its
   hard truths — no pre-2017 labels, the beetle signal inversion, the 30 m resolution wall — that are
   bigger risks than the model choice.
 - [**FM-vs-RF, decided on the deployable map**](specs/2026-07-19-fm-vs-rf-deploy-decision.md) — where
-  OlmoEarth **1.1** must earn its keep: **spatial coherence** (the FM's 32×32 context vs RF's per-pixel
-  salt-and-pepper) and **cross-reach transfer** (the constraint 3B surfaced, and a single-scene RF just
-  collapsed to 0.527 on). The baseline is **median-mosaic RF**, not the strawman; the go bar is **≥ +0.04
-  transfer AUC or materially cleaner maps**, written before the spend. If the FM misses, RF ships.
+  OlmoEarth **1.1** must earn its keep, on the **`silver.riparian_extent` task only** (invasives out of
+  scope). The bar is **measured, not hypothetical**: leave-one-reach-out median-mosaic RF over 4 diverse
+  reaches, **macro-mean AUC 0.798** (arroyo fold 0.557 — PR #71). **GO** requires the FM to pass a written
+  contract — Transfer *(macro-mean ≥ +0.04 **and** DeLong-significant, **or** the arroyo fold ≥ +0.04 with
+  no other fold −0.01)*, or a transfer tie plus Coherence *(≥ 2 of 3: speckle ≤ ½ RF, connectivity ≥ +0.10,
+  Moran's I ≥ RF, all at matched 0.80 recall)*, with an ECE ≤ RF + 0.02 calibration guard. Miss it and RF
+  ships — with a number.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
