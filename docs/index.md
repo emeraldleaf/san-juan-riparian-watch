@@ -158,6 +158,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**The RF transfer bar — diverse-reach pooling closes it, except the arroyo**](2026-07-20-diverse-reach-transfer.md)
+  — the honest baseline for the FM decision. Training on **morphologically diverse** reaches lifts
+  cross-reach transfer to **0.85–0.91** on river corridors (RF is genuinely good), but the lone
+  **arroyo** stays at **0.557** — the one place a per-pixel RF can't reach, and exactly the
+  under-represented-morphology transfer the foundation model is predicted to win. Sharpens FM-vs-RF to a
+  single falsifiable test. Reproducible via [`deploy_extent_map.py`](../olmoearth_run_data/riparian_extent/deploy_extent_map.py).
 - [**Phase 3B — the temporal gate**](2026-07-18-phase3b-temporal-result.md) — going back three years
   is essentially **free**: an RF trained on 2020 and scored at the same 167 CSU points on **Landsat
   2020 vs Landsat 2017** loses only **+0.003 AUC**. With 3A, both model-agnostic deep-time axes are now
