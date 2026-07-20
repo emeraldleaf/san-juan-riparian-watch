@@ -24,7 +24,7 @@ transfer). Result in `docs/2026-07-20-diverse-reach-transfer.md`; the DB-free in
 from "materially cleaner / no worse" into a contract a third party could run: **extent task only**
 (`silver.riparian_extent`; invasives out of scope), **Transfer** = macro-mean AUC **+0.04 with a
 cluster-aware reach-block bootstrap** CI > 0 **or** the arroyo fold +0.04 significant with no other
-fold significantly regressing; **Coherence** (speckle/connectivity/Moran's I, 2-of-3 at matched 0.80
+fold regressing by > 0.01 AUC (point estimate); **Coherence** (speckle/connectivity/Moran's I, 2-of-3 at matched 0.80
 recall) as the tie-breaker; **Calibration** an ECE guard that only scopes recalibration, never flips
 the decision. GO/ABORT is a total function over the outcomes. `docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md`.
 
@@ -34,6 +34,7 @@ Python-standards fixes on the deploy tool: type hints, specific exceptions, <25-
 the "a green check only means it *ran*" trap the merge gate warns about.
 
 ### ➡️ Next — the FM finally races the bar
+
 Everything upstream of the GPU is done. **Fine-tune OlmoEarth 1.1 on the same 4 pooled reaches, predict
 each held-out reach, score against the contract — the arroyo (0.557) is the sharp test.** Then build the
 deployable maps (interactive `silver.riparian_extent` + static Pages twin) from whichever model wins.
