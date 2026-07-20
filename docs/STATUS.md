@@ -1,11 +1,46 @@
 # Project Status
 
-**Last updated:** 2026-07-18
+**Last updated:** 2026-07-20
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-07-18): pre-flight PRs merged · **Phase 3A cross-sensor gate RUN** · merge-gate bug fixed
+## ⏩⏩ Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
+
+The FM-vs-RF deploy decision now has **a written contract and a measured baseline** — the two things
+it needed before any GPU spend. **#70** (the spec) and **#71** (the RF bar + tooling) are on `main`.
+
+**The honest RF bar is measured (#71).** Median-mosaic RF, **leave-one-reach-out** over **4
+morphologically-diverse NM reaches**: Farmington **0.905**, Aztec/Animas **0.886**, Kirtland **0.845**,
+Malpais (arroyo) **0.557** — **macro-mean 0.798**. The path there matters: a poor 2-reach transfer
+(0.42) was first proved to be **real morphological domain shift, not an artifact** (each reach separable
+in-domain at CV 0.90+, but boundaries don't transfer across morphology). **Diverse-reach pooling then
+closed river-corridor transfer to ~0.88 — but the lone arroyo stays 0.557**, because it is the only
+example of its type. That gap **is** the FM's one predicted opening (under-represented-morphology
+transfer). Result in `docs/2026-07-20-diverse-reach-transfer.md`; the DB-free inference tool is
+`olmoearth_run_data/riparian_extent/deploy_extent_map.py` (median-mosaic → GeoTIFF + extent GeoJSON).
+
+**The gate is now reproducible (#70), not qualitative.** Two CodeRabbit rounds (ASSERTIVE) turned it
+from "materially cleaner / no worse" into a contract a third party could run: **extent task only**
+(`silver.riparian_extent`; invasives out of scope), **Transfer** = macro-mean AUC **+0.04 with a
+cluster-aware reach-block bootstrap** CI > 0 **or** the arroyo fold +0.04 significant with no other
+fold regressing by > 0.01 AUC (point estimate); **Coherence** (speckle/connectivity/Moran's I, 2-of-3 at matched 0.80
+recall) as the tie-breaker; **Calibration** an ECE guard that only scopes recalibration, never flips
+the decision. GO/ABORT is a total function over the outcomes. `docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md`.
+
+**Merge-gate note:** CodeRabbit's "Review completed" check on #71 was **green while masking a
+rate-limit skip** — it had not actually reviewed. Caught it, re-triggered, got a real review (4 minor
+Python-standards fixes on the deploy tool: type hints, specific exceptions, <25-line functions). Exactly
+the "a green check only means it *ran*" trap the merge gate warns about.
+
+### ➡️ Next — the FM finally races the bar
+
+Everything upstream of the GPU is done. **Fine-tune OlmoEarth 1.1 on the same 4 pooled reaches, predict
+each held-out reach, score against the contract — the arroyo (0.557) is the sharp test.** Then build the
+deployable maps (interactive `silver.riparian_extent` + static Pages twin) from whichever model wins.
+Resolve the 1.1 stack first (`olmoearth_pretrain ≥ 0.1.1`, HF gate) on CPU — see the spec's sequence.
+
+## Latest (2026-07-18): pre-flight PRs merged · **Phase 3A cross-sensor gate RUN** · merge-gate bug fixed
 
 **All four Phase-1 pre-flight PRs are on `main`** — #61 (status pre-flight), #62 (GPU launch kit),
 #63 (GPU extent-control result), #64 (reusable reach-cube pipeline + technique/methods docs +
