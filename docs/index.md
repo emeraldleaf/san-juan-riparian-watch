@@ -154,6 +154,11 @@ That is what this project is for — and their recommendation is, in effect, its
   edge) and settles it on a **measured** cross-sensor test, not the single-epoch tie. Names the three
   hard truths — no pre-2017 labels, the beetle signal inversion, the 30 m resolution wall — that are
   bigger risks than the model choice.
+- [**FM-vs-RF, decided on the deployable map**](specs/2026-07-19-fm-vs-rf-deploy-decision.md) — where
+  OlmoEarth **1.1** must earn its keep: **spatial coherence** (the FM's 32×32 context vs RF's per-pixel
+  salt-and-pepper) and **cross-reach transfer** (the constraint 3B surfaced, and a single-scene RF just
+  collapsed to 0.527 on). The baseline is **median-mosaic RF**, not the strawman; the go bar is **≥ +0.04
+  transfer AUC or materially cleaner maps**, written before the spend. If the FM misses, RF ships.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
