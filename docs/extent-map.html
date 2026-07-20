@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Predicted riparian extent — Bloomfield reach (RF)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root { --ink:#0f172a; --panel:rgba(255,255,255,.94); --accent:#15803d; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position:absolute; inset:0; }
+  .card {
+    position:absolute; background:var(--panel); color:var(--ink);
+    border-radius:12px; box-shadow:0 6px 28px rgba(0,0,0,.35); backdrop-filter:blur(6px);
+  }
+  #info { top:16px; left:16px; max-width:min(380px,calc(100vw - 32px)); padding:18px 20px; line-height:1.5; }
+  #info h1 { margin:0 0 6px; font-size:19px; letter-spacing:-.2px; }
+  #info .sub { color:#475569; font-size:13px; margin:0 0 12px; }
+  #info p { margin:10px 0; font-size:13.5px; color:#1e293b; }
+  #info .stat { display:flex; gap:14px; margin:12px 0; }
+  #info .stat b { display:block; font-size:20px; color:var(--accent); line-height:1.1; }
+  #info .stat span { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+  table.auc { border-collapse:collapse; width:100%; font-size:12.5px; margin:8px 0 4px; }
+  table.auc td { padding:2px 6px; border-bottom:1px solid #e2e8f0; }
+  table.auc td:last-child { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+  table.auc tr.arroyo td { color:#b45309; }
+  .note { font-size:11.5px; color:#64748b; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:10px; }
+  .note a { color:var(--accent); }
+  #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
+  #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
+  #legend .sw { width:16px; height:16px; border-radius:3px; border:1px solid rgba(0,0,0,.25); }
+  details summary { cursor:pointer; font-size:12.5px; color:#334155; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="info" class="card">
+  <h1>Predicted riparian extent</h1>
+  <p class="sub">Bloomfield reach, San Juan River · pooled Random-Forest baseline · Sentinel-2 2020</p>
+  <div class="stat">
+    <div><b>8.0%</b><span>of AOI riparian</span></div>
+    <div><b>8,511</b><span>polygons ≥ 0.50</span></div>
+    <div><b>4→1</b><span>reaches → unseen</span></div>
+  </div>
+  <p>The model was trained on <b>four morphologically-diverse reaches</b> and is predicting a
+  <b>fifth it never saw</b> (Bloomfield). Extent = pixels the RF scored ≥ 0.50 riparian, on 12-month
+  median-mosaic Sentinel-2 features.</p>
+  <p style="margin-bottom:4px"><b>Honest cross-reach transfer</b> (hold each training reach out):</p>
+  <table class="auc">
+    <tr><td>Farmington — wide river</td><td>0.905</td></tr>
+    <tr><td>Aztec/Animas — tributary</td><td>0.886</td></tr>
+    <tr><td>Kirtland — mainstem</td><td>0.845</td></tr>
+    <tr class="arroyo"><td>Malpais — arroyo</td><td>0.557</td></tr>
+  </table>
+  <details>
+    <summary>What this is, and isn't</summary>
+    <p class="note" style="border:0;padding:0">This is the <b>RF baseline</b> — the honest bar a foundation
+    model must beat, not the final product. It is <b>per-pixel</b>, so edges can be speckled; the arroyo
+    (0.557) is where diverse-reach pooling still doesn't transfer, and the FM's sharpest test.
+    Read: <a href="2026-07-20-diverse-reach-transfer.md">the diverse-reach result</a> ·
+    <a href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">the FM-vs-RF gate</a>.</p>
+  </details>
+</div>
+
+<div id="legend" class="card">
+  <div class="row"><span class="sw" style="background:#22c55e"></span> Predicted riparian (≥ 0.50)</div>
+  <div class="row"><span class="sw" style="background:#0ea5e9;opacity:.5"></span> San Juan River corridor</div>
+</div>
+
+<script>
+  const map = new maplibregl.Map({
+    container: "map",
+    center: [-108.00989, 36.72509],
+    zoom: 11.6,
+    style: {
+      version: 8,
+      sources: {
+        sat: {
+          type: "raster",
+          tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256,
+          attribution: "Imagery © Esri, Maxar, Earthstar Geographics"
+        }
+      },
+      layers: [{ id: "sat", type: "raster", source: "sat" }]
+    }
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+
+  map.on("load", () => {
+    map.addSource("extent", { type: "geojson", data: "maps/extent-bloomfield-rf.geojson" });
+    map.addLayer({
+      id: "extent-fill", type: "fill", source: "extent",
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.55 }
+    });
+    map.addLayer({
+      id: "extent-line", type: "line", source: "extent",
+      paint: { "line-color": "#166534", "line-width": 0.4, "line-opacity": 0.7 }
+    });
+  });
+</script>
+</body>
+</html>
