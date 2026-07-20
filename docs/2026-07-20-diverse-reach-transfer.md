@@ -68,7 +68,7 @@ foundation model, if anywhere, earns its keep.
 
 ## Reproduce
 
-```
+```bash
 PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/deploy_extent_map.py \
     --gdb <path>/GRSJ_Version2_0Plus_North.gdb
 ```

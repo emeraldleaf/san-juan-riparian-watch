@@ -23,6 +23,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Pin GDAL/rasterio + Python temp to the DATA DRIVE before rasterio loads (receipt #17: GDAL keeps
 # its own CPL_TMPDIR that TMPDIR does not cover; a COG-heavy run will otherwise fill the boot disk).
@@ -48,9 +49,18 @@ import planetary_computer as pc  # noqa: E402
 import pystac_client  # noqa: E402
 
 from phase3a_cross_sensor import STAC, S2_BANDS, S2_OFF, S2_SCALE, UTM, _grid, _read_band  # noqa: E402
+from pystac_client.exceptions import APIError  # noqa: E402
 from rasterio.warp import transform_geom  # noqa: E402
+from requests.exceptions import RequestException  # noqa: E402
 from riparian.labels import label_layer, validate_layer  # noqa: E402
 from validate_reach import gdb_reader_factory, rasterize_labels  # noqa: E402
+
+if TYPE_CHECKING:  # annotation-only imports (kept out of the runtime path above rasterio)
+    import pystac
+    from affine import Affine
+
+# (min_lon, min_lat, max_lon, max_lat) in EPSG:4326 — the bbox shape every reader here expects.
+BBox = tuple[float, float, float, float]
 
 N_SCENES = 4  # scenes per month to median-composite — aligned compositing (receipt #20), not single-scene
 
@@ -72,7 +82,7 @@ POS = validate_layer.POSITIVE_CLASS
 NEG = validate_layer.CORRIDOR_NEGATIVE_CLASSES
 
 
-def _search_s2(cat, bbox, month: int):
+def _search_s2(cat: pystac_client.Client, bbox: BBox, month: int) -> list[pystac.Item]:
     """Least-cloudy-first S2 items for one 2020 month; [] only after retries exhaust."""
     for attempt in range(6):
         try:
@@ -80,17 +90,37 @@ def _search_s2(cat, bbox, month: int):
                                     datetime=f"2020-{month:02d}-01/2020-{month:02d}-28",
                                     query={"eo:cloud_cover": {"lt": 40}}).items())
             return sorted(items, key=lambda x: x.properties.get("eo:cloud_cover", 100))
-        except Exception:  # noqa: BLE001 — STAC is intermittently slow; retry hard
+        except (APIError, RequestException):  # STAC is intermittently slow/flaky; retry the transient
             time.sleep(2 + 2 * attempt)
     return []
 
 
-def _fetch_s2(bbox):
+def _month_median(cat: pystac_client.Client, bbox: BBox, affine: Affine,
+                  h: int, w: int, month: int) -> np.ndarray:
+    """Pixel-wise median of the ``N_SCENES`` least-cloudy scenes for one month → (6, H, W).
+
+    Median is robust to the bright cloud outliers a single scene carries; all-NaN when the month has
+    no usable scene. A missing month never aborts the cube — it just yields a NaN slab.
+    """
+    items = _search_s2(cat, bbox, month)[:N_SCENES]
+    if not items:
+        logger.info("  m%02d: no scenes", month)
+        return np.full((6, h, w), np.nan, np.float32)
+    band_meds = []
+    for band in S2_BANDS:
+        scenes = np.stack([_read_band(it.assets[band].href, S2_SCALE, S2_OFF, affine, h, w)
+                           for it in items])
+        band_meds.append(np.nanmedian(scenes, axis=0).astype(np.float32))
+    logger.info("  m%02d: median of %d scenes", month, len(items))
+    return np.stack(band_meds)
+
+
+def _fetch_s2(bbox: BBox) -> tuple[np.ndarray, Affine, int, int]:
     """S2-2020 12-month **median-mosaic** cube (receipt #20 aligned compositing).
 
-    Each month is the pixel-wise median of the ``N_SCENES`` least-cloudy scenes — median is robust to
-    the bright cloud outliers a single scene carries, and gives features that transfer across reaches
-    (single-scene collapsed Farmington→Malpais to AUC 0.527). Returns (features (72,H,W), affine, h, w).
+    Aligned compositing is what makes features transfer across reaches (single-scene collapsed
+    Farmington→Malpais to AUC 0.527). Cached per bbox so a multi-reach run is resumable. Returns
+    (features (72,H,W), affine, h, w).
     """
     affine, h, w = _grid(bbox)
     key = "_".join(f"{v:.4f}" for v in bbox)
@@ -99,27 +129,14 @@ def _fetch_s2(bbox):
         logger.info("  cached cube %s", cache.name)
         return np.load(cache)["s2"], affine, h, w
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
-    cube = []
-    for m in range(1, 13):
-        items = _search_s2(cat, bbox, m)[:N_SCENES]
-        if not items:
-            cube.append(np.full((6, h, w), np.nan, np.float32))
-            logger.info("  m%02d: no scenes", m)
-            continue
-        band_meds = []
-        for band in S2_BANDS:
-            scenes = np.stack([_read_band(it.assets[band].href, S2_SCALE, S2_OFF, affine, h, w)
-                               for it in items])
-            band_meds.append(np.nanmedian(scenes, axis=0).astype(np.float32))
-        cube.append(np.stack(band_meds))
-        logger.info("  m%02d: median of %d scenes", m, len(items))
+    cube = [_month_median(cat, bbox, affine, h, w, m) for m in range(1, 13)]
     s2 = np.concatenate(cube, 0)
     CUBE_CACHE.mkdir(parents=True, exist_ok=True)
     np.savez(cache, s2=s2)
     return s2, affine, h, w
 
 
-def labeled_pixels(bbox, gdb: str) -> tuple[np.ndarray, np.ndarray]:
+def labeled_pixels(bbox: BBox, gdb: str) -> tuple[np.ndarray, np.ndarray]:
     """Fetch S2 + rasterise NMRipMap; return (X_labeled (n,72), y) for riparian-vs-corridor."""
     s2, affine, h, w = _fetch_s2(bbox)
     fc, stats = label_layer.build_extent_labels(bbox, corridor=None, reader=gdb_reader_factory(gdb))
@@ -159,7 +176,7 @@ def cross_reach_report(per_reach: dict[str, tuple[np.ndarray, np.ndarray]]) -> N
         logger.info("  → %-12s AUC = %.3f  (%d px)", held, auc, len(te_y))
 
 
-def _write_geotiff(prob: np.ndarray, affine, dest: Path) -> None:
+def _write_geotiff(prob: np.ndarray, affine: Affine, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(dest, "w", driver="GTiff", height=prob.shape[0], width=prob.shape[1],
                        count=1, dtype="float32", crs=UTM, transform=affine,
@@ -168,7 +185,7 @@ def _write_geotiff(prob: np.ndarray, affine, dest: Path) -> None:
     logger.info("wrote %s", dest)
 
 
-def _write_geojson(prob: np.ndarray, affine, dest: Path, threshold: float) -> int:
+def _write_geojson(prob: np.ndarray, affine: Affine, dest: Path, threshold: float) -> int:
     """Vectorise prob >= threshold to WGS84 polygons; return polygon count."""
     binary = (np.nan_to_num(prob) >= threshold).astype("uint8")
     feats = []
@@ -184,6 +201,40 @@ def _write_geojson(prob: np.ndarray, affine, dest: Path, threshold: float) -> in
     return len(feats)
 
 
+def _train_pooled_rf(gdb: str) -> tuple[RandomForestClassifier, np.ndarray]:
+    """Label + pool every training reach, report held-out transfer, fit the deploy RF.
+
+    Returns the fitted model and the pooled training features (the imputation reference inference
+    reuses, so held-out AOI pixels are filled with the *training* medians, not their own).
+    """
+    logger.info("== training on %d NMRipMap reaches ==", len(TRAIN_REACHES))
+    per_reach = {name: labeled_pixels(bbox, gdb) for name, bbox in TRAIN_REACHES.items()}
+    cross_reach_report(per_reach)
+    x = np.vstack([v[0] for v in per_reach.values()])
+    y = np.concatenate([v[1] for v in per_reach.values()])
+    rf = _new_rf()
+    rf.fit(_impute(x, x), y)
+    logger.info("deployed model: %d px pooled (%d riparian) from %d reaches",
+                len(y), int(y.sum()), len(per_reach))
+    return rf, x
+
+
+def _infer_and_write(rf: RandomForestClassifier, train_x: np.ndarray, dest: Path,
+                     threshold: float) -> int:
+    """Predict riparian probability over ``DEPLOY_AOI``; write the GeoTIFF + extent GeoJSON."""
+    logger.info("== inference over deploy AOI %s ==", DEPLOY_AOI)
+    s2, affine, h, w = _fetch_s2(DEPLOY_AOI)
+    grid_x = s2.reshape(72, -1).T
+    valid = np.isfinite(grid_x).any(1)
+    prob = np.full(h * w, np.nan, np.float32)
+    prob[valid] = rf.predict_proba(_impute(train_x, grid_x[valid]))[:, 1]
+    prob = prob.reshape(h, w)
+    logger.info("predicted %d valid px; %.1f%% ≥ %.2f (riparian)",
+                int(valid.sum()), 100 * (np.nan_to_num(prob) >= threshold).mean(), threshold)
+    _write_geotiff(prob, affine, dest / "riparian_extent_prob.tif")
+    return _write_geojson(prob, affine, dest / "riparian_extent.geojson", threshold)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gdb", required=True, help="local NMRipMap File Geodatabase")
@@ -191,33 +242,8 @@ def main() -> int:
     ap.add_argument("--threshold", type=float, default=0.5, help="riparian probability cut for polygons")
     a = ap.parse_args()
 
-    logger.info("== training on %d NMRipMap reaches ==", len(TRAIN_REACHES))
-    per_reach = {}
-    for name, bbox in TRAIN_REACHES.items():
-        logger.info("reach %s %s", name, bbox)
-        per_reach[name] = labeled_pixels(bbox, a.gdb)
-
-    cross_reach_report(per_reach)
-
-    x = np.vstack([v[0] for v in per_reach.values()])
-    y = np.concatenate([v[1] for v in per_reach.values()])
-    rf = _new_rf()
-    rf.fit(_impute(x, x), y)
-    logger.info("deployed model: %d px pooled (%d riparian) from %d reaches",
-                len(y), int(y.sum()), len(per_reach))
-
-    logger.info("== inference over deploy AOI %s ==", DEPLOY_AOI)
-    s2, affine, h, w = _fetch_s2(DEPLOY_AOI)
-    grid_x = s2.reshape(72, -1).T
-    valid = np.isfinite(grid_x).any(1)
-    prob = np.full(h * w, np.nan, np.float32)
-    prob[valid] = rf.predict_proba(_impute(x, grid_x[valid]))[:, 1]
-    prob = prob.reshape(h, w)
-    logger.info("predicted %d valid px; %.1f%% ≥ %.2f (riparian)",
-                int(valid.sum()), 100 * (np.nan_to_num(prob) >= a.threshold).mean(), a.threshold)
-
-    _write_geotiff(prob, affine, a.dest / "riparian_extent_prob.tif")
-    n_poly = _write_geojson(prob, affine, a.dest / "riparian_extent.geojson", a.threshold)
+    rf, train_x = _train_pooled_rf(a.gdb)
+    n_poly = _infer_and_write(rf, train_x, a.dest, a.threshold)
     logger.info("== DEPLOYABLE: %d riparian polygons over the AOI ==", n_poly)
     return 0
 
