@@ -77,32 +77,48 @@ The FM's prediction is scored against the RF numbers above under these **reprodu
 qualitative language decides the gate.
 
 **1. Transfer — the primary criterion.** Metric: LORO held-out-reach **ROC-AUC** on the extent task, per
-fold and macro-mean. Significance via **DeLong 95% CI** on the paired FM−RF AUC difference (same held-out
-pixels, so paired). A fold *passes* iff the FM−RF difference CI lower bound **> 0**. The FM clears Transfer
-iff **either**:
+fold and unweighted 4-fold macro-mean.
+
+*Uncertainty — predeclared, cluster-aware.* **Not pixel-level DeLong** — held-out pixels are strongly
+spatially autocorrelated, so a per-pixel test pseudoreplicates and would call trivial gaps "significant."
+Instead, a **spatial block bootstrap**, fixed here before the FM runs:
+  - **Per-fold CI.** Partition the held-out reach into square **spatial blocks of side ≥ 300 m** (comfortably
+    beyond the reflectance autocorrelation range at 10 m). Resample blocks with replacement (**2000 iterations**,
+    seed pinned in the harness), recompute the **paired FM−RF AUC difference** on each resample, and take the
+    2.5/97.5 percentiles. A fold *passes* iff that per-fold difference CI lower bound **> 0**.
+  - **Macro-mean CI.** Resample **blocks within all four held-out reaches jointly** (hierarchical: reach → block),
+    recompute the unweighted 4-fold mean FM−RF difference per iteration, same 2000-iter percentile CI. **Honest
+    limitation, stated up front:** with **only 4 reach clusters** the macro-mean CI is wide and dominated by
+    between-reach variance; the block bootstrap captures within-reach uncertainty but cannot manufacture reach
+    replication. So the **arroyo fold (b) is the statistically cleaner signal** than the macro-mean, by design.
+
+The FM clears Transfer iff **either**:
   - **(a) broad win** — macro-mean AUC improvement **≥ +0.04** (FM macro-mean **≥ 0.838**) **and** the
-    macro-mean improvement is significant (paired CI excludes 0); **or**
-  - **(b) arroyo win** — the **Malpais fold** improves by **≥ +0.04** (FM **≥ 0.597**), significant by
-    DeLong, **and** no other fold regresses by **> 0.01 AUC**. This is the pre-flight's exact prediction —
-    a win confined to the hard, under-represented morphology still counts, and is the more *interesting*
-    result.
+    macro-mean block-bootstrap CI lower bound **> 0**; **or**
+  - **(b) arroyo win** — the **Malpais fold** improves by **≥ +0.04** (FM **≥ 0.597**), its per-fold
+    block-bootstrap CI lower bound **> 0**, **and** no other fold regresses by **> 0.01 AUC** (point estimate).
+    This is the pre-flight's exact prediction — a win confined to the hard, under-represented morphology still
+    counts, and is the more *interesting* result.
 
-**2. Coherence — the secondary criterion, at matched recall.** First fix the operating point: threshold
-each model's probability field per held-out reach so **recall on held-out positives = 0.80** (identical
-recall removes the "cleaner because it predicts less" confound). At that threshold, compute:
-  - **Speckle** — fraction of predicted-positive pixels with **no 4-connected positive neighbour**. FM must
-    be **≤ 0.5× RF's**.
-  - **Connectivity** — **largest-connected-component share** of predicted-positive area. FM must be
-    **≥ RF's + 0.10**.
-  - **Moran's *I*** of the probability field (spatial autocorrelation). FM must be **≥ RF's**.
+**2. Coherence — the secondary criterion, at matched recall.** First fix the operating point per held-out
+reach, **deterministically and identically for both models**: pick the **smallest probability threshold τ
+whose held-out recall on positives is ≥ 0.80** (recall is a step function of τ, so exact 0.80 is generally
+unattainable — this rule is unambiguous and applied the same way to FM and RF; ties in τ broken toward the
+smaller τ). Matched recall removes the "cleaner because it predicts less" confound. At each fold's τ compute:
+  - **Speckle** — fraction of predicted-positive pixels with **no 4-connected positive neighbour** (lower is better).
+  - **Connectivity** — **largest-connected-component share** of predicted-positive area (higher is better).
+  - **Moran's *I*** of the probability field (higher = smoother).
 
-  Coherence *passes* iff **≥ 2 of these 3** clear their thresholds. This is what replaces "materially
-  cleaner."
+  *Aggregation across folds (same as AUC):* take the **unweighted macro-mean of each metric over the 4 held-out
+  folds**, then evaluate the three thresholds **on those macro-means** — FM speckle **≤ 0.5×** RF speckle,
+  FM connectivity **≥** RF **+ 0.10**, FM Moran's *I* **≥** RF. **Coherence passes iff ≥ 2 of the 3** clear.
+  This is what replaces "materially cleaner."
 
-**3. Calibration — a guard, not a gate.** Metric: **Expected Calibration Error** (ECE, 10 equal-width
-bins) on the held-out reach. FM ECE must be **≤ RF ECE + 0.02**. A larger regression does **not** by
-itself abort — a transfer-winning FM can be recalibrated (isotonic/Platt) before ship — but it is
-**flagged as required recalibration work**, not waved through.
+**3. Calibration — a guard, not a gate.** Metric: **Expected Calibration Error** (ECE, 10 equal-width bins),
+computed per held-out fold and reported as the **unweighted 4-fold macro-mean**. The guard: macro-mean FM ECE
+**≤ macro-mean RF ECE + 0.02**. A larger regression does **not** by itself abort — a transfer-winning FM can be
+recalibrated (isotonic/Platt on a held-out slice) before ship — but it is **flagged as required recalibration
+work scoped into the ship**, never waved through. Calibration is thus never a stand-alone GO or ABORT trigger.
 
 A **visual side-by-side** (FM vs RF extent over each held-out reach, on NAIP, at the matched-recall
 threshold) accompanies the numbers, because the coherence claim is ultimately a product-quality claim.
@@ -117,17 +133,24 @@ efficiency is the deploy-time reason to pay that cost now (it was explicitly par
 
 ## Go / abort — written before the spend
 
-Decided on the **extent task only**, against the measured RF bar (macro-mean 0.798; arroyo 0.557):
+Decided on the **extent task only**, against the measured RF bar (macro-mean 0.798; arroyo 0.557). The
+outcome is a **total function** of two facts — does Transfer **win** (a or b), or is it a **tie** (neither
+win nor a significant macro-mean *regression*), or a **loss** — and does Coherence pass (≥ 2 of 3). Every
+leaf is GO or ABORT; calibration only ever adds scoped recalibration work, never flips the decision:
 
-- **GO (FM ships for the map):** **Transfer passes** — criterion **(a)** *broad win* (macro-mean ≥ 0.838,
-  significant) **or** **(b)** *arroyo win* (Malpais ≥ 0.597, significant, no other fold −0.01) — **OR**
-  Transfer is a statistical tie **and Coherence passes** (≥ 2 of 3 at matched recall) with no fold
-  regressing significantly. Calibration must not be flagged, or its recalibration work is scoped into the
-  ship. A Transfer win **and** Coherence pass is the strong case.
-- **ABORT (RF ships):** Transfer fails **both** (a) and (b) — macro-mean improvement < +0.04 or its CI
-  includes 0, **and** the arroyo fold does not clear (b) — **and** Coherence fails (< 2 of 3). Then RF is
-  the deploy model, the map gets cheap morphological cleanup, and we record — with a number — that the FM
-  did not earn it here either. **That is a publishable result, not a failure.**
+| Transfer outcome | Coherence | Decision |
+|---|---|---|
+| **Win** — (a) broad **or** (b) arroyo clears | pass **or** fail | **GO** — strong case if Coherence also passes |
+| **Tie** — no win, and no fold *significantly* regresses (block-bootstrap CI) | **pass** | **GO** (coherence-only) |
+| **Tie** | fail | **ABORT** |
+| **Loss** — macro-mean significantly regresses, **or** any fold significantly regresses | pass **or** fail | **ABORT** |
+
+- **On a GO**, if the calibration guard is **flagged** (FM macro-mean ECE > RF + 0.02), the ship **includes**
+  the recalibration step — GO stands, the work is scoped in. Calibration never produces a GO or an ABORT on
+  its own.
+- **On any ABORT, RF ships:** RF is the deploy model, the map gets cheap morphological cleanup, and we
+  record — with a number — that the FM did not earn it here either. **That is a publishable result, not a
+  failure.**
 - **Cost guard:** the median-mosaic data build + RF baseline are **laptop/$0 and already done** (PR #71).
   Only now does the GPU come out of hibernation for the FM fine-tune (control-run scale, the 4-reach set —
   a few dollars, per the [GPU plan](2026-07-12-gpu-finetune-execution-plan.md)).
