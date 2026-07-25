@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -82,12 +83,29 @@ def _engine() -> Engine:
     return create_engine(url)
 
 
+def _probability(value: str) -> float:
+    """Parse a CLI probability argument, rejecting non-finite or out-of-[0,1] values."""
+    f = float(value)
+    if not math.isfinite(f) or not 0.0 <= f <= 1.0:
+        raise argparse.ArgumentTypeError(f"threshold must be a finite value in [0, 1], got {value!r}")
+    return f
+
+
 def main() -> int:
+    """CLI entrypoint: warp the deploy probability raster, vectorize, and write to silver.
+
+    Reads the arguments (``--tif``, ``--threshold``, ``--model-version``), warps the UTM
+    probability GeoTIFF to EPSG:4269, vectorizes pixels at or above the threshold via the
+    canonical ``runner._vectorize``, and replaces the matching ``silver.riparian_extent`` rows.
+
+    Returns:
+        Process exit code (``0`` on success).
+    """
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tif", type=Path, default=HERE / ".tmp/deploy/riparian_extent_prob.tif",
                     help="deploy probability GeoTIFF (UTM)")
-    ap.add_argument("--threshold", type=float, default=0.5, help="riparian probability cut")
+    ap.add_argument("--threshold", type=_probability, default=0.5, help="riparian probability cut [0,1]")
     ap.add_argument("--model-version", default=MODEL_VERSION, help="version tag written to silver")
     a = ap.parse_args()
 
