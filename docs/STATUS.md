@@ -1,11 +1,49 @@
 # Project Status
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-25
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
+## ⏩⏩ Latest (2026-07-25): 4-reach FM dataset **built + materialized** — the GPU run is a rental away
+
+The rigorous deploy test (spec #70) needs the FM scored **leave-one-reach-out over the same 4 reaches**
+the RF bar was measured on. All four are now built as rslearn datasets (12-month median mosaics,
+identical compositing), materialized and verified on disk:
+
+| reach | windows | rasters |
+|---|---|---|
+| Farmington | 238 | 3,332 |
+| Malpais (arroyo) | 328 | 4,264 |
+| Kirtland | 444 | 5,328 |
+| Aztec-Animas | 394 | 4,728 |
+
+Kirtland + Aztec were the two new builds. They surfaced **two real macOS/network traps** the earlier
+Farmington/Malpais builds had dodged, both fixed in `materialize_reach.py` (this PR):
+
+- **`AF_UNIX path too long`** — the temp redirect put `TMPDIR` at the deep dataset path, and rslearn's
+  `--workers` pool opens a multiprocessing socket under it that overflows macOS's 104-char limit;
+  `prepare` died on step one. Scratch now goes to the **volume root** (`/Volumes/<name>/.oe-tmp`) —
+  same drive (space, boot disk stays clear), short path (socket fits).
+- **Planetary Computer 403** on the STAC `prepare` search under 8 concurrent workers (a single search
+  is fine). Use `--workers 3` for the search-heavy step; documented in the tool.
+
+**Also this session:** the deployable **static extent map** shipped (#73 — `docs/extent-map.html`, the
+Bloomfield reach on satellite) with an honest **model-vs-NMRipMap-truth** overlay. It made the RF's
+weakness visible: model predicts 8.0% riparian vs NMRipMap's 5.7% truth, over-firing on green fields
+because **80% of the AOI is unlabeled** so the RF was never taught to reject upland/ag — the per-pixel,
+no-corridor-constraint failure the FM's spatial context is meant to fix.
+
+### ➡️ Next — the FM finally races the bar (GPU)
+
+Everything upstream is done. **Wire the LORO fine-tune across the 4 reach datasets** (train on 3,
+predict the held-out, rotate), score each held-out reach against the RF bar — the **arroyo (0.557)** is
+the sharp test — plus the coherence criterion at matched recall. Needs a rented CUDA GPU (~$3–15) and
+the datasets on the box (rebuild via `materialize_reach.py` or transfer). Config: `model.yaml`
+(V1_BASE + per-pixel `UNetDecoder`) is ready for a single split; the remaining wiring is combining the
+3 training reaches per fold.
+
+## Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
 
 The FM-vs-RF deploy decision now has **a written contract and a measured baseline** — the two things
 it needed before any GPU spend. **#70** (the spec) and **#71** (the RF bar + tooling) are on `main`.
