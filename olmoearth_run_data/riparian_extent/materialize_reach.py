@@ -70,10 +70,23 @@ def _redirect_temp(dest: Path) -> None:
 
     ``ingest`` stages whole S2 granules through ``TMPDIR``; ``materialize`` uses
     GDAL's own ``CPL_TMPDIR``. Both default to the boot volume and will fill it.
-    We point them at a ``.tmp`` beside the dataset (same drive as the output) and
-    cap the GDAL block cache. Setting only one is a trap — set all of them.
+    We point them at a scratch dir on the **same drive as the output** and cap the
+    GDAL block cache. Setting only one is a trap — set all of them.
+
+    The scratch dir must also be a **short path**: rslearn's ``--workers`` pool
+    opens an ``AF_UNIX`` multiprocessing socket *under* ``TMPDIR``, and macOS caps
+    that path at 104 chars. A ``.tmp`` beside a deeply-nested dataset (e.g.
+    ``…/olmoearth_run_data/riparian_extent/.tmp``) overflows it and ``prepare``
+    dies with ``AF_UNIX path too long``. So on a ``/Volumes/<name>`` mount we place
+    the scratch at the volume root (short, same filesystem); otherwise beside the
+    dataset as before.
     """
-    tmp = dest.parent / ".tmp"
+    resolved = dest.resolve()
+    parts = resolved.parts
+    if len(parts) >= 3 and parts[1] == "Volumes":
+        tmp = Path(*parts[:3]) / ".oe-tmp"  # /Volumes/<name>/.oe-tmp — short + on the data drive
+    else:
+        tmp = dest.parent / ".tmp"
     tmp.mkdir(parents=True, exist_ok=True)
     for var in ("TMPDIR", "TMP", "TEMP", "CPL_TMPDIR"):
         os.environ[var] = str(tmp)
@@ -140,7 +153,9 @@ def main() -> None:
                        help="an arbitrary AOI in EPSG:4326")
     ap.add_argument("--gdb", help="local NMRipMap File Geodatabase; omit for the live ArcGIS fetch")
     ap.add_argument("--dest", required=True, type=Path, help="dataset root to create")
-    ap.add_argument("--workers", type=int, default=8, help="concurrency for ingest/materialize (default 8)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrency for prepare/ingest/materialize (default 8). Drop to ~3 if the "
+                         "STAC `prepare` step 403s — Planetary Computer rate-limits many concurrent searches.")
     ap.add_argument("--skip-download", action="store_true", help="build labelled windows only (smoke test)")
     args = ap.parse_args()
 
