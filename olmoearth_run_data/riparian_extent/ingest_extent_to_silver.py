@@ -23,15 +23,15 @@ from __future__ import annotations
 
 import argparse
 import logging
-import math
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import numpy as np
 import rasterio
+from pydantic import Field, TypeAdapter
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 from sqlalchemy import create_engine
 
@@ -83,32 +83,39 @@ def _engine() -> Engine:
     return create_engine(url)
 
 
+# Pydantic constraint (repo convention: Pydantic for validation) — a finite probability in [0, 1].
+_PROBABILITY = TypeAdapter(Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)])
+
+
 def _probability(value: str) -> float:
-    """Parse a CLI probability argument, rejecting non-finite or out-of-[0,1] values."""
-    f = float(value)
-    if not math.isfinite(f) or not 0.0 <= f <= 1.0:
-        raise argparse.ArgumentTypeError(f"threshold must be a finite value in [0, 1], got {value!r}")
-    return f
+    """Parse + validate a CLI probability argument via the Pydantic ``_PROBABILITY`` constraint."""
+    try:  # pydantic's ValidationError subclasses ValueError, as does float()'s parse error
+        return _PROBABILITY.validate_python(float(value))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"threshold must be a finite value in [0, 1], got {value!r}") from exc
 
 
-def main() -> int:
-    """CLI entrypoint: warp the deploy probability raster, vectorize, and write to silver.
-
-    Reads the arguments (``--tif``, ``--threshold``, ``--model-version``), warps the UTM
-    probability GeoTIFF to EPSG:4269, vectorizes pixels at or above the threshold via the
-    canonical ``runner._vectorize``, and replaces the matching ``silver.riparian_extent`` rows.
-
-    Returns:
-        Process exit code (``0`` on success).
-    """
+def _parse_args() -> argparse.Namespace:
+    """Build the CLI parser and parse ``sys.argv``."""
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tif", type=Path, default=HERE / ".tmp/deploy/riparian_extent_prob.tif",
                     help="deploy probability GeoTIFF (UTM)")
     ap.add_argument("--threshold", type=_probability, default=0.5, help="riparian probability cut [0,1]")
     ap.add_argument("--model-version", default=MODEL_VERSION, help="version tag written to silver")
-    a = ap.parse_args()
+    return ap.parse_args()
 
+
+def main() -> int:
+    """CLI entrypoint: warp the deploy probability raster, vectorize, and write to silver.
+
+    Warps the UTM probability GeoTIFF to EPSG:4269, vectorizes pixels at or above ``--threshold``
+    via the canonical ``runner._vectorize``, and replaces the matching ``silver.riparian_extent`` rows.
+
+    Returns:
+        Process exit code (``0`` on success).
+    """
+    a = _parse_args()
     prob, transform, _, _ = _warp_to_4269(a.tif)
     filled = np.nan_to_num(prob)
     tag = _ExtentTag("rf", a.model_version)
