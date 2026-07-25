@@ -61,7 +61,7 @@ class _ExtentTag:
     model_version: str
 
 
-def _warp_to_4269(tif: Path) -> tuple[np.ndarray, "Affine", int, int]:
+def _warp_to_4269(tif: Path) -> tuple[np.ndarray, Affine, int, int]:
     """Warp the UTM probability raster to an EPSG:4269 grid → (prob, transform, h, w)."""
     with rasterio.open(tif) as src:
         transform, width, height = calculate_default_transform(
@@ -74,7 +74,7 @@ def _warp_to_4269(tif: Path) -> tuple[np.ndarray, "Affine", int, int]:
     return dst, transform, height, width
 
 
-def _engine() -> "Engine":
+def _engine() -> Engine:
     """SQLAlchemy engine from the Aspire-injected DSN (RIPARIANDB_URI / DATABASE_URL)."""
     url = os.environ.get("RIPARIANDB_URI") or os.environ.get("DATABASE_URL")
     if not url:

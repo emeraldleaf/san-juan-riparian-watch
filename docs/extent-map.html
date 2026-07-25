@@ -39,10 +39,10 @@
 
 <div id="info" class="card">
   <h1>Predicted riparian extent</h1>
-  <p class="sub">Bloomfield reach, San Juan River · pooled Random-Forest baseline · Sentinel-2 2020</p>
+  <p class="sub"><span style="color:#166534;font-weight:700">Model prediction vs NMRipMap truth</span><br>Bloomfield reach, San Juan River · pooled Random-Forest baseline · Sentinel-2 2020</p>
   <div class="stat">
     <div><b>8.0%</b><span>of AOI riparian</span></div>
-    <div><b>8,511</b><span>polygons ≥ 0.50</span></div>
+    <div><b>2,672</b><span>riparian polygons</span></div>
     <div><b>4→1</b><span>reaches → unseen</span></div>
   </div>
   <p>The model was trained on <b>four morphologically-diverse reaches</b> and is predicting a
@@ -58,16 +58,21 @@
   <details>
     <summary>What this is, and isn't</summary>
     <p class="note" style="border:0;padding:0">This is the <b>RF baseline</b> — the honest bar a foundation
-    model must beat, not the final product. It is <b>per-pixel</b>, so edges can be speckled; the arroyo
-    (0.557) is where diverse-reach pooling still doesn't transfer, and the FM's sharpest test.
+    model must beat, not the final product. It is <b>per-pixel</b>, so edges are speckly; shown after
+    <b>cheap cleanup</b> — a peak-NDVI greenness floor that drops ~15% of the raw prediction as
+    non-vegetated false positives (open water + bare sediment, the documented failure mode), plus
+    sub-3-pixel despeckling. The arroyo (0.557) is where diverse-reach pooling still doesn't transfer,
+    and the FM's sharpest test.
     Read: <a href="2026-07-20-diverse-reach-transfer.md">the diverse-reach result</a> ·
     <a href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">the FM-vs-RF gate</a>.</p>
   </details>
 </div>
 
 <div id="legend" class="card">
-  <div class="row"><span class="sw" style="background:#22c55e"></span> Predicted riparian (≥ 0.50)</div>
-  <div class="row"><span class="sw" style="background:#0ea5e9;opacity:.5"></span> San Juan River corridor</div>
+  <div class="row"><span class="sw" style="background:#22c55e"></span> Model predicted (8.0% of AOI)</div>
+  <div class="row"><span class="sw" style="background:transparent;border:2px solid #38bdf8"></span> NMRipMap truth (5.7%)</div>
+  <div class="row" style="font-size:11px;color:#64748b">Green outside blue = over-prediction</div>
+  <div id="status" style="margin-top:8px;font-size:11px;color:#64748b">loading…</div>
 </div>
 
 <script>
@@ -91,15 +96,35 @@
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
 
+  const DATA_BBOX = [[-108.09973, 36.65580], [-107.92004, 36.79437]];
+  const status = document.getElementById("status");
+
+  map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
+
   map.on("load", () => {
     map.addSource("extent", { type: "geojson", data: "maps/extent-bloomfield-rf.geojson" });
     map.addLayer({
       id: "extent-fill", type: "fill", source: "extent",
-      paint: { "fill-color": "#22c55e", "fill-opacity": 0.55 }
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.75, "fill-outline-color": "#bbf7d0" }
     });
     map.addLayer({
       id: "extent-line", type: "line", source: "extent",
-      paint: { "line-color": "#166534", "line-width": 0.4, "line-opacity": 0.7 }
+      paint: { "line-color": "#4ade80", "line-width": 1.2, "line-opacity": 0.9 }
+    });
+    // NMRipMap truth (5.7% of AOI) as a blue outline — green outside blue = model over-prediction.
+    map.addSource("truth", { type: "geojson", data: "maps/nmripmap-bloomfield.geojson" });
+    map.addLayer({
+      id: "truth-line", type: "line", source: "truth",
+      paint: { "line-color": "#38bdf8", "line-width": 1.4, "line-opacity": 0.95 }
+    });
+    // Fit to the data so the thin corridor is always in frame.
+    map.fitBounds(DATA_BBOX, { padding: 40, duration: 0 });
+    // Confirm the source actually parsed (renders a live count on the page).
+    map.on("sourcedata", (e) => {
+      if (e.sourceId === "extent" && e.isSourceLoaded && status) {
+        const n = map.querySourceFeatures("extent").length;
+        status.textContent = n + " extent features rendered";
+      }
     });
   });
 </script>
