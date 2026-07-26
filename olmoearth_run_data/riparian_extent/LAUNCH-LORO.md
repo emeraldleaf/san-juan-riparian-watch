@@ -54,7 +54,7 @@ avoids a 53 GB upload — then `build_loro_dataset.py`). The real fits use `mode
 
 ```bash
 export PYTHONPATH=../../python-etl
-export WANDB_PROJECT=riparian-loro WANDB_ENTITY=<you>   # optional
+export WANDB_PROJECT=riparian-loro WANDB_ENTITY=your-wandb-entity   # optional
 export NUM_WORKERS=8
 
 for reach in farmington aztec_animas kirtland malpais; do
