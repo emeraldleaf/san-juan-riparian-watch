@@ -34,14 +34,17 @@ weakness visible: model predicts 8.0% riparian vs NMRipMap's 5.7% truth, over-fi
 because **80% of the AOI is unlabeled** so the RF was never taught to reject upland/ag — the per-pixel,
 no-corridor-constraint failure the FM's spatial context is meant to fix.
 
-### ➡️ Next — the FM finally races the bar (GPU)
+### ➡️ Next — the FM finally races the bar (GPU only)
 
-Everything upstream is done. **Wire the LORO fine-tune across the 4 reach datasets** (train on 3,
-predict the held-out, rotate), score each held-out reach against the RF bar — the **arroyo (0.557)** is
-the sharp test — plus the coherence criterion at matched recall. Needs a rented CUDA GPU (~$3–15) and
-the datasets on the box (rebuild via `materialize_reach.py` or transfer). Config: `model.yaml`
-(V1_BASE + per-pixel `UNetDecoder`) is ready for a single split; the remaining wiring is combining the
-3 training reaches per fold.
+**The LORO wiring is done and CPU-validated** (this PR): `build_loro_dataset.py` combines the 4 reaches
+into one dataset (hardlinked, 1404 windows, labels rasterized), `run_loro.py` sets each fold, and a
+NANO/CPU dry-run ran a clean epoch. It is **unbiased by construction** — the held-out reach is the
+`test` set scored once; epoch selection uses a `val` slice of the *three training reaches* (not the
+held-out one), so the FM number is comparable to the single-shot RF bar. Runbook: `LAUNCH-LORO.md`.
+
+The **only** remaining step is the GPU: rent a CUDA box (~$3–15), get the datasets there (rebuild via
+`materialize_reach.py`), then per fold `run_loro.py --hold-out <reach> --fit` → read the **test riparian
+AUC** and lay it beside the RF bar (arroyo **0.557** is the sharp test), plus coherence at matched recall.
 
 ## Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
 

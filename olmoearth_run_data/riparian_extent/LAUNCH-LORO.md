@@ -54,7 +54,7 @@ avoids a 53 GB upload — then `build_loro_dataset.py`). The real fits use `mode
 
 ```bash
 export PYTHONPATH=../../python-etl
-export WANDB_PROJECT=riparian-loro WANDB_ENTITY=<you> WANDB_NAME=fold-malpais   # optional
+export WANDB_PROJECT=riparian-loro WANDB_ENTITY=<you>   # optional
 export NUM_WORKERS=8
 
 for reach in farmington aztec_animas kirtland malpais; do
@@ -63,13 +63,14 @@ for reach in farmington aztec_animas kirtland malpais; do
 done
 ```
 
-`run_loro.py --fit` sets the fold's split then launches `rslearn model fit --config model.yaml`. Because
-`val_config` selects `tags: {split: val}`, the **held-out reach is the validation set** — so the logged
-`val riparian AUC` (WandB, or the CSV logger) **is** that fold's transfer AUC.
+`run_loro.py --fit` sets the fold's split, runs `rslearn model fit` (early-stopping/epoch-selection on
+the **`val` slice of the three training reaches**), then runs `rslearn model test` on the **held-out
+reach** (`split=test`). The **`test riparian AUC` is the transfer number** — the held-out reach is never
+used to pick the epoch, so it stays comparable to the single-shot RF bar.
 
 ## Step 2 — score
 
-Collect the best `val riparian AUC` per fold and lay it beside the RF column above. Apply the spec #70
+Collect the **`test riparian AUC`** per fold and lay it beside the RF column above. Apply the spec #70
 contract: FM clears if the **arroyo fold** improves ≥ +0.04 (≥ 0.597) significantly with no other fold
 regressing > 0.01, **or** the macro-mean improves ≥ +0.04 (≥ 0.838) significantly. Also compare
 coherence (speckle/connectivity/Moran's I) at matched 0.80 recall. **Ship the winner; record the number

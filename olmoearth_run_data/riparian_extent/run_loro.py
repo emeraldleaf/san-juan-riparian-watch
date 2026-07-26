@@ -1,13 +1,19 @@
 """Drive the leave-one-reach-out (LORO) FM fine-tune over the combined dataset.
 
-For a held-out reach this flips ``options.split`` — the reach's windows become ``val``, the other
-three become ``train`` — then (with ``--fit``) launches ``rslearn model fit``. ``model.yaml`` is
-never edited: its ``val_config`` already selects ``tags: {split: val}``, so the **val metrics are the
-held-out-reach transfer metrics**. Read the best ``val riparian AUC`` per fold and compare to the RF
-bar (Farmington 0.905 · Aztec/Animas 0.886 · Kirtland 0.845 · Malpais 0.557 · macro 0.798).
+**Unbiased by construction.** The held-out reach is the ``test`` set, scored **once** at the end —
+never used to pick the epoch. Epoch selection / early-stopping uses ``val``, which is an internal
+hash slice of the *three training reaches* (carried in ``options.cv`` by ``build_loro_dataset.py``).
+Selecting the best epoch on the held-out reach and then reporting it would be selection-on-the-test-set
+and would not be comparable to the single-shot RF bar. So per fold this sets:
 
-Run once per reach to complete the 4-fold LORO. Without ``--fit`` it only sets the split and prints
-the exact fit command (so you can eyeball the counts before spending GPU).
+- held-out reach windows → ``split = test``
+- the other three reaches → their ``cv`` split (``train`` / ``val``)
+
+then (with ``--fit``) runs ``rslearn model fit`` (train/val) **and** ``rslearn model test`` (held-out).
+The **test riparian AUC** is the transfer number — compare to the RF bar (Farmington 0.905 ·
+Aztec/Animas 0.886 · Kirtland 0.845 · Malpais 0.557 · macro 0.798).
+
+Run once per reach for the 4-fold LORO. Without ``--fit`` it only sets the split and prints the commands.
 
 Usage:
     PYTHONPATH=../../python-etl python run_loro.py --dest dataset_loro --hold-out malpais [--fit]
@@ -31,27 +37,40 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("run_loro")
 
 
-def set_fold(dest: Path, held_out: str) -> tuple[int, int]:
-    """Tag the held-out reach's windows ``split=val`` and the rest ``split=train``. Returns (train, val)."""
+def set_fold(dest: Path, held_out: str) -> dict[str, int]:
+    """Tag the held-out reach ``split=test``; the other three keep their ``cv`` split (train/val).
+
+    Args:
+        dest: Combined LORO dataset root.
+        held_out: Reach to hold out (its windows become the ``test`` set, scored once).
+
+    Returns:
+        Window counts per split, e.g. ``{"train": 953, "val": 123, "test": 328}``.
+    """
     from rslearn.dataset import Dataset
     from upath import UPath
 
-    n_train = n_val = 0
+    counts = {"train": 0, "val": 0, "test": 0}
     for window in Dataset(UPath(str(dest))).load_windows(groups=[GROUP]):
-        is_val = window.options.get("reach") == held_out
-        window.options = {**window.options, "split": "val" if is_val else "train"}
+        is_test = window.options.get("reach") == held_out
+        split = "test" if is_test else window.options.get("cv", "train")
+        window.options = {**window.options, "split": split}
         window.save()
-        n_val += is_val
-        n_train += not is_val
-    logger.info("fold hold-out=%s → %d train / %d val windows", held_out, n_train, n_val)
-    return n_train, n_val
+        counts[split] += 1
+    logger.info("fold hold-out=%s → %d train / %d val / %d test", held_out, *counts.values())
+    return counts
 
 
 def _fit_command(dest: Path) -> list[str]:
-    """The rslearn fit command for this fold (V1_BASE + per-pixel UNetDecoder, from model.yaml)."""
+    """rslearn fit for this fold — trains on the 3 reaches' train/val (V1_BASE + UNetDecoder)."""
     return [sys.executable, "-m", "rslearn.main", "model", "fit",
-            "--config", str(HERE / "model.yaml"),
-            "--data.init_args.path", str(dest)]
+            "--config", str(HERE / "model.yaml"), "--data.init_args.path", str(dest)]
+
+
+def _test_command(dest: Path) -> list[str]:
+    """rslearn test on the held-out reach (``split=test``) — the UNBIASED transfer score."""
+    return [sys.executable, "-m", "rslearn.main", "model", "test",
+            "--config", str(HERE / "model.yaml"), "--data.init_args.path", str(dest)]
 
 
 def _fit_env(dest: Path, held_out: str) -> dict[str, str]:
@@ -73,12 +92,14 @@ def main() -> int:
     a = ap.parse_args()
 
     set_fold(a.dest, a.hold_out)
-    cmd = _fit_command(a.dest)
     if not a.fit:
-        logger.info("dry (no --fit). To train this fold:\n  %s", " ".join(cmd))
+        logger.info("dry (no --fit). This fold would run:\n  %s\n  %s",
+                    " ".join(_fit_command(a.dest)), " ".join(_test_command(a.dest)))
         return 0
-    Path(_fit_env(a.dest, a.hold_out)["CHECKPOINT_PATH"]).mkdir(parents=True, exist_ok=True)
-    subprocess.run(cmd, check=True, env=_fit_env(a.dest, a.hold_out))
+    env = _fit_env(a.dest, a.hold_out)
+    Path(env["CHECKPOINT_PATH"]).mkdir(parents=True, exist_ok=True)
+    subprocess.run(_fit_command(a.dest), check=True, env=env)   # train/val on the 3 reaches
+    subprocess.run(_test_command(a.dest), check=True, env=env)  # score the held-out reach ONCE
     return 0
 
 

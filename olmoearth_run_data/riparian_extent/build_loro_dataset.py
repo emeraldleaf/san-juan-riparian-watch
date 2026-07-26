@@ -80,20 +80,47 @@ def _combine(dest: Path) -> int:
     return n
 
 
+def _assert_same_device(dest: Path) -> None:
+    """Hardlinks need one filesystem — fail early if any reach dir is on a different device than dest."""
+    dev = dest.stat().st_dev
+    for ds in REACHES.values():
+        if (HERE / ds).stat().st_dev != dev:
+            raise SystemExit(f"{HERE / ds} is on a different filesystem than {dest}; os.link cannot "
+                             f"cross devices. Put --dest on the same drive as the reach datasets.")
+
+
+def _tag_cv(dest: Path) -> None:
+    """Preserve each window's train/val hash split as ``options['cv']`` — run_loro flips it per fold."""
+    from rslearn.dataset import Dataset
+    from upath import UPath
+
+    for window in Dataset(UPath(str(dest))).load_windows(groups=[GROUP]):
+        window.options = {**window.options, "cv": window.options.get("split", "train")}
+        window.save()
+
+
 def main() -> int:
-    """Build the combined LORO dataset: hardlink 4 reaches, rasterize labels, verify imagery."""
+    """Build the combined LORO dataset: hardlink 4 reaches, rasterize labels, preserve the CV split.
+
+    Side effects: creates ``--dest``, hardlinks ~53 GB of GeoTIFFs into it, writes label rasters, and
+    tags each window with ``reach`` + ``cv`` (the train/val hash slice run_loro flips per fold).
+
+    Returns:
+        Process exit code (``0`` on success).
+    """
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dest", type=Path, default=HERE / "dataset_loro", help="combined dataset root")
     a = ap.parse_args()
 
     (a.dest / "windows").mkdir(parents=True, exist_ok=True)
+    _assert_same_device(a.dest)  # hardlinks fail across devices — check before writing anything
     shutil.copy(HERE / "dataset" / "config.json", a.dest / "config.json")  # identical across reaches
     n = _combine(a.dest)
     logger.info("combined %d windows into %s (group=%s)", n, a.dest, GROUP)
-    rasterize_labels_and_split(a.dest, group=GROUP)  # writes label_raster; hash split merged with reach
-    verified = verify_materialized(a.dest, group=GROUP)
-    logger.info("verified %d windows with imagery on disk", verified)
+    rasterize_labels_and_split(a.dest, group=GROUP)  # writes label_raster + a train/val hash split
+    _tag_cv(a.dest)  # freeze that hash split as options['cv'] before per-fold retagging
+    verify_materialized(a.dest, group=GROUP)
     print(f"done: {n} windows in {a.dest}")
     return 0
 
