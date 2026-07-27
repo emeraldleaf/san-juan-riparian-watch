@@ -21,6 +21,7 @@ question that actually matters to a watershed manager:
 | Document | What it is |
 |---|---|
 | **[▸ Interactive method map](method-map.html)** | The whole method, made explorable — inputs → the phenology data cube → RF vs a fine-tuned foundation model → the output maps (with the real chips) → the honest findings, plus a guided Q&A. **Start here for the visual tour.** |
+| **[▸ Live extent map — Bloomfield reach](extent-map.html)** | The actual **product** artifact: predicted riparian extent (8,511 polygons, 8.0% of the AOI) from the pooled RF, over a reach it never trained on, on satellite imagery. The honest RF baseline the foundation model must beat. |
 | **[Engineering & methodology walkthrough](engineering-review.html)** | How the pipeline works end to end — STAC satellite ETL, weak-label and reference-trained delineation, spatial cross-validation, RF vs OlmoEarth, the PostGIS medallion schema, the C# API and the MapLibre map — with **verbatim code** and a *"where a reviewer should attack this"* section. |
 | **[Literature review](literature-review.md)** | What has already been done, and why this project is not duplicating it. Written so the novelty claim can be **falsified**, not just asserted. |
 | **[Stage 2 spec — invasive vs native cover (Tamarix)](specs/2026-07-11-stage2-invasives-tamarix.md)** | The product thesis, the phased class schema, the trade-offs accepted, and what was **cut and why**. |
