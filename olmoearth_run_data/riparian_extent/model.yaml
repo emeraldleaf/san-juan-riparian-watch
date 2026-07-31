@@ -260,7 +260,7 @@ data:
         - san_juan_nmripmap
         names: null
         tags:
-          split: val
+          split: test
     predict_config:
       patch_size: 2
       overlap_ratio: null
