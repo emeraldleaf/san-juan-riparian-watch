@@ -67,10 +67,25 @@ def _fit_command(dest: Path) -> list[str]:
             "--config", str(HERE / "model.yaml"), "--data.init_args.path", str(dest)]
 
 
-def _test_command(dest: Path) -> list[str]:
-    """rslearn test on the held-out reach (``split=test``) — the UNBIASED transfer score."""
+def _best_checkpoint(ckpt_dir: Path) -> Path:
+    """The fit's ``save_top_k=1`` best checkpoint (``epoch=*.ckpt``); falls back to ``last.ckpt``."""
+    best = sorted(ckpt_dir.glob("epoch=*.ckpt"))
+    if best:
+        return best[0]
+    if (ckpt_dir / "last.ckpt").exists():
+        return ckpt_dir / "last.ckpt"
+    raise SystemExit(f"no checkpoint in {ckpt_dir} — did the fit run?")
+
+
+def _test_command(dest: Path, ckpt: Path) -> list[str]:
+    """rslearn test on the held-out reach, **loading the fit's checkpoint** — the unbiased score.
+
+    Without ``--ckpt_path`` a separate ``model test`` process scores freshly-initialised weights
+    (an untrained decoder), which is meaningless — so the trained checkpoint is passed explicitly.
+    """
     return [sys.executable, "-m", "rslearn.main", "model", "test",
-            "--config", str(HERE / "model.yaml"), "--data.init_args.path", str(dest)]
+            "--config", str(HERE / "model.yaml"), "--data.init_args.path", str(dest),
+            "--ckpt_path", str(ckpt)]
 
 
 def _fit_env(dest: Path, held_out: str) -> dict[str, str]:
@@ -79,6 +94,7 @@ def _fit_env(dest: Path, held_out: str) -> dict[str, str]:
     env.setdefault("DATASET_PATH", str(dest))
     env.setdefault("CHECKPOINT_PATH", str(HERE / f".tmp/loro/{held_out}"))
     env.setdefault("NUM_WORKERS", "4")
+    env.setdefault("PREDICTION_OUTPUT_LAYER", "output")  # model.yaml's RslearnWriter needs it, even for fit
     return env
 
 
@@ -92,14 +108,16 @@ def main() -> int:
     a = ap.parse_args()
 
     set_fold(a.dest, a.hold_out)
-    if not a.fit:
-        logger.info("dry (no --fit). This fold would run:\n  %s\n  %s",
-                    " ".join(_fit_command(a.dest)), " ".join(_test_command(a.dest)))
-        return 0
     env = _fit_env(a.dest, a.hold_out)
-    Path(env["CHECKPOINT_PATH"]).mkdir(parents=True, exist_ok=True)
-    subprocess.run(_fit_command(a.dest), check=True, env=env)   # train/val on the 3 reaches
-    subprocess.run(_test_command(a.dest), check=True, env=env)  # score the held-out reach ONCE
+    ckpt_dir = Path(env["CHECKPOINT_PATH"])
+    if not a.fit:
+        logger.info("dry (no --fit). This fold trains on 3 reaches, then tests the held-out one:\n  %s",
+                    " ".join(_fit_command(a.dest)))
+        return 0
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(_fit_command(a.dest), check=True, env=env)                 # train/val on the 3 reaches
+    subprocess.run(_test_command(a.dest, _best_checkpoint(ckpt_dir)),         # score the held-out reach ONCE,
+                   check=True, env=env)                                       # from the fit's best checkpoint
     return 0
 
 

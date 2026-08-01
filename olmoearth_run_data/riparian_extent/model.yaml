@@ -143,6 +143,18 @@ data:
                         zero_division: 0
                     pass_probabilities: true
                     class_idx: 1
+                riparian_auroc:
+                  class_path: rslearn.train.tasks.segmentation.SegmentationMetric
+                  init_args:
+                    metric:
+                      class_path: torchmetrics.classification.MulticlassAUROC
+                      init_args:
+                        num_classes: 5
+                        average: null
+                        ignore_index: null
+                        validate_args: true
+                    pass_probabilities: true
+                    class_idx: 1
                 water_precision:
                   class_path: rslearn.train.tasks.segmentation.SegmentationMetric
                   init_args:
