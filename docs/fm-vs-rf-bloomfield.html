@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>The deployable map — FM vs RF over Bloomfield</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+        integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<style>
+  :root { --ink:#0f172a; --panel:rgba(255,255,255,.94); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position:absolute; inset:0; }
+  .card { position:absolute; background:var(--panel); color:var(--ink); border-radius:12px;
+    box-shadow:0 6px 28px rgba(0,0,0,.35); backdrop-filter:blur(6px); }
+  #info { top:16px; left:16px; max-width:min(390px,calc(100vw - 32px)); padding:18px 20px; line-height:1.5; }
+  #info h1 { margin:0 0 4px; font-size:19px; letter-spacing:-.2px; }
+  #info .sub { color:#475569; font-size:12.5px; margin:0 0 12px; }
+  #info p { margin:9px 0; font-size:13.5px; }
+  .note { font-size:11.5px; color:#64748b; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:9px; }
+  .note a { color:#15803d; }
+  #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
+  #legend .row { display:flex; align-items:center; gap:8px; margin:4px 0; cursor:pointer; user-select:none; }
+  #legend .row.off { opacity:.4; }
+  #legend .sw { width:16px; height:16px; border-radius:3px; }
+  details summary { cursor:pointer; font-size:12.5px; color:#334155; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="info" class="card">
+  <h1>The deployable map — Bloomfield</h1>
+  <p class="sub">San Juan River at Bloomfield · a reach <b>neither model trained on</b> · Sentinel-2 2020</p>
+  <p>Both models were fit on the four labeled reaches, then asked to map riparian extent over this
+  <b>unseen</b> reach — the actual deployment task. The <b>foundation model won the decision</b>
+  (leave-one-reach-out macro AUROC <b>0.872 vs 0.798</b>), so this is the FM's map, shown against the
+  RF baseline and the NMRipMap truth.</p>
+  <p style="margin-bottom:4px"><b>On the map:</b> green = FM predicted riparian, orange = RF predicted
+  riparian, blue outline = NMRipMap truth. On a well-sampled river like this the two agree closely — the
+  FM's edge shows on hard morphologies (see the arroyo).</p>
+  <details>
+    <summary>What am I looking at</summary>
+    <p class="note" style="border:0;padding:0">The FM classifies in 2×2-pixel patches (coarser than the
+    RF's per-pixel map). Companion views: <a href="fm-vs-rf-malpais.html">the arroyo (where they
+    diverge)</a> · <a href="2026-08-01-fm-vs-rf-loro-result.md">the full result</a>.</p>
+  </details>
+</div>
+
+<div id="legend" class="card">
+  <div class="row" data-layer="fm-fill"><span class="sw" style="background:#22c55e"></span> FM predicted riparian</div>
+  <div class="row" data-layer="rf-fill"><span class="sw" style="background:#f97316"></span> RF predicted riparian</div>
+  <div class="row" data-layer="truth-line"><span class="sw" style="background:transparent;border:2px solid #38bdf8"></span> NMRipMap truth</div>
+  <output id="status" aria-live="polite" style="display:block;margin-top:8px;font-size:11px;color:#64748b">loading…</output>
+</div>
+
+<script>
+  const map = new maplibregl.Map({
+    container: "map", center: [-108.010, 36.725], zoom: 12,
+    style: { version: 8, sources: { sat: { type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" } },
+      layers: [{ id: "sat", type: "raster", source: "sat" }] }
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+  const BBOX = [[-108.10, 36.66], [-107.92, 36.79]];
+  const status = document.getElementById("status");
+  map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
+
+  map.on("load", () => {
+    map.addSource("rf", { type: "geojson", data: "maps/extent-bloomfield-rf.geojson" });
+    map.addLayer({ id: "rf-fill", type: "fill", source: "rf",
+      paint: { "fill-color": "#f97316", "fill-opacity": 0.45 } });
+    map.addSource("fm", { type: "geojson", data: "maps/fm_bloomfield.geojson" });
+    map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.55 } });
+    map.addSource("truth", { type: "geojson", data: "maps/nmripmap-bloomfield.geojson" });
+    map.addLayer({ id: "truth-line", type: "line", source: "truth",
+      paint: { "line-color": "#38bdf8", "line-width": 1.4, "line-opacity": 0.9 } });
+    map.fitBounds(BBOX, { padding: 30, duration: 0 });
+    map.on("idle", () => { if (status && status.textContent === "loading…")
+      status.textContent = "FM " + map.querySourceFeatures("fm").length + " · RF "
+        + map.querySourceFeatures("rf").length + " polys"; });
+    document.querySelectorAll("#legend .row[data-layer]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const id = row.dataset.layer;
+        const vis = map.getLayoutProperty(id, "visibility") === "none" ? "visible" : "none";
+        map.setLayoutProperty(id, "visibility", vis);
+        row.classList.toggle("off", vis === "none");
+      });
+    });
+  });
+</script>
+</body>
+</html>
