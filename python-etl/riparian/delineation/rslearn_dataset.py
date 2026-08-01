@@ -87,6 +87,7 @@ def build(
     label_fc: dict,
     group: str = "train",
     window_px: int = WINDOW_PX,
+    dense: bool = False,
 ) -> DatasetBuild:
     """Create the rslearn dataset directory, windows, and per-window label GeoJSON.
 
@@ -152,7 +153,9 @@ def build(
             )
             if positive_px < MIN_POSITIVE_PX:
                 n_empty += 1
-                continue  # pure-negative window: a full S2 download that teaches nothing
+                if not dense:
+                    continue  # pure-negative window: a full S2 download that teaches nothing
+                # dense=True (prediction grid): keep the empty window to tile the whole AOI
 
             window = Window(
                 storage=dataset.storage,
@@ -173,7 +176,7 @@ def build(
             window.mark_layer_completed("label")
             n_built += 1
 
-    if n_built == 0:
+    if n_built == 0 and not dense:
         raise EmptyDatasetError(
             "no window contains riparian label — a dataset of pure negatives trains happily and "
             "learns nothing. Check the bbox and the label layer before going further."

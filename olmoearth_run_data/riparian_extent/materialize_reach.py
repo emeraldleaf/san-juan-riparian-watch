@@ -108,6 +108,7 @@ def materialize_reach(
     reader,
     workers: int = 8,
     skip_download: bool = False,
+    dense: bool = False,
 ) -> int:
     """Build labelled windows for ``bbox`` and materialize the S2 cube into ``dest``.
 
@@ -117,6 +118,8 @@ def materialize_reach(
         reader: A ``LabeledPolygonReader`` — the label source.
         workers: Concurrency for the I/O-bound ingest/materialize (COG reads).
         skip_download: Build labelled windows but skip the S2 download (smoke test).
+        dense: Keep **every** window tiling the AOI, not just label-containing ones — a full
+            prediction grid for deploying a trained model over an AOI (far more S2 to download).
 
     Returns:
         The number of windows with materialized imagery (0 if ``skip_download``).
@@ -126,7 +129,7 @@ def materialize_reach(
 
     _redirect_temp(dest)
     fc, _stats = build_extent_labels(bbox, reader=reader)
-    result = build(dest, SCAFFOLD_CONFIG, bbox, fc)
+    result = build(dest, SCAFFOLD_CONFIG, bbox, fc, dense=dense)
     logger.info("windows: %d built, %d skipped (no riparian)",
                 result.n_windows, result.n_windows_skipped_empty)
     if result.n_windows == 0:
@@ -157,6 +160,9 @@ def main() -> None:
                     help="concurrency for prepare/ingest/materialize (default 8). Drop to ~3 if the "
                          "STAC `prepare` step 403s — Planetary Computer rate-limits many concurrent searches.")
     ap.add_argument("--skip-download", action="store_true", help="build labelled windows only (smoke test)")
+    ap.add_argument("--dense", action="store_true",
+                    help="keep EVERY window tiling the AOI (a full prediction grid), not just "
+                         "label-containing ones — for deploying a trained model over an AOI")
     args = ap.parse_args()
 
     bbox = tuple(args.bbox) if args.bbox else REACHES[args.reach]
@@ -166,7 +172,8 @@ def main() -> None:
         from riparian.labels import nmripmap
         reader = nmripmap.fetch_labeled
 
-    n = materialize_reach(args.dest, bbox, reader, workers=args.workers, skip_download=args.skip_download)
+    n = materialize_reach(args.dest, bbox, reader, workers=args.workers,
+                          skip_download=args.skip_download, dense=args.dense)
     print(f"done: {n} materialized windows in {args.dest}")
 
 
