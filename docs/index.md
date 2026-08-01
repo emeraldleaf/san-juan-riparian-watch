@@ -169,6 +169,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**FM-vs-RF, settled — the foundation model rescues the arroyo, ties on rivers**](2026-08-01-fm-vs-rf-loro-result.md)
+  — the deploy decision, answered with a number. Fine-tuned OlmoEarth, leave-one-reach-out, unbiased
+  test/val split: it **ties** the RF on the three river reaches (0.81–0.89 vs 0.85–0.91) and **rescues
+  the arroyo** (RF 0.557 → **FM 0.889**), lifting the macro-mean to **0.872 vs 0.798**. **GO — but the FM
+  is a specialist for hard morphology, not a uniform upgrade.** Layered newcomer→practitioner write-up,
+  with the honest limitations a reviewer would raise.
 - [**The RF transfer bar — diverse-reach pooling closes it, except the arroyo**](2026-07-20-diverse-reach-transfer.md)
   — the honest baseline for the FM decision. Training on **morphologically diverse** reaches lifts
   cross-reach transfer to **0.85–0.91** on river corridors (RF is genuinely good), but the lone
