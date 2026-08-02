@@ -1,0 +1,101 @@
+name: architecture-review
+
+# Self-owned architecture gate — the encoding-loop fix for "a surface invoked by nothing".
+# The architecture-reviewer agent (.claude/agents/architecture-reviewer.md) used to run ONLY when
+# a human typed /check-rules, so it drifted to never. This runs it headless on every PR's diff,
+# independent of CodeRabbit (a third-party surface we deliberately don't want to depend on).
+#
+# ACTIVATION: needs repo secret ANTHROPIC_API_KEY. Until it is set the job SOFT-PASSES with a
+# notice (it must not wedge merges before setup). To make it a hard gate, set the secret AND add
+# "architecture-review" to .github/branch-protection.json required checks.
+
+on:
+  pull_request:
+    paths:
+      - 'python-etl/**'
+      - 'olmoearth_run_data/**'
+      - 'RiparianPoc.Api/**'
+      - 'sql/**'
+      - 'frontend/src/**'
+      - '.github/workflows/architecture-review.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: arch-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  architecture-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Notice if unconfigured
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "::notice title=architecture-review dormant::Set the ANTHROPIC_API_KEY secret to activate the self-owned architecture gate. Soft-passing until then."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Claude Code CLI
+        if: env.HAS_KEY == 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Review the diff against CLAUDE.md conventions
+        if: env.HAS_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "$BASE"
+          PROMPT=$(cat <<'EOF'
+          You are the architecture-reviewer for this repository. Work ONLY from CLAUDE.md and the
+          files you read — you have no other context.
+
+          1. Read CLAUDE.md at the repo root (the canonical rules) and .claude/agents/architecture-reviewer.md
+             (your full Pattern Checklist).
+          2. Get this PR's changes: run `git diff origin/BASE_REF...HEAD` (substitute the base ref below).
+          3. Review ONLY those changes against the checklist — Python (type hints, Protocol I/O
+             boundaries, <25-line functions, no bare except, single-source label vintage/class sets,
+             riparian-package placement), C# service-layer/Dapper, SQL/medallion one-way flow,
+             spatial CRS/geography, frontend, and the no-new-dependency rule.
+          4. Do NOT restate what a linter catches. Focus on architectural judgment.
+
+          End your report with EXACTLY these two lines, nothing after:
+          MUST_FIX_COUNT: <integer>
+          VERDICT: <PASS or CHANGES>
+          EOF
+          )
+          PROMPT=${PROMPT//BASE_REF/$BASE}
+          claude -p "$PROMPT" \
+            --allowedTools "Bash,Read,Grep,Glob" \
+            --output-format text | tee review.md
+
+      - name: Enforce — comment and fail on must-fix
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          COUNT=$(grep -oE 'MUST_FIX_COUNT: *[0-9]+' review.md | grep -oE '[0-9]+' | tail -1 || echo 0)
+          {
+            echo "## 🏛️ Architecture review (self-owned agent)"
+            echo
+            cat review.md
+          } > comment.md
+          gh pr comment "$PR" --body-file comment.md || echo "comment post failed (non-fatal)"
+          echo "must-fix count: $COUNT"
+          if [ "${COUNT:-0}" -gt 0 ]; then
+            echo "::error title=architecture-review::$COUNT must-fix architecture finding(s) — see the PR comment."
+            exit 1
+          fi

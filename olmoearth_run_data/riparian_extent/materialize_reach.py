@@ -56,7 +56,11 @@ sys.path.insert(0, str(HERE))
 logger = logging.getLogger("materialize_reach")
 
 # Named reaches, reused from validate_reach so the two tools cannot drift apart.
-from validate_reach import FARMINGTON_BBOX, MALPAIS_BBOX, gdb_reader_factory  # noqa: E402
+from validate_reach import (
+    FARMINGTON_BBOX,
+    MALPAIS_BBOX,
+    gdb_reader_factory,
+)
 
 REACHES: dict[str, tuple[float, float, float, float]] = {
     "farmington": FARMINGTON_BBOX,

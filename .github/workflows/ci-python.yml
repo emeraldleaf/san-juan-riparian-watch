@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'python-etl/**'
+      - 'olmoearth_run_data/**'
       - '.github/workflows/ci-python.yml'
 
 permissions:
@@ -35,7 +36,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install ruff mypy pytest
+          # Ruff is PINNED. Unpinned, a new release promotes rules and retroactively fails a
+          # branch that changed nothing (0.15→0.16 did exactly this). Bump it in a deliberate PR.
+          pip install ruff==0.16.1 mypy pytest
           # torch from the CPU-only index: the default wheel drags in ~2 GB of CUDA that a
           # GitHub runner can never use. tests/test_olmoearth_pooling.py needs real torch
           # (it exercises pool_tokens, which operates on encoder tensors) — skipping it in
@@ -44,7 +47,10 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Ruff (lint) — gate
-        run: ruff check riparian tests
+        # `../olmoearth_run_data` closes the ungated zone: experiment scripts there (materialize,
+        # LORO drivers, the phase3c invasives arm) were linted by nothing. Same default ruleset,
+        # no separate config, so a script gets the identical treatment as the riparian package.
+        run: ruff check riparian tests ../olmoearth_run_data
 
       - name: Mypy (type-check) — advisory
         continue-on-error: true

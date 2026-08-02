@@ -35,7 +35,7 @@ from rasterio.windows import transform as window_transform
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python-etl"))
 
-from riparian.labels import label_layer, nmripmap, validate_layer  # noqa: E402
+from riparian.labels import label_layer, nmripmap, validate_layer
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("validate_reach")

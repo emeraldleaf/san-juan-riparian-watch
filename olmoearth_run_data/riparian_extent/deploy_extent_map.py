@@ -34,26 +34,33 @@ for _v in ("TMPDIR", "TMP", "TEMP", "CPL_TMPDIR"):
 os.environ.setdefault("GDAL_CACHEMAX", "256")
 
 # These imports follow the temp-redirect above, which must run before rasterio/GDAL loads.
-import numpy as np  # noqa: E402
-import rasterio  # noqa: E402
-from rasterio.features import shapes  # noqa: E402
-from sklearn.ensemble import RandomForestClassifier  # noqa: E402
+import numpy as np
+import rasterio
+from rasterio.features import shapes
+from sklearn.ensemble import RandomForestClassifier
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-import time  # noqa: E402
+import time
 
-import planetary_computer as pc  # noqa: E402
-import pystac_client  # noqa: E402
-
-from phase3a_cross_sensor import STAC, S2_BANDS, S2_OFF, S2_SCALE, UTM, _grid, _read_band  # noqa: E402
-from pystac_client.exceptions import APIError  # noqa: E402
-from rasterio.warp import transform_geom  # noqa: E402
-from requests.exceptions import RequestException  # noqa: E402
-from riparian.labels import label_layer, validate_layer  # noqa: E402
-from validate_reach import gdb_reader_factory, rasterize_labels  # noqa: E402
+import planetary_computer as pc
+import pystac_client
+from phase3a_cross_sensor import (
+    S2_BANDS,
+    S2_OFF,
+    S2_SCALE,
+    STAC,
+    UTM,
+    _grid,
+    _read_band,
+)
+from pystac_client.exceptions import APIError
+from rasterio.warp import transform_geom
+from requests.exceptions import RequestException
+from riparian.labels import label_layer, validate_layer
+from validate_reach import gdb_reader_factory, rasterize_labels
 
 if TYPE_CHECKING:  # annotation-only imports (kept out of the runtime path above rasterio)
     import pystac

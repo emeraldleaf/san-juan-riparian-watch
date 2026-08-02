@@ -40,8 +40,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-from riparian.labels import csu_points, label_layer, validate_layer  # noqa: E402
-from validate_reach import gdb_reader_factory, rasterize_labels  # noqa: E402
+from riparian.labels import csu_points, label_layer, validate_layer
+from validate_reach import gdb_reader_factory, rasterize_labels
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("phase3b")

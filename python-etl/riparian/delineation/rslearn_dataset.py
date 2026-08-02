@@ -98,13 +98,16 @@ def build(
         label_fc: The label FeatureCollection from ``riparian.labels.label_layer``.
         group: rslearn window group name.
         window_px: Window side in pixels.
+        dense: If True, keep every window (a full prediction grid for deploy/inference); if False
+            (default, training), drop windows with too few positive pixels.
 
     Returns:
         What was built.
 
     Raises:
         EmptyDatasetError: If no window contains any riparian label — a dataset of pure negatives
-            would train happily and learn nothing.
+            would train happily and learn nothing. Only raised when ``dense`` is False; a dense
+            deploy grid is allowed to be all-negative.
     """
     import shapely
     from rasterio.crs import CRS

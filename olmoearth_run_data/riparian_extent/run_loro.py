@@ -31,7 +31,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-from build_loro_dataset import GROUP, REACHES  # noqa: E402
+from build_loro_dataset import GROUP, REACHES
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("run_loro")
