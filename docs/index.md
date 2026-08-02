@@ -167,6 +167,13 @@ That is what this project is for — and their recommendation is, in effect, its
   speckle ≤ ½ RF, connectivity ≥ +0.10, Moran's I ≥ RF, at matched ≥ 0.80 recall)*. Calibration (macro-mean
   ECE vs RF + 0.02) is a **guard only** — it scopes recalibration work into a GO, never flips the decision.
   Every non-GO leaf is **ABORT → RF ships**, with a number.
+- [**Stage 2 — native-vs-invasive, and does it survive the beetle**](specs/2026-08-01-stage2-invasives-beetle-gate.md)
+  — the Stage-1 LORO method pointed at the **actual novelty** (native vs Tamarix/Russian-olive over the
+  deep record). Three nested tests (separability gate · species LORO · the **beetle axis isolated**), with
+  the headline prediction **pre-registered**: a present-day-trained model **inverts** pre-beetle (AUROC < 0.5)
+  because the beetle *flips the sign* of the tamarisk phenology cue — the confound turned into a number.
+  The CPU RF arm ([`phase3c_invasives_beetle.py`](../olmoearth_run_data/riparian_extent/phase3c_invasives_beetle.py))
+  is scaffolded and GPU-free — the highest information-per-dollar next move.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
 ## Results
