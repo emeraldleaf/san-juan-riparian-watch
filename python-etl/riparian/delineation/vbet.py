@@ -87,7 +87,7 @@ class _HttpRangeFile(io.RawIOBase):
             self.size = size
             return
         req = urllib.request.Request(url, method="HEAD", headers=_UA)
-        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 — fixed https URL
+        with urllib.request.urlopen(req, timeout=60) as resp:
             self.size = int(resp.headers["Content-Length"])
 
     def readable(self) -> bool:
@@ -118,7 +118,7 @@ class _HttpRangeFile(io.RawIOBase):
         req = urllib.request.Request(
             self.url, headers={**_UA, "Range": f"bytes={self.pos}-{self.pos + size - 1}"},
         )
-        with urllib.request.urlopen(req, timeout=180) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=180) as resp:
             data = resp.read()
         self.pos += len(data)
         return data

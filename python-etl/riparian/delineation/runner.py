@@ -24,15 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from riparian.delineation.baseline import (
-    DEFAULT_MODEL_VERSION,
-    DelineationModel,
-    predict_proba,
-    train,
-)
-from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
 from riparian.datacube.features import FeatureStack, build_feature_stack
-from riparian.delineation.hand import build_hand_envelope
 from riparian.datacube.stac import (
     CubeRequest,
     PlanetaryComputerSearcher,
@@ -40,6 +32,14 @@ from riparian.datacube.stac import (
     build_landcover_grid,
     build_sentinel2_cube,
 )
+from riparian.delineation.baseline import (
+    DEFAULT_MODEL_VERSION,
+    DelineationModel,
+    predict_proba,
+    train,
+)
+from riparian.delineation.hand import build_hand_envelope
+from riparian.delineation.validate import CvReport, assign_spatial_folds, spatial_cv
 from riparian.delineation.weak_labels import (
     LabelGrid,
     PostGISWeakLabelWriter,

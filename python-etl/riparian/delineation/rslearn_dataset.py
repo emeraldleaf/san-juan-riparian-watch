@@ -221,9 +221,8 @@ def rasterize_labels_and_split(dest: Path, group: str = "train", val_fraction: i
     import numpy as np
     import shapely
     from rasterio.features import rasterize
-    from rslearn.utils.raster_format import GeotiffRasterFormat
-
     from rslearn.dataset import Dataset
+    from rslearn.utils.raster_format import GeotiffRasterFormat
     from upath import UPath
 
     dataset = Dataset(UPath(dest))

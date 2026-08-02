@@ -14,6 +14,8 @@ aggregation) are covered by the `postgis` job in ci-python.yml.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 
@@ -158,7 +160,7 @@ def build_aligned(veg: list[tuple]) -> tuple[list[float], list[str]]:
 
 class TestHeightLifeformAlignment:
     #                id, _, lifeform, height
-    VEG = [
+    VEG: ClassVar[list[tuple[int, str, str, float | None]]] = [
         (1, "a", "Tree", 20.0),
         (2, "b", "Shrub", None),    # null height — this row is the trap
         (3, "c", "Herb", 0.5),

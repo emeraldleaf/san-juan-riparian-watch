@@ -37,7 +37,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
 # Reuse the 3B point-sampler verbatim — same retry/scene-assignment/COG-read logic, tested in prod.
-from phase3b_temporal import (  # noqa: E402
+from phase3b_temporal import (
     SJ_AOI,
     STAC,
     _assign_points,
@@ -45,7 +45,7 @@ from phase3b_temporal import (  # noqa: E402
     _sample_scene,
     _search,
 )
-from riparian.labels import csu_points, validate_layer  # noqa: E402
+from riparian.labels import csu_points, validate_layer
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("phase3c")

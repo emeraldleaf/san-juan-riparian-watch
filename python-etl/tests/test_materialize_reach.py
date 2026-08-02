@@ -91,7 +91,7 @@ def test_full_pipeline_runs_all_steps_in_order(mr, monkeypatch, tmp_path):
 
 
 def test_skip_download_stops_after_windows(mr, monkeypatch, tmp_path):
-    build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=5)
+    _build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=5)
 
     n = mr.materialize_reach(
         tmp_path / "ds", MALPAIS_BBOX, ("reader",), skip_download=True
@@ -103,7 +103,7 @@ def test_skip_download_stops_after_windows(mr, monkeypatch, tmp_path):
 
 
 def test_no_windows_short_circuits(mr, monkeypatch, tmp_path):
-    build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=0)
+    _build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=0)
 
     n = mr.materialize_reach(tmp_path / "ds", MALPAIS_BBOX, ("reader",))
 
