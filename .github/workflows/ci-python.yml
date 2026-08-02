@@ -47,10 +47,15 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Ruff (lint) — gate
-        # `../olmoearth_run_data` closes the ungated zone: experiment scripts there (materialize,
-        # LORO drivers, the phase3c invasives arm) were linted by nothing. Same default ruleset,
-        # no separate config, so a script gets the identical treatment as the riparian package.
-        run: ruff check riparian tests ../olmoearth_run_data
+        run: ruff check riparian tests
+
+      - name: Ruff (lint) — ungated zone gate
+        # Closes the ungated zone: experiment scripts under olmoearth_run_data (materialize, LORO
+        # drivers, the phase3c invasives arm) were linted by nothing. Runs from the repo ROOT — its
+        # own import tree (sibling `phase3a_cross_sensor` etc.), so isort first-party detection must
+        # anchor there, not at python-etl, or the sort grouping flips. Same pinned ruff, no config.
+        working-directory: ${{ github.workspace }}
+        run: ruff check olmoearth_run_data
 
       - name: Mypy (type-check) — advisory
         continue-on-error: true
