@@ -158,6 +158,26 @@ comparison.
 
 ---
 
+## The deployable maps — and a warning about "looks better"
+
+Both models, trained on all four reaches, were deployed over two reaches to *see* the difference
+([arroyo](fm-vs-rf-malpais.html) · [Bloomfield river](fm-vs-rf-bloomfield.html)). The arroyo map is the
+vivid win — FM green tracking the corridor, RF a handful of specks. But the Bloomfield map carries a
+lesson. By eye the FM looks *more accurate* there; scored against the NMRipMap truth on a common 10 m
+grid, it is not:
+
+| Bloomfield (river) | precision | recall | IoU |
+|---|---|---|---|
+| FM | 0.55 | 0.70 | 0.45 |
+| RF | **0.61** | 0.70 | **0.48** |
+
+Recall ties; the **RF slightly wins precision and IoU**. What reads as "more accurate" is the FM's
+**coherence** — it draws tidy, corridor-shaped patches (and a bit more area), while the per-pixel RF
+speckles. **Tidiness is not accuracy.** The FM's measurable accuracy edge is confined to the arroyo; on
+rivers it ties or slightly trails. That distinction is the whole point of scoring instead of eyeballing.
+(Caveat: NMRipMap truth is sparse — 5.7% of the AOI — so absolute precision is a lower bound; the
+*relative* FM-vs-RF ordering is the reliable part.)
+
 ## What it means for the product
 
 The deploy decision ([spec](specs/2026-07-19-fm-vs-rf-deploy-decision.md)) was written to be settled by a
