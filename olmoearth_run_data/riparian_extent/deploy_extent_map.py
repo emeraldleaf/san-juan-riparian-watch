@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -33,20 +34,22 @@ for _v in ("TMPDIR", "TMP", "TEMP", "CPL_TMPDIR"):
     os.environ[_v] = str(_TMP)
 os.environ.setdefault("GDAL_CACHEMAX", "256")
 
-# These imports follow the temp-redirect above, which must run before rasterio/GDAL loads.
+# These third-party imports follow the temp-redirect above, which must run before rasterio/GDAL
+# loads. All third-party imports are grouped here; only local (sibling) imports go below sys.path.
 import numpy as np
+import planetary_computer as pc
+import pystac_client
 import rasterio
+from pystac_client.exceptions import APIError
 from rasterio.features import shapes
+from rasterio.warp import transform_geom
+from requests.exceptions import RequestException
 from sklearn.ensemble import RandomForestClassifier
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-import time
-
-import planetary_computer as pc
-import pystac_client
 from phase3a_cross_sensor import (
     S2_BANDS,
     S2_OFF,
@@ -56,9 +59,6 @@ from phase3a_cross_sensor import (
     _grid,
     _read_band,
 )
-from pystac_client.exceptions import APIError
-from rasterio.warp import transform_geom
-from requests.exceptions import RequestException
 from riparian.labels import label_layer, validate_layer
 from validate_reach import gdb_reader_factory, rasterize_labels
 

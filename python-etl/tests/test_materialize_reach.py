@@ -115,7 +115,8 @@ def test_no_windows_short_circuits(mr, monkeypatch, tmp_path):
 def test_main_resolves_named_reach_to_its_bbox(mr, monkeypatch, tmp_path):
     captured = {}
 
-    def _capture(dest, bbox, reader, workers=8, skip_download=False, dense=False):
+    def _capture(dest: Path, bbox: tuple[float, float, float, float], reader: object,
+                 workers: int = 8, skip_download: bool = False, dense: bool = False) -> int:
         captured.update(dest=dest, bbox=bbox, reader=reader, dense=dense)
         return 0
 

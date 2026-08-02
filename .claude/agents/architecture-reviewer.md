@@ -97,6 +97,7 @@ report. You do **not** write or edit code — you read, analyze, and report.
   AUC of 0.740 instead of 0.752.
 
 ### 🔴 Python OUTSIDE `python-etl/` — the (mostly-closed) ungated zone (`docs/**/*.py`, anywhere else)
+
 **Partly closed 2026-08-02.** `ci-python.yml` now runs `ruff check riparian tests ../olmoearth_run_data`
 (pinned ruff), so `olmoearth_run_data/**/*.py` gets the **same lint gate** as the package, and this
 review agent runs in CI (`architecture-review.yml`). Still uncovered: `sonar.sources` remains
