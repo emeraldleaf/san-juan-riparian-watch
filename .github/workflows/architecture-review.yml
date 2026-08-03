@@ -109,17 +109,25 @@ jobs:
         if: env.HAS_KEY == 'true'
         run: |
           set -euo pipefail
-          # Require EXACTLY one well-formed MUST_FIX_COUNT line; a missing/duplicate/malformed
-          # verdict is a gate failure, never a silent pass (a fail-open review gate is worthless).
+          # Validate the WHOLE two-line trailer: exactly one MUST_FIX_COUNT and one VERDICT, and they
+          # must agree. Anything missing/duplicate/malformed/contradictory is a gate failure, never a
+          # silent pass (a fail-open review gate is worthless).
           counts=$(grep -oE 'MUST_FIX_COUNT: [0-9]+' review.md | grep -oE '[0-9]+$' || true)
-          n=$(printf '%s\n' "$counts" | grep -c . || true)
-          if [ "$n" -ne 1 ]; then
-            echo "::error title=architecture-review::review output had $n MUST_FIX_COUNT lines, expected exactly 1 — treating as failure."
+          verdict=$(grep -oE 'VERDICT: (PASS|CHANGES)' review.md | grep -oE '(PASS|CHANGES)$' || true)
+          nc=$(printf '%s\n' "$counts"  | grep -c . || true)
+          nv=$(printf '%s\n' "$verdict" | grep -c . || true)
+          if [ "$nc" -ne 1 ] || [ "$nv" -ne 1 ]; then
+            echo "::error title=architecture-review::malformed trailer — MUST_FIX_COUNT lines=$nc, VERDICT lines=$nv (need exactly 1 of each)."
             exit 1
           fi
-          echo "ran=true"   >> "$GITHUB_OUTPUT"
+          if { [ "$counts" -gt 0 ] && [ "$verdict" = "PASS" ]; } || \
+             { [ "$counts" -eq 0 ] && [ "$verdict" = "CHANGES" ]; }; then
+            echo "::error title=architecture-review::contradictory trailer — MUST_FIX_COUNT=$counts with VERDICT=$verdict."
+            exit 1
+          fi
+          echo "ran=true"    >> "$GITHUB_OUTPUT"
           echo "count=$counts" >> "$GITHUB_OUTPUT"
-          echo "must-fix count: $counts"
+          echo "verdict=$verdict, must-fix count: $counts"
 
       - name: Upload the review for the comment job
         if: env.HAS_KEY == 'true'

@@ -237,17 +237,24 @@ def _report(taxon: str, scores: dict[int, float], is_control: bool) -> None:
 
 def _score_taxon(taxon: str, labels: np.ndarray, native: np.ndarray,
                  feats_by_year: dict[int, np.ndarray], trips: np.ndarray) -> bool:
-    """Run + report Test A/C1 for one taxon vs native. Returns True iff its separability gate FAILED."""
+    """Run + report Test A/C1 for one taxon vs native.
+
+    Returns True iff the run should ABORT for this taxon: for the required signal taxon (tamarisk)
+    that means the separability gate failed **or** it was unscorable (too few points). The Russian
+    olive control is optional — skipping it never aborts.
+    """
+    is_control = taxon == csu_points.RUSSIAN_OLIVE
     is_taxon = labels == taxon
     mask = native | is_taxon
     n_pos, n_neg = int(is_taxon.sum()), int(native.sum())
     if n_pos < MIN_TAXON or n_neg < MIN_TAXON:
-        logger.warning("skip %s-vs-native — too few points (%d vs %d native, need ≥ %d each)",
-                       taxon, n_pos, n_neg, MIN_TAXON)
-        return False
+        # A required endpoint that can't be scored is a failure; a skipped control is not.
+        level = logger.warning if is_control else logger.error
+        level("%s-vs-native unscorable — too few points (%d vs %d native, need ≥ %d each)%s",
+              taxon, n_pos, n_neg, MIN_TAXON, "" if is_control else " — ABORT (required endpoint)")
+        return not is_control
     sub = {yr: f[mask] for yr, f in feats_by_year.items()}
     scores = beetle_cv(sub, is_taxon[mask].astype(int), trips[mask])
-    is_control = taxon == csu_points.RUSSIAN_OLIVE
     _report(taxon, scores, is_control)
     gate = scores[TRAIN_YEAR]
     if not is_control and (not np.isfinite(gate) or gate < SEPARABILITY_GATE):
