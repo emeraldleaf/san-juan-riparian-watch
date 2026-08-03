@@ -87,6 +87,7 @@ def build(
     label_fc: dict,
     group: str = "train",
     window_px: int = WINDOW_PX,
+    dense: bool = False,
 ) -> DatasetBuild:
     """Create the rslearn dataset directory, windows, and per-window label GeoJSON.
 
@@ -97,13 +98,16 @@ def build(
         label_fc: The label FeatureCollection from ``riparian.labels.label_layer``.
         group: rslearn window group name.
         window_px: Window side in pixels.
+        dense: If True, keep every window (a full prediction grid for deploy/inference); if False
+            (default, training), drop windows with too few positive pixels.
 
     Returns:
         What was built.
 
     Raises:
         EmptyDatasetError: If no window contains any riparian label — a dataset of pure negatives
-            would train happily and learn nothing.
+            would train happily and learn nothing. Only raised when ``dense`` is False; a dense
+            deploy grid is allowed to be all-negative.
     """
     import shapely
     from rasterio.crs import CRS
@@ -152,7 +156,9 @@ def build(
             )
             if positive_px < MIN_POSITIVE_PX:
                 n_empty += 1
-                continue  # pure-negative window: a full S2 download that teaches nothing
+                if not dense:
+                    continue  # pure-negative window: a full S2 download that teaches nothing
+                # dense=True (prediction grid): keep the empty window to tile the whole AOI
 
             window = Window(
                 storage=dataset.storage,
@@ -173,7 +179,7 @@ def build(
             window.mark_layer_completed("label")
             n_built += 1
 
-    if n_built == 0:
+    if n_built == 0 and not dense:
         raise EmptyDatasetError(
             "no window contains riparian label — a dataset of pure negatives trains happily and "
             "learns nothing. Check the bbox and the label layer before going further."
@@ -218,9 +224,8 @@ def rasterize_labels_and_split(dest: Path, group: str = "train", val_fraction: i
     import numpy as np
     import shapely
     from rasterio.features import rasterize
-    from rslearn.utils.raster_format import GeotiffRasterFormat
-
     from rslearn.dataset import Dataset
+    from rslearn.utils.raster_format import GeotiffRasterFormat
     from upath import UPath
 
     dataset = Dataset(UPath(dest))

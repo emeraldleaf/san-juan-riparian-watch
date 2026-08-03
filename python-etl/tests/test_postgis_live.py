@@ -105,9 +105,8 @@ class TestFkCascadeWipesDependents:
         """Rules out the tempting 'just don't use CASCADE' fix — Postgres will not allow it."""
         from sqlalchemy.exc import DatabaseError
 
-        with pytest.raises(DatabaseError, match="(?i)cascade|foreign key"):
-            with engine.begin() as c:
-                c.execute(text("TRUNCATE silver.riparian_buffers"))
+        with pytest.raises(DatabaseError, match="(?i)cascade|foreign key"), engine.begin() as c:
+            c.execute(text("TRUNCATE silver.riparian_buffers"))
 
     def test_the_fix_is_to_rebuild_dependents_after_the_wipe(self, engine) -> None:
         """`analyze_buffer_wetlands()` must run in `run()`; it had been commented out.

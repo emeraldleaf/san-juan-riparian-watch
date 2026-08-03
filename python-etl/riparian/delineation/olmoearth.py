@@ -19,17 +19,15 @@ from dataclasses import dataclass, replace
 import numpy as np
 import torch
 import xarray as xr
-
 from olmoearth_pretrain_minimal import ModelID, Normalizer, load_model_from_id
 from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.nn.latent_mim import (
     unpack_encoder_output,
 )
 from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.constants import Modality
 from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (
-    MaskValue,
     MaskedOlmoEarthSample,
+    MaskValue,
 )
-
 from rasterio.transform import from_bounds
 
 from riparian.datacube.features import build_feature_stack

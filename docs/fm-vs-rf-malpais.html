@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FM vs RF over the arroyo — Malpais</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+        integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<style>
+  :root { --ink:#0f172a; --panel:rgba(255,255,255,.94); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position:absolute; inset:0; }
+  .card { position:absolute; background:var(--panel); color:var(--ink); border-radius:12px;
+    box-shadow:0 6px 28px rgba(0,0,0,.35); backdrop-filter:blur(6px); }
+  #info { top:16px; left:16px; max-width:min(390px,calc(100vw - 32px)); padding:18px 20px; line-height:1.5; }
+  #info h1 { margin:0 0 4px; font-size:19px; letter-spacing:-.2px; }
+  #info .sub { color:#475569; font-size:12.5px; margin:0 0 12px; }
+  #info p { margin:9px 0; font-size:13.5px; }
+  #info .stat { display:flex; gap:16px; margin:12px 0; }
+  #info .stat b { display:block; font-size:22px; line-height:1.1; }
+  #info .stat .fm b { color:#15803d; } #info .stat .rf b { color:#c2410c; }
+  #info .stat span { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+  .note { font-size:11.5px; color:#64748b; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:9px; }
+  .note a { color:#15803d; }
+  #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
+  #legend .row { display:flex; align-items:center; gap:8px; margin:4px 0; cursor:pointer; user-select:none; }
+  #legend .row.off { opacity:.4; }
+  #legend .sw { width:16px; height:16px; border-radius:3px; }
+  details summary { cursor:pointer; font-size:12.5px; color:#334155; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="info" class="card">
+  <h1>The arroyo, where the models diverge</h1>
+  <p class="sub">Malpais Arroyo, San Juan Basin · both models held this reach out · Sentinel-2 2020</p>
+  <div class="stat">
+    <div class="fm"><b>0.889</b><span>FM riparian AUROC</span></div>
+    <div class="rf"><b>0.557</b><span>RF riparian AUC</span></div>
+  </div>
+  <p>A narrow desert wash — the one morphology unlike the wide-river reaches the models trained on. The
+  per-pixel <b>RF is near-chance here (0.557)</b>; the foundation model, reading spatial context, lifts
+  it to <b>0.889</b>. That gap is the whole reason the FM earns its keep.</p>
+  <p style="margin-bottom:4px"><b>On the map:</b> green = FM predicted riparian, orange = RF predicted
+  riparian, blue outline = NMRipMap truth. Watch the RF scatter onto dry ground while the FM tracks the
+  corridor.</p>
+  <details>
+    <summary>Why the FM looks blocky</summary>
+    <p class="note" style="border:0;padding:0">OlmoEarth classifies in <b>2×2-pixel patches</b>, so its
+    extent is coarser-grained than the RF's per-pixel map — a rendering artifact of the patch head, not a
+    quality difference. Read: <a href="2026-08-01-fm-vs-rf-loro-result.md">the full result</a>.</p>
+  </details>
+</div>
+
+<div id="legend" class="card">
+  <div class="row" data-layer="fm-fill"><span class="sw" style="background:#22c55e"></span> FM riparian (0.889)</div>
+  <div class="row" data-layer="rf-fill"><span class="sw" style="background:#f97316"></span> RF riparian (0.557)</div>
+  <div class="row" data-layer="truth-line"><span class="sw" style="background:transparent;border:2px solid #38bdf8"></span> NMRipMap truth</div>
+  <output id="status" aria-live="polite" style="display:block;margin-top:8px;font-size:11px;color:#64748b">loading…</output>
+</div>
+
+<script>
+  const map = new maplibregl.Map({
+    container: "map", center: [-108.747, 36.880], zoom: 12,
+    style: { version: 8, sources: { sat: { type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" } },
+      layers: [{ id: "sat", type: "raster", source: "sat" }] }
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+  const BBOX = [[-108.8217, 36.8096], [-108.6729, 36.9508]];
+  const status = document.getElementById("status");
+  map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
+
+  map.on("load", () => {
+    map.addSource("fm", { type: "geojson", data: "maps/fm_malpais.geojson" });
+    map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.5 } });
+    map.addSource("rf", { type: "geojson", data: "maps/rf_malpais.geojson" });
+    map.addLayer({ id: "rf-fill", type: "fill", source: "rf",
+      paint: { "fill-color": "#f97316", "fill-opacity": 0.85, "fill-outline-color": "#7c2d12" } });
+    // the RF's riparian pixels are ~10 m specks — sub-pixel at this zoom — so also draw them as dots
+    map.addSource("rfpts", { type: "geojson", data: "maps/rf_malpais_points.geojson" });
+    map.addLayer({ id: "rf-pts", type: "circle", source: "rfpts",
+      paint: { "circle-radius": 4, "circle-color": "#f97316", "circle-stroke-color": "#7c2d12",
+               "circle-stroke-width": 1, "circle-opacity": 0.9 } });
+    map.addSource("truth", { type: "geojson", data: "maps/truth_malpais.geojson" });
+    map.addLayer({ id: "truth-line", type: "line", source: "truth",
+      paint: { "line-color": "#38bdf8", "line-width": 1.5, "line-opacity": 0.95 } });
+    map.fitBounds(BBOX, { padding: 30, duration: 0 });
+    map.on("idle", () => { if (status && status.textContent === "loading…")
+      status.textContent = "FM " + map.querySourceFeatures("fm").length + " · RF "
+        + map.querySourceFeatures("rf").length + " polys"; });
+    // legend toggles
+    document.querySelectorAll("#legend .row[data-layer]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const ids = row.dataset.layer === "rf-fill" ? ["rf-fill", "rf-pts"] : [row.dataset.layer];
+        const vis = map.getLayoutProperty(ids[0], "visibility") === "none" ? "visible" : "none";
+        ids.forEach((x) => map.setLayoutProperty(x, "visibility", vis));
+        row.classList.toggle("off", vis === "none");
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -33,14 +33,16 @@ skills, `docs/` + diagrams) × 3 enforcement tiers, kept from drifting by mechan
 ### What is AUTOMATIC vs what you must RUN
 Be honest about this — a surface nobody runs is documentation, not enforcement. The
 `architecture-reviewer` was listed above as an enforcement surface while being invoked by
-**nothing**, for the whole life of the repo.
+**nothing** for most of the repo's life; it is now wired into CI (`architecture-review.yml`),
+so the ledger below stays honest.
 
 | Surface | When it runs |
 |---|---|
 | PostToolUse/PreToolUse hooks (`check-claude-md-refs`, `check-file-moves`, `block-sync-over-async`) | **Automatic**, on every edit |
 | Drift gates — `./dev.sh --check-encoding` | **Automatic in CI** (`drift-gates` job) |
+| Ruff (lint) — `python-etl` **and** `olmoearth_run_data` (the ungated zone, now gated) | **Automatic in CI** (`ci-python`), version **pinned** so a release can't retro-fail a branch |
 | CodeRabbit | **Automatic** on every PR — and it must be **green before merge** (below) |
-| `architecture-reviewer` agent | **On demand only** — you must launch it, via `/check-rules` |
+| `architecture-reviewer` agent | **Automatic in CI** (`architecture-review.yml`, self-owned, fails on must-fix) **once `ANTHROPIC_API_KEY` is set** — soft-passes until then; also on demand via `/check-rules` |
 
 **Drift gates** (`./dev.sh --check-encoding`) catch *semantic* drift, which every other check is
 blind to. Every existing check enforced file **shape** — canon size, diagram pairing, stale refs

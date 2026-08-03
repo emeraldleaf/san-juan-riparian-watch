@@ -30,7 +30,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-from riparian.delineation.rslearn_dataset import (  # noqa: E402
+from riparian.delineation.rslearn_dataset import (
     rasterize_labels_and_split,
     verify_materialized,
 )

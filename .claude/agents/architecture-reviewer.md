@@ -96,11 +96,16 @@ report. You do **not** write or edit code — you read, analyze, and report.
   disagree**. This exact drift class produced `num_classes: 4` and a dormant-contaminated
   AUC of 0.740 instead of 0.752.
 
-### 🔴 Python OUTSIDE `python-etl/` — the ungated zone (`docs/**/*.py`, `olmoearth_run_data/**/*.py`, anywhere else)
-**Nothing watches these files.** Verified 2026-07-17: `ci-python.yml` runs
-`ruff check riparian tests` with `working-directory: python-etl`; `sonar.sources=python-etl,frontend/src,sql`;
-CodeRabbit's Python `path_instructions` match `python-etl/**/*.py` only. So a `.py` outside
-`python-etl/` is covered by **no linter, no type-checker, no Sonar rule, and no AI-review rule**.
+### 🔴 Python OUTSIDE `python-etl/` — the (mostly-closed) ungated zone (`docs/**/*.py`, anywhere else)
+
+**Partly closed 2026-08-02.** `ci-python.yml` now runs **two** ruff steps (pinned ruff): `ruff check
+riparian tests` from `python-etl`, then `ruff check olmoearth_run_data` from the **repo root** (its own
+import tree — the root working dir is required for correct isort first-party detection). So
+`olmoearth_run_data/**/*.py` gets the **same lint gate** as the package, and this review agent runs in
+CI (`architecture-review.yml`). Still uncovered: `sonar.sources` remains
+`python-etl,frontend/src,sql` (no Sonar/type-check outside `python-etl`), and `docs/**/*.py` gets **no
+linter at all**. So a `.py` under `docs/` is still gate-free, and nothing outside `python-etl/` is
+type-checked or Sonar-scanned.
 - Treat any new/changed `.py` there as **Must-review-by-hand against the full Python checklist above**
   — nothing mechanical will catch it for you. (Two such scripts shipped with a bare
   `except Exception` and untyped params straight through a CodeRabbit round.)

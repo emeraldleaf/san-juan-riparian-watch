@@ -91,7 +91,7 @@ def test_full_pipeline_runs_all_steps_in_order(mr, monkeypatch, tmp_path):
 
 
 def test_skip_download_stops_after_windows(mr, monkeypatch, tmp_path):
-    build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=5)
+    _build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=5)
 
     n = mr.materialize_reach(
         tmp_path / "ds", MALPAIS_BBOX, ("reader",), skip_download=True
@@ -103,7 +103,7 @@ def test_skip_download_stops_after_windows(mr, monkeypatch, tmp_path):
 
 
 def test_no_windows_short_circuits(mr, monkeypatch, tmp_path):
-    build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=0)
+    _build, verify, run = _fake_pipeline(monkeypatch, mr, n_windows=0)
 
     n = mr.materialize_reach(tmp_path / "ds", MALPAIS_BBOX, ("reader",))
 
@@ -115,8 +115,9 @@ def test_no_windows_short_circuits(mr, monkeypatch, tmp_path):
 def test_main_resolves_named_reach_to_its_bbox(mr, monkeypatch, tmp_path):
     captured = {}
 
-    def _capture(dest, bbox, reader, workers=8, skip_download=False):
-        captured.update(dest=dest, bbox=bbox, reader=reader)
+    def _capture(dest: Path, bbox: tuple[float, float, float, float], reader: object,
+                 workers: int = 8, skip_download: bool = False, dense: bool = False) -> int:
+        captured.update(dest=dest, bbox=bbox, reader=reader, dense=dense)
         return 0
 
     monkeypatch.setattr(mr, "materialize_reach", _capture)

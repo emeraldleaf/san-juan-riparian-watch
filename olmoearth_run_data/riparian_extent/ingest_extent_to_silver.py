@@ -38,7 +38,7 @@ from sqlalchemy import create_engine
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-from riparian.delineation.runner import _vectorize, _write_extent  # noqa: E402
+from riparian.delineation.runner import _vectorize, _write_extent
 
 if TYPE_CHECKING:
     from affine import Affine

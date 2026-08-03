@@ -40,17 +40,17 @@ import numpy as np
 import planetary_computer as pc
 import pystac_client
 import rasterio
+from pyproj import Transformer
 from rasterio.transform import Affine, from_bounds
 from rasterio.warp import Resampling, reproject
-from pyproj import Transformer
 from sklearn.ensemble import RandomForestClassifier
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "python-etl"))
 
-from riparian.labels import label_layer, validate_layer  # noqa: E402
-from validate_reach import gdb_reader_factory, rasterize_labels  # noqa: E402
+from riparian.labels import label_layer, validate_layer
+from validate_reach import gdb_reader_factory, rasterize_labels
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("phase3a")
@@ -121,7 +121,7 @@ def _fetch(coll: str, bands: list[str], scale: float, off: float, bbox, affine, 
             cube.append(np.full((6, h, w), np.nan, np.float32))
             logger.info("  %s m%d: no scenes (genuine)", coll[:8], i + 1)
             continue
-        it = sorted(items, key=lambda x: x.properties.get("eo:cloud_cover", 100))[0]
+        it = min(items, key=lambda x: x.properties.get("eo:cloud_cover", 100))
         cube.append(np.stack([_read_band(it.assets[b].href, scale, off, affine, h, w) for b in bands]))
         logger.info("  %s m%d: %s", coll[:8], i + 1, it.id[:22])
     logger.info("  == %s: %d/12 populated | search-failed=%s", coll[:8], 12 - len(failed), failed)

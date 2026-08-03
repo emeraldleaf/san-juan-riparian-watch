@@ -41,12 +41,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Polygon as MplPolygon
 import planetary_computer
 import pystac_client
 import rasterio
 import shapely.geometry
 import shapely.ops
+from matplotlib.patches import Polygon as MplPolygon
+from pystac_client.exceptions import APIError
+from rasterio.errors import RasterioIOError
 from rasterio.warp import transform_bounds
 from shapely.affinity import translate
 
@@ -122,8 +124,11 @@ def _fetch_naip(minx: float, miny: float, maxx: float, maxy: float, utm_crs: str
                 rgb = src.read([1, 2, 3], window=win).transpose(1, 2, 0)
             signal.alarm(0)
             return rgb, (minx, miny, maxx, maxy)
-        except Exception as e:  # retry gateway timeouts, hangs (_FetchTimeout), url expiry
-            signal.alarm(0)  # cancel FIRST — else the 75s deadline could fire during the sleep below
+        except (_FetchTimeout, OSError, RuntimeError, RasterioIOError, APIError) as e:
+            # gateway timeouts / hangs (_FetchTimeout) / no-tile (RuntimeError) / COG-read /
+            # STAC-search / socket errors — all transient; retry. Cancel the alarm FIRST, else the
+            # 75s deadline could fire during the sleep below.
+            signal.alarm(0)
             last = e
             time.sleep(5 * (attempt + 1))  # PC blob gateway blips clear within minutes
     raise RuntimeError(f"NAIP fetch failed after retries: {str(last)[:80]}")
@@ -171,7 +176,7 @@ def main() -> int:
         minx, miny, maxx, maxy, crs = _window_utm_bounds(meta)
         try:
             rgb, extent = _fetch_naip(minx, miny, maxx, maxy, crs)
-        except Exception as e:  # a chip that won't fetch just gets skipped
+        except RuntimeError as e:  # _fetch_naip exhausted its retries — skip this chip
             print(f"  [{i}] {w.name}: SKIP ({e})")
             continue
         fig, axes = plt.subplots(1, 3, figsize=(12, 4.4))
