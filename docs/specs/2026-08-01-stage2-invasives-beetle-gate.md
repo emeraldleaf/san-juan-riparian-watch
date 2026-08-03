@@ -65,15 +65,24 @@ Does the FM's spatial context help species-ID transfer the way it rescued extent
 
 ### Test C — the beetle axis, isolated (the real experiment)
 
-The 3B trick — *score the same stands in two conditions differing in one axis; the difference is that
-axis.* Two complementary sub-tests:
+The 3B trick — *score the same stands across a transition; interpret the change against the axes it
+carries.* Two complementary sub-tests:
 
-- **C1 — deep-time inversion (persistence-based).** Train invasive-vs-native on **2020** phenology; score
-  the same stands on **2000** (pre-beetle) Landsat. Report AUROC(2020), AUROC(2000), and the drop.
+- **C1 — deep-time inversion (persistence-based).** Train **tamarisk-vs-native** on **2020** phenology;
+  score the same stands on **2000** (pre-beetle) Landsat. Report AUROC(2020), AUROC(2000), and the drop.
+  - **⚠ The sensor confound (do not skip).** 2000 is **Landsat-5 (TM)** and 2020 is **Landsat-8 (OLI)**:
+    the 2020→2000 gap carries **sensor + beetle**, *not* the beetle in isolation — the "one axis" framing
+    is false here. The control is [3A](../2026-07-18-phase3a-cross-sensor-result.md): the whole S2→Landsat
+    sensor penalty was **+0.046 AUC**, nowhere near a sign flip, so a measured *inversion* (< 0.5) cannot
+    be a sensor artifact. The magnitude of any non-inverting drop, though, must be read net of that ~0.05
+    sensor allowance, and the beetle conclusion is **conditional on this control holding**.
+  - **Taxon-split, not pooled.** Run C1 **per taxon** — tamarisk-vs-native *and* Russian-olive-vs-native —
+    never a pooled "invasive-vs-native." Russian olive is **not** beetle-defoliated, so it is the built-in
+    **negative control**: tamarisk should invert while RO should **not**. Pooling them would let the
+    control mask the signal.
 - **C2 — defoliation signature (real labels).** On the Plateau pool, train live-tamarisk vs
   beetle-affected-tamarisk (`is_beetle_affected`) from phenology; does the detector exist, and does it
-  transfer to the San Juan? Russian olive is a built-in **control** — it is *not* beetle-defoliated, so
-  its cross-era signal should **not** invert.
+  transfer to the San Juan?
 
 ## Pre-registered predictions + GO/ABORT
 

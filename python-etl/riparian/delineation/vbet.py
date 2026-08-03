@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import io
 import logging
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -60,6 +61,12 @@ SOURCE: Final[str] = "vbet"
 LICENSE: Final[str] = "CC BY-SA 4.0"
 
 _UA: Final[dict[str, str]] = {"User-Agent": "riparian-research/0.1"}
+
+
+def _require_http_url(url: str) -> None:
+    """Raise if ``url`` is not http/https — keeps file://, ftp:// and friends out of ``urlopen``."""
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        raise ValueError(f"refusing non-http(s) URL scheme for range fetch: {url!r}")
 
 
 class _HttpRangeFile(io.RawIOBase):
@@ -86,6 +93,7 @@ class _HttpRangeFile(io.RawIOBase):
         if size is not None:
             self.size = size
             return
+        _require_http_url(url)  # only http/https reaches urlopen (guards against file://, ftp:// …)
         req = urllib.request.Request(url, method="HEAD", headers=_UA)
         with urllib.request.urlopen(req, timeout=60) as resp:
             self.size = int(resp.headers["Content-Length"])
@@ -115,6 +123,7 @@ class _HttpRangeFile(io.RawIOBase):
             size = self.size - self.pos
         if size == 0:
             return b""
+        _require_http_url(self.url)  # only http/https reaches urlopen (guards against file://, ftp:// …)
         req = urllib.request.Request(
             self.url, headers={**_UA, "Range": f"bytes={self.pos}-{self.pos + size - 1}"},
         )

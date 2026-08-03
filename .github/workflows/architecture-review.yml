@@ -8,6 +8,10 @@ name: architecture-review
 # ACTIVATION: needs repo secret ANTHROPIC_API_KEY. Until it is set the job SOFT-PASSES with a
 # notice (it must not wedge merges before setup). To make it a hard gate, set the secret AND add
 # "architecture-review" to .github/branch-protection.json required checks.
+#
+# SECURITY: the `review` job checks out and reads untrusted PR content, so it holds ONLY
+# `contents: read` and never gets a write token. Posting the result needs `pull-requests: write`,
+# so it lives in a SEPARATE `comment` job that touches no PR code — only the review artifact.
 
 on:
   pull_request:
@@ -17,22 +21,29 @@ on:
       - 'RiparianPoc.Api/**'
       - 'sql/**'
       - 'frontend/src/**'
+      - 'CLAUDE.md'
+      - '.claude/agents/architecture-reviewer.md'
       - '.github/workflows/architecture-review.yml'
 
+# Least privilege at the workflow level; the comment job re-grants write for itself only.
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: arch-review-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  architecture-review:
+  review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     env:
       HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    outputs:
+      ran: ${{ steps.parse.outputs.ran }}
+      must_fix: ${{ steps.parse.outputs.count }}
     steps:
       - name: Notice if unconfigured
         if: env.HAS_KEY != 'true'
@@ -47,6 +58,9 @@ jobs:
 
       - name: Install Claude Code CLI
         if: env.HAS_KEY == 'true'
+        # PIN THIS at activation: `@anthropic-ai/claude-code@<exact-version>`. Left unpinned only
+        # because the gate is dormant until ANTHROPIC_API_KEY is set — pin to the then-current
+        # release when you activate it, so a CLI update can't silently change the gate's behavior.
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Generate the PR diff (trusted step, no model involved)
@@ -63,8 +77,8 @@ jobs:
         if: env.HAS_KEY == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        # The agent is READ-ONLY (no Bash) and never runs commands from untrusted PR content — the
-        # diff is pre-generated above by a trusted step and handed over as a file it merely reads.
+        # READ-ONLY agent (no Bash); it never runs commands from untrusted PR content — the diff is
+        # pre-generated above by a trusted step and handed over as a file it merely reads.
         run: |
           set -euo pipefail
           PROMPT=$(cat <<'EOF'
@@ -90,19 +104,53 @@ jobs:
             --allowedTools "Read,Grep,Glob" \
             --output-format text | tee review.md
 
-      - name: Enforce — comment and fail on must-fix
+      - name: Parse the verdict (fail closed)
+        id: parse
         if: env.HAS_KEY == 'true'
+        run: |
+          set -euo pipefail
+          # Require EXACTLY one well-formed MUST_FIX_COUNT line; a missing/duplicate/malformed
+          # verdict is a gate failure, never a silent pass (a fail-open review gate is worthless).
+          counts=$(grep -oE 'MUST_FIX_COUNT: [0-9]+' review.md | grep -oE '[0-9]+$' || true)
+          n=$(printf '%s\n' "$counts" | grep -c . || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error title=architecture-review::review output had $n MUST_FIX_COUNT lines, expected exactly 1 — treating as failure."
+            exit 1
+          fi
+          echo "ran=true"   >> "$GITHUB_OUTPUT"
+          echo "count=$counts" >> "$GITHUB_OUTPUT"
+          echo "must-fix count: $counts"
+
+      - name: Upload the review for the comment job
+        if: env.HAS_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-review
+          path: review.md
+          retention-days: 7
+
+  comment:
+    needs: review
+    # Only when the review actually ran (secret set) and produced a verdict.
+    if: needs.review.outputs.ran == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # to post the review comment — this job touches NO PR code
+    steps:
+      - name: Download the review
+        uses: actions/download-artifact@v4
+        with:
+          name: architecture-review
+
+      - name: Comment and fail on must-fix
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          COUNT: ${{ needs.review.outputs.must_fix }}
         run: |
           set -euo pipefail
-          COUNT=$(grep -oE 'MUST_FIX_COUNT: *[0-9]+' review.md | grep -oE '[0-9]+' | tail -1 || echo 0)
-          {
-            echo "## 🏛️ Architecture review (self-owned agent)"
-            echo
-            cat review.md
-          } > comment.md
+          { echo "## 🏛️ Architecture review (self-owned agent)"; echo; cat review.md; } > comment.md
           gh pr comment "$PR" --body-file comment.md || echo "comment post failed (non-fatal)"
           echo "must-fix count: $COUNT"
           if [ "${COUNT:-0}" -gt 0 ]; then

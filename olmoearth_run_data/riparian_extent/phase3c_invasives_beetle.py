@@ -7,9 +7,13 @@ field points, point-sampled from Landsat (the only sensor reaching pre-beetle, 1
 * **Test A — separability.** Spatial-CV (grouped by field trip) RF on invasive-vs-native from the
   2020 phenology cube. Is the species signal even there? Pre-registered gate: AUROC ≥ 0.75.
 * **Test C1 — the beetle deep-time inversion.** The 3B trick: the *same points*, the *same CV folds*,
-  scored on 2020 vs 2000 Landsat — only the year differs, so the AUROC gap is the beetle. A 2020-trained
-  model learns "tamarisk browns before native"; pre-beetle tamarisk stays green *longer*, so the
-  cue's sign flips. Pre-registered prediction: **AUROC(2000) < 0.5** — actively wrong, not just degraded.
+  scored on 2020 vs 2000 Landsat. A 2020-trained model learns "tamarisk browns before native"; pre-beetle
+  tamarisk stays green *longer*, so the cue's sign flips. Pre-registered prediction: **AUROC(2000) < 0.5**
+  — actively wrong, not just degraded. ⚠ **Confound:** 2000 is Landsat-5 (TM) and 2020 is Landsat-8 (OLI),
+  so the raw C1 gap carries *sensor + beetle*, not the beetle alone. 3A measured the S2→Landsat sensor
+  penalty at only +0.046 AUC, far short of a sign flip — so an *inversion* can't be a sensor artifact —
+  but the gap's magnitude must be read against that control, per the spec.  Russian olive (not
+  beetle-defoliated) is the built-in negative control: it should NOT invert.
 
 This is a scaffold: it runs the moment `TabletData_2017.csv` (CSU, CC BY-SA, ~326 KB from
 mountainscholar) is on disk. It reuses the tested 3B point-sampler verbatim, adding only
@@ -42,7 +46,6 @@ from phase3b_temporal import (
     SJ_AOI,
     STAC,
     _assign_points,
-    _impute_cols,
     _sample_scene,
     _search,
 )
@@ -70,6 +73,8 @@ NATIVE = frozenset({csu_points.NATIVE_RIPARIAN_WOODY})
 # The training year IS the label vintage — one derived fact, never a re-hardcoded literal.
 TRAIN_YEAR = validate_layer.IMAGERY_YEAR
 CV_SPLITS = 5
+SEPARABILITY_GATE = 0.75  # Test A pre-registered bar: below this the species signal is too weak → ABORT
+MIN_TAXON = 8  # min points per class to attempt a taxon-vs-native fold split (in-basin labels are scarce)
 
 
 def _platform_for_year(year: int) -> str:
@@ -155,17 +160,26 @@ def _year_features(cat: StacClient, year: int, lonlat: np.ndarray, aoi: BBox,
 
 
 def _load_species_points(csv: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """CSU points → (lonlat (N,2), y invasive=1/native=0, trip groups) inside the San Juan AOI."""
-    pts = [p for p in csu_points.load_points(csv, bbox=SJ_AOI)
-           if p.label in INVASIVE or p.label in NATIVE]
+    """CSU points → (lonlat (N,2), per-point species label, trip groups) inside the San Juan AOI.
+
+    Labels are kept per-taxon (not pooled to invasive/native) so C1 can score tamarisk-vs-native and
+    Russian-olive-vs-native separately — RO is the beetle-negative control that must NOT invert.
+    """
+    keep = INVASIVE | NATIVE
+    pts = [p for p in csu_points.load_points(csv, bbox=SJ_AOI) if p.label in keep]
     if not pts:
         raise ValueError("no invasive/native CSU points in the San Juan AOI — check the CSV path")
     lonlat = np.array([[p.lon, p.lat] for p in pts])
-    y = np.array([1 if p.label in INVASIVE else 0 for p in pts])
+    labels = np.array([p.label for p in pts])
     trips = np.array([p.trip for p in pts])
-    logger.info("species points: %d (%d invasive / %d native) over %d field trips",
-                len(pts), int(y.sum()), int((y == 0).sum()), len(set(trips)))
-    return lonlat, y, trips
+    logger.info("species points: %d over %d field trips — %s", len(pts), len(set(trips)),
+                {lab: int((labels == lab).sum()) for lab in sorted(keep)})
+    return lonlat, labels, trips
+
+
+def _impute_with(x: np.ndarray, med: np.ndarray) -> np.ndarray:
+    """Fill NaNs in ``x`` with the pre-fitted per-column medians ``med`` (fitted on train rows only)."""
+    return np.where(np.isfinite(x), x, med)
 
 
 def beetle_cv(feats_by_year: dict[int, np.ndarray], y: np.ndarray,
@@ -180,13 +194,17 @@ def beetle_cv(feats_by_year: dict[int, np.ndarray], y: np.ndarray,
     n_splits = min(CV_SPLITS, len(set(trips)))
     gkf = GroupKFold(n_splits=n_splits)
     oof = {yr: np.full(n, np.nan, np.float64) for yr in feats_by_year}
-    x_train = _impute_cols(feats_by_year[TRAIN_YEAR])
-    for tr, te in gkf.split(x_train, y, groups=trips):
+    train_feats = feats_by_year[TRAIN_YEAR]
+    for tr, te in gkf.split(train_feats, y, groups=trips):
+        # Fit imputation medians on the TRAIN rows only — a full-array median would leak held-out
+        # (and other-year) values into the fill applied to test rows.
+        med = np.nanmedian(train_feats[tr], axis=0)
+        med = np.where(np.isfinite(med), med, 0.0)
         rf = RandomForestClassifier(n_estimators=300, class_weight="balanced",
                                     max_features="sqrt", n_jobs=-1, random_state=0)
-        rf.fit(x_train[tr], y[tr])
+        rf.fit(_impute_with(train_feats[tr], med), y[tr])
         for yr, feats in feats_by_year.items():
-            oof[yr][te] = rf.predict_proba(_impute_cols(feats)[te])[:, 1]
+            oof[yr][te] = rf.predict_proba(_impute_with(feats[te], med))[:, 1]
     return {yr: validate_layer.auc(p[y == 1], p[y == 0]) for yr, p in oof.items()}
 
 
@@ -202,17 +220,41 @@ def _build_parser() -> argparse.ArgumentParser:
     return ap
 
 
-def _report(scores: dict[int, float]) -> None:
-    """Log the separability gate (train year) and the beetle deltas for each earlier year."""
+def _report(taxon: str, scores: dict[int, float], is_control: bool) -> None:
+    """Log the separability gate + beetle deltas for one taxon-vs-native classification."""
+    role = "beetle-negative CONTROL — should NOT invert" if is_control else "beetle signal taxon"
     logger.info("")
-    logger.info("═══ Phase 3C — native-vs-invasive across the beetle era (RF, trip-grouped CV) ═══")
-    logger.info("  Test A — in-domain separability   %d AUROC = %.3f  (gate: ≥ 0.75)",
-                TRAIN_YEAR, scores[TRAIN_YEAR])
+    logger.info("═══ Phase 3C — %s-vs-native across the beetle era (%s) ═══", taxon, role)
+    logger.info("  Test A — in-domain separability   %d AUROC = %.3f  (gate: ≥ %.2f)",
+                TRAIN_YEAR, scores[TRAIN_YEAR], SEPARABILITY_GATE)
     for yr in sorted((yr for yr in scores if yr != TRAIN_YEAR), reverse=True):
         tag = "PRE-beetle" if yr < 2004 else "post-beetle"
         flip = "  ⚠ INVERTED (<0.5)" if scores[yr] < 0.5 else ""
-        logger.info("  Test C1 — %s %d AUROC = %.3f  (Δ from %d = %+.3f)%s",
+        # ~0.05 of any drop is the Landsat-5→8 sensor change (3A control); an inversion is not.
+        logger.info("  Test C1 — %s %d AUROC = %.3f  (Δ from %d = %+.3f; ≈0.05 of a drop is sensor)%s",
                     tag, yr, scores[yr], TRAIN_YEAR, scores[yr] - scores[TRAIN_YEAR], flip)
+
+
+def _score_taxon(taxon: str, labels: np.ndarray, native: np.ndarray,
+                 feats_by_year: dict[int, np.ndarray], trips: np.ndarray) -> bool:
+    """Run + report Test A/C1 for one taxon vs native. Returns True iff its separability gate FAILED."""
+    is_taxon = labels == taxon
+    mask = native | is_taxon
+    n_pos, n_neg = int(is_taxon.sum()), int(native.sum())
+    if n_pos < MIN_TAXON or n_neg < MIN_TAXON:
+        logger.warning("skip %s-vs-native — too few points (%d vs %d native, need ≥ %d each)",
+                       taxon, n_pos, n_neg, MIN_TAXON)
+        return False
+    sub = {yr: f[mask] for yr, f in feats_by_year.items()}
+    scores = beetle_cv(sub, is_taxon[mask].astype(int), trips[mask])
+    is_control = taxon == csu_points.RUSSIAN_OLIVE
+    _report(taxon, scores, is_control)
+    gate = scores[TRAIN_YEAR]
+    if not is_control and (not np.isfinite(gate) or gate < SEPARABILITY_GATE):
+        logger.error("Test A gate FAILED for %s (AUROC %.3f < %.2f) — ABORT.",
+                     taxon, gate, SEPARABILITY_GATE)
+        return True
+    return False
 
 
 def main() -> int:
@@ -220,15 +262,21 @@ def main() -> int:
     if TRAIN_YEAR not in a.years:
         raise SystemExit(f"--years must include the training year {TRAIN_YEAR}")
 
-    lonlat, y, trips = _load_species_points(a.csv)
+    lonlat, labels, trips = _load_species_points(a.csv)
     aoi = (float(lonlat[:, 0].min()) - 0.05, float(lonlat[:, 1].min()) - 0.05,
            float(lonlat[:, 0].max()) + 0.05, float(lonlat[:, 1].max()) + 0.05)
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
 
     feats_by_year = {yr: _year_features(cat, yr, lonlat, aoi, a.cache / f"landsat_{yr}_pts.npz")
                      for yr in sorted(a.years, reverse=True)}
-    _report(beetle_cv(feats_by_year, y, trips))
-    return 0
+    native = labels == csu_points.NATIVE_RIPARIAN_WOODY
+    # Score each invasive taxon vs native separately — Russian olive is the beetle-negative control.
+    # Both always run (no short-circuit) so each reports; abort the run if any signal gate fails.
+    aborted = False
+    for taxon in (csu_points.TAMARISK, csu_points.RUSSIAN_OLIVE):
+        if _score_taxon(taxon, labels, native, feats_by_year, trips):
+            aborted = True
+    return 1 if aborted else 0
 
 
 if __name__ == "__main__":
