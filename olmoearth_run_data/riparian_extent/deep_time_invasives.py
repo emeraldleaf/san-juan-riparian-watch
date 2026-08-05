@@ -55,40 +55,50 @@ BBox = tuple[float, float, float, float]
 FARM: BBox = (-108.33, 36.70, -108.19, 36.79)     # Farmington reach — best-labelled NM reach
 TM_FAMILY = ("landsat-5", "landsat-7")            # exclude OLI so the trajectory holds one sensor family
 GROW = ("06-01", "08-31")                         # peak growing season
-MAX_SCENES = 4                                    # least-cloudy scenes to median per epoch
+WINDOW_MAX = 18                                   # cap of least-cloudy scenes to median across a window
+HALF_WIDTH = 2                                     # ±2 yr → 5-yr windows; single years vary ~±0.5 pp,
+#                                                   so a multi-year median is what makes the trend robust
 
 
-def _search(cat: pystac_client.Client, bbox: BBox, year: int) -> list:
-    """Least-cloudy TM/ETM+ growing-season scenes for ``year`` over ``bbox`` (retry-hardened)."""
-    for attempt in range(6):
-        try:
-            items = list(cat.search(
-                collections=["landsat-c2-l2"], bbox=list(bbox),
-                datetime=f"{year}-{GROW[0]}/{year}-{GROW[1]}",
-                query={"eo:cloud_cover": {"lt": 40}, "platform": {"in": list(TM_FAMILY)}}).items())
-            return sorted(items, key=lambda x: x.properties.get("eo:cloud_cover", 100))[:MAX_SCENES]
-        except Exception as ex:  # noqa: BLE001 — STAC is intermittently slow; retry then give up
-            if attempt == 5:
-                logger.warning("  %d: search failed: %s", year, str(ex)[:50])
-                return []
-            time.sleep(2 + 2 * attempt)
-    return []
+def _search_window(cat: pystac_client.Client, bbox: BBox, years: range) -> list:
+    """Pool the least-cloudy TM/ETM+ growing-season scenes across every year in ``years``.
+
+    A multi-year window (not a single year) is deliberate: single-year composites swing ~±0.5 pp
+    (1999→2001 ran 2.1→1.2% here), so the trend only stabilises when a bad year is outvoted.
+    """
+    pooled: list = []
+    for year in years:
+        for attempt in range(6):
+            try:
+                pooled += list(cat.search(
+                    collections=["landsat-c2-l2"], bbox=list(bbox),
+                    datetime=f"{year}-{GROW[0]}/{year}-{GROW[1]}",
+                    query={"eo:cloud_cover": {"lt": 40}, "platform": {"in": list(TM_FAMILY)}}).items())
+                break
+            except Exception as ex:  # noqa: BLE001 — STAC is intermittently slow; retry then give up
+                if attempt == 5:
+                    logger.warning("  %d: search failed: %s", year, str(ex)[:50])
+                else:
+                    time.sleep(2 + 2 * attempt)
+    return sorted(pooled, key=lambda x: x.properties.get("eo:cloud_cover", 100))[:WINDOW_MAX]
 
 
-def season_composite(cat: pystac_client.Client, bbox: BBox, year: int,
+def season_composite(cat: pystac_client.Client, bbox: BBox, center: int, half_width: int,
                      affine, h: int, w: int) -> np.ndarray | None:
-    """Per-band growing-season median over the least-cloudy TM/ETM+ scenes → ``(6, h, w)`` or None."""
-    items = _search(cat, bbox, year)
+    """Per-band growing-season median over a ``center ± half_width`` year window → ``(6, h, w)`` or None."""
+    years = range(center - half_width, center + half_width + 1)
+    items = _search_window(cat, bbox, years)
     if not items:
-        logger.info("  %d: no TM/ETM+ scenes", year)
+        logger.info("  %d±%d: no TM/ETM+ scenes", center, half_width)
         return None
     plats = {it.properties.get("platform", "?") for it in items}
     bands = [np.nanmedian(
         np.stack([_read_band(it.assets[b].href, LS_SCALE, LS_OFF, affine, h, w) for it in items]),
         axis=0) for b in LS_BANDS]
     comp = np.stack(bands)
-    logger.info("  %d: %d scene(s) %s → composite, %.0f%% pixels valid",
-                year, len(items), sorted(plats), 100 * np.isfinite(comp).any(0).mean())
+    logger.info("  %d (%d–%d): %d scene(s) %s → composite, %.0f%% pixels valid",
+                center, years[0], years[-1], len(items), sorted(plats),
+                100 * np.isfinite(comp).any(0).mean())
     return comp
 
 
@@ -150,7 +160,9 @@ def main() -> int:
                     help="local NMRipMap File Geodatabase for invasive labels (bypasses the live service)")
     ap.add_argument("--label-year", type=int, default=2020, help="imagery year paired with the 2020 labels")
     ap.add_argument("--epochs", type=int, nargs="+", default=[1990, 2000, 2010, 2020],
-                    help="trajectory epochs to map (TM/ETM+ only)")
+                    help="trajectory window CENTER years to map (TM/ETM+ only)")
+    ap.add_argument("--half-width", type=int, default=HALF_WIDTH,
+                    help="composite window half-width in years (±); 2 → 5-year windows")
     ap.add_argument("--out", type=Path, default=HERE / ".tmp/deep_invasives", help="GeoJSON output dir")
     ap.add_argument("--threshold", type=float, default=0.5, help="invasive-probability cutoff for extent")
     a = ap.parse_args()
@@ -158,16 +170,16 @@ def main() -> int:
     affine, h, w = _grid(FARM)
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
     logger.info("label year %d — building training composite", a.label_year)
-    train_comp = season_composite(cat, FARM, a.label_year, affine, h, w)
+    train_comp = season_composite(cat, FARM, a.label_year, a.half_width, affine, h, w)
     if train_comp is None:
         raise SystemExit(f"no TM/ETM+ imagery for label year {a.label_year}")
     reader = gdb_reader_factory(str(a.gdb))
     rf, med = train_invasive_rf(train_comp, reader, FARM, affine, h, w)
 
-    logger.info("mapping invasive extent per epoch:")
+    logger.info("mapping invasive extent per %d-year window:", 2 * a.half_width + 1)
     trajectory = {}
     for year in sorted(a.epochs):
-        comp = train_comp if year == a.label_year else season_composite(cat, FARM, year, affine, h, w)
+        comp = train_comp if year == a.label_year else season_composite(cat, FARM, year, a.half_width, affine, h, w)
         if comp is None:
             continue
         trajectory[year] = predict_extent(rf, med, comp, affine, h, w,
