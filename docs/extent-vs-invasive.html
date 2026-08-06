@@ -24,8 +24,10 @@
   .big span { font-size:13px; color:#334155; }
   .note { font-size:11.5px; color:#64748b; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:9px; }
   #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
-  #legend .row { display:flex; align-items:center; gap:8px; margin:5px 0; cursor:pointer; user-select:none; }
+  #legend .row { display:flex; align-items:center; gap:8px; margin:5px 0; cursor:pointer; user-select:none;
+    background:none; border:none; font:inherit; color:inherit; text-align:left; width:100%; padding:2px 0; }
   #legend .row.off { opacity:.4; }
+  #legend .row:focus-visible { outline:2px solid #2563eb; outline-offset:2px; border-radius:3px; }
   #legend .sw { width:16px; height:16px; border-radius:3px; }
   output { display:block; margin-top:8px; font-size:11px; color:#64748b; }
 </style>
@@ -40,14 +42,15 @@
   <p>A watershed manager doesn't just want "where is the green corridor" — they want <b>how much of it
   is the wrong plant.</b> Green is the predicted riparian-woody corridor (7.6&nbsp;km²); red is the
   invasive share <b>within</b> it (1.7&nbsp;km²).</p>
-  <p class="note"><b>Validated:</b> the 23% masked prediction matches the NMRipMap label truth
-  (15,656 / 67,625 woody pixels invasive = 23%) — a present-day, label-anchored map, not a
-  reconstruction. Invasive is masked to inside the corridor (the two classifiers are independent).</p>
+  <p class="note"><b>In-sample calibration (not independent validation):</b> the 23% masked prediction
+  <i>reproduces</i> the NMRipMap label proportion (15,656 / 67,625 woody pixels invasive = 23%) — the
+  model is well-calibrated to the 2020 labels it was trained on. A spatially-held-out test is the proper
+  next step. Invasive is masked to inside the corridor (the two classifiers are independent).</p>
 </div>
 
 <div id="legend" class="card">
-  <div class="row" data-layer="corridor"><span class="sw" style="background:#16a34a"></span> riparian corridor (woody)</div>
-  <div class="row" data-layer="invasive"><span class="sw" style="background:#e11d48"></span> invasive within corridor</div>
+  <button type="button" class="row" data-layer="corridor" aria-pressed="true"><span class="sw" style="background:#16a34a"></span> riparian corridor (woody)</button>
+  <button type="button" class="row" data-layer="invasive" aria-pressed="true"><span class="sw" style="background:#e11d48"></span> invasive within corridor</button>
   <output id="status" aria-live="polite">loading…</output>
 </div>
 
@@ -81,6 +84,7 @@
         const vis = map.getLayoutProperty(id, "visibility") === "none" ? "visible" : "none";
         map.setLayoutProperty(id, "visibility", vis);
         row.classList.toggle("off", vis === "none");
+        row.setAttribute("aria-pressed", String(vis === "visible"));
       });
     });
   });

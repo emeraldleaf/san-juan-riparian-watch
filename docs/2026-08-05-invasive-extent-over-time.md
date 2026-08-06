@@ -10,16 +10,18 @@ present-day map) · reproducible via
 Trying to map invasive extent *back through the Landsat record* is **not robust before ~2000** — the
 historical numbers swing ~1 pp with the compositing recipe no matter what normalization you apply, so no
 trajectory shape can be claimed. What the effort *did* deliver, honestly, is the reliable **present-day**
-product: **23% of Farmington's riparian corridor is invasive** — and that number is validated against the
-NMRipMap labels.
+product: **23% of Farmington's riparian corridor is invasive** — a figure the model reproduces from the
+NMRipMap labels it was trained on (in-sample calibration, not an independent validation).
 
 ## The reliable result: the corridor vs the invaders within it
 
 The [interactive map](extent-vs-invasive.html) (present-day, 2020, label-anchored): the predicted
 riparian-woody **corridor** (7.6 km²) with the **invasive share within it** (1.7 km²) highlighted.
 
-> **23% of the mapped corridor is invasive tamarisk / Russian olive** — and the masked prediction matches
-> the label truth (15,656 / 67,625 woody-labelled pixels are invasive = 23%) *exactly*.
+> **23% of the mapped corridor is invasive tamarisk / Russian olive** — and the masked prediction
+> *reproduces* the label proportion (15,656 / 67,625 woody-labelled pixels are invasive = 23%). Because
+> the model was trained on those 2020 labels, this is an **in-sample calibration check, not an independent
+> validation** — a spatially-held-out test is the proper next step.
 
 This is the answer to "riparian extent vs invasive": not just *where* the green corridor is, but *how much
 of it is the wrong plant*. It is a present-day map anchored to real labels — no reconstruction, no error
@@ -51,10 +53,11 @@ the ±0.6 pp method-noise on the anchor itself*. The dramatic "5×" was an artif
 
 ## Why the present-day map *is* trustworthy when the trajectory isn't
 
-The 2020 map is trained on 2020 imagery *and* scored against 2020 labels — it is *in-distribution* and
-*validated* (the 23% match). The historical maps are the same model applied to out-of-distribution old
-imagery with **no ground truth to anchor them**. That asymmetry is the whole story: present-day is
-anchored, deep-time is extrapolation.
+The 2020 map is trained on 2020 imagery *and* calibrated to 2020 labels — it is *in-distribution*, so its
+class proportions are anchored (the 23% match is that in-sample calibration). The historical maps are the
+same model applied to out-of-distribution old imagery with **no ground truth to anchor them**. That
+asymmetry is the whole story: present-day is anchored, deep-time is extrapolation. (An independent spatial
+holdout would upgrade the present-day map from *calibrated* to *validated* — the honest next step.)
 
 ## The honest limitations (of the reliable product)
 
@@ -66,8 +69,8 @@ anchored, deep-time is extrapolation.
 
 ## What it means
 
-The deliverable is the **present-day corridor-vs-invasive map** — reliable, validated, and exactly the
-question a watershed manager asks. The deep-time trajectory is a documented *negative*: with a
+The deliverable is the **present-day corridor-vs-invasive map** — reliable, label-calibrated, and exactly
+the question a watershed manager asks. The deep-time trajectory is a documented *negative*: with a
 present-day-trained RF on Landsat, invasive extent is **not reconstructable before ~2000**, and the change
 since is too small to claim over the method noise. Getting *there* would need era-specific labels or a
 sensor that resolves the phenology (which the incumbent literature also flags as the wall).
@@ -77,8 +80,20 @@ sensor that resolves the phenology (which the incumbent literature also flags as
 ```bash
 cd olmoearth_run_data/riparian_extent
 export PYTHONPATH=../../python-etl
-python deep_time_invasives.py --target extent   --epochs 2020   # the corridor
-python deep_time_invasives.py --target invasive --epochs 2020   # the invasive share
+# present-day corridor + invasive predictions → .tmp/present/{extent,invasive}_2020.geojson
+python deep_time_invasives.py --target extent   --epochs 2020 --out .tmp/present
+python deep_time_invasives.py --target invasive --epochs 2020 --out .tmp/present
+# mask invasive to the corridor → the map's two layers + the 23% (post-processing step):
+python - <<'PY'
+import geopandas as gpd
+ext = gpd.read_file(".tmp/present/extent_2020.geojson").to_crs(32612)
+inv = gpd.read_file(".tmp/present/invasive_2020.geojson").to_crs(32612)
+inv_in = inv.union_all().intersection(ext.union_all())
+print(f"invasive-in-corridor: {100 * inv_in.area / ext.union_all().area:.0f}% of corridor")
+gpd.GeoDataFrame(geometry=[inv_in], crs=32612).explode(index_parts=False).to_crs(4326).to_file(
+    "../../docs/maps/present-invasive-in-corridor.geojson", driver="GeoJSON")
+ext.to_crs(4326).to_file("../../docs/maps/present-extent-2020.geojson", driver="GeoJSON")
+PY
 #   deep-time (exploratory, NOT robust before ~2000):
 python deep_time_invasives.py --target invasive --epochs 2000 2010 2020
 ```
