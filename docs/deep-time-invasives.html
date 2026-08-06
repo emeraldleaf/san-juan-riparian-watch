@@ -38,15 +38,18 @@
 
 <div id="info" class="card">
   <h1>Invasive extent over time</h1>
-  <p class="sub">San Juan River at Farmington · tamarisk + Russian olive (combined) · Landsat TM/ETM+</p>
-  <p>An RF trained on NMRipMap's invasive class, mapped back through the Landsat record on <b>one sensor
-  family</b> (Landsat-5/7, no OLI) so year-to-year change means <i>vegetation</i>, not <i>sensor</i>.
-  The footprint expands <b>~5× from 1990 to 2020</b>.</p>
-  <div class="traj" id="traj" role="group" aria-label="invasive extent by year"></div>
-  <p class="warn"><b>Read the trend, not the year.</b> Labels are a 2020 snapshot and there's no ground
-  truth before ~2018, so any single map is an unvalidated reconstruction. The <b>2010 dip</b> is either
-  the tamarisk beetle's peak-defoliation era (defoliated tamarisk reads as less-invasive) or Landsat-7
-  SLC-off noise — the honest answer is we can't separate them here.</p>
+  <p class="sub">San Juan River at Farmington · tamarisk + Russian olive (combined) · Landsat TM/ETM+ ·
+  <b>exploratory</b></p>
+  <p>An attempt to map the invasive footprint back through the Landsat record, one sensor family
+  (Landsat-5/7, no OLI). The bars below are 5-year window composites — but treat them as <i>exploratory</i>
+  (see the warning).</p>
+  <div class="traj" id="traj" aria-label="invasive extent by 5-year window"></div>
+  <p class="warn"><b>⚠ Not a robust result.</b> Follow-up checks showed this reconstruction is
+  <b>unreliable before ~2000</b>: the pure-Landsat-5 1990 value swings ~1 pp with the compositing recipe
+  no matter what normalization is applied, so no trajectory shape can be claimed. The reliable,
+  label-validated product is <a href="extent-vs-invasive.html">the present-day corridor-vs-invasive
+  map</a> (23% of the corridor is invasive). Full story: <a href="2026-08-05-invasive-extent-over-time.md">the
+  write-up</a>.</p>
 </div>
 
 <div id="slider" class="card">
