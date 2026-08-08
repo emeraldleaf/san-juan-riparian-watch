@@ -24,6 +24,7 @@ question that actually matters to a watershed manager:
 | **[▸ Live extent map — Bloomfield reach](extent-map.html)** | The actual **product** artifact: predicted riparian extent (8,511 polygons, 8.0% of the AOI) from the pooled RF, over a reach it never trained on, on satellite imagery. The honest RF baseline the foundation model must beat. |
 | **[▸ FM vs RF — the arroyo](fm-vs-rf-malpais.html)** | The vivid win: over the held-out Malpais arroyo the FM (green, AUROC **0.889**) tracks the corridor while the RF (orange dots, **0.557**) fires in one corner. The foundation model's spatial context, made visible. |
 | **[▸ FM vs RF — the deployable map (Bloomfield)](fm-vs-rf-bloomfield.html)** | Both models deployed over an unseen reach: FM (green) vs RF (orange) vs NMRipMap truth. On a well-sampled river they agree closely — the FM's edge is on the hard morphologies. |
+| **[▸ Riparian corridor vs invasive (Farmington)](extent-vs-invasive.html)** | The product a watershed manager actually wants: the green riparian-woody corridor (7.6 km²) with the invasive tamarisk/Russian-olive share **within** it (1.7 km²) in red. **23% of the corridor is invasive** — a figure the model reproduces from the NMRipMap labels it was trained on (in-sample calibration, not an independent validation). Present-day, label-anchored. |
 | **[Engineering & methodology walkthrough](engineering-review.html)** | How the pipeline works end to end — STAC satellite ETL, weak-label and reference-trained delineation, spatial cross-validation, RF vs OlmoEarth, the PostGIS medallion schema, the C# API and the MapLibre map — with **verbatim code** and a *"where a reviewer should attack this"* section. |
 | **[Literature review](literature-review.md)** | What has already been done, and why this project is not duplicating it. Written so the novelty claim can be **falsified**, not just asserted. |
 | **[Stage 2 spec — invasive vs native cover (Tamarix)](specs/2026-07-11-stage2-invasives-tamarix.md)** | The product thesis, the phased class schema, the trade-offs accepted, and what was **cut and why**. |
@@ -178,6 +179,12 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Results
 
+- [**Invasive extent over time — a robustness cautionary tale, and the reliable map it pointed to**](2026-08-05-invasive-extent-over-time.md)
+  — the honest arc: mapping invasive extent *back through Landsat* is **not robust before ~2000** (four
+  fixes — bracketing, 5-year windows, spectral indices, radiometric normalization — stabilised 2000–2010
+  but never the pure-TM 1990, which swings ~1 pp regardless), so **no trajectory can be claimed**. What it
+  delivered instead is the reliable **[present-day corridor-vs-invasive map](extent-vs-invasive.html)**:
+  **23% of Farmington's corridor is invasive** — the model reproduces the NMRipMap label proportion (in-sample calibration, not an independent validation).
 - [**The beetle didn't break the discriminator — and the control proves we couldn't have seen it if it had**](2026-08-04-phase3c-beetle-null-result.md)
   — the Stage-2 beetle-inversion CPU/RF arm, run on the real CSU field points. The pre-registered
   prediction (tamarisk-vs-native inverts pre-beetle) is **falsified** — it holds 0.81–0.86 across

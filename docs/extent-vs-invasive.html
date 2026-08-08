@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>The corridor vs the invaders — Farmington, 2020</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+        integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<style>
+  :root { --ink:#0f172a; --panel:rgba(255,255,255,.94); --corridor:#16a34a; --inv:#e11d48; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position:absolute; inset:0; }
+  .card { position:absolute; background:var(--panel); color:var(--ink); border-radius:12px;
+    box-shadow:0 6px 28px rgba(0,0,0,.35); backdrop-filter:blur(6px); }
+  #info { top:16px; left:16px; max-width:min(400px,calc(100vw - 32px)); padding:18px 20px; line-height:1.5; }
+  #info h1 { margin:0 0 4px; font-size:19px; letter-spacing:-.2px; }
+  #info .sub { color:#475569; font-size:12.5px; margin:0 0 12px; }
+  #info p { margin:9px 0; font-size:13.5px; }
+  .big { display:flex; align-items:baseline; gap:8px; margin:12px 0; }
+  .big b { font-size:40px; line-height:1; color:var(--inv); font-variant-numeric:tabular-nums; }
+  .big span { font-size:13px; color:#334155; }
+  .note { font-size:11.5px; color:#64748b; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:9px; }
+  #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
+  #legend .row { display:flex; align-items:center; gap:8px; margin:5px 0; cursor:pointer; user-select:none;
+    background:none; border:none; font:inherit; color:inherit; text-align:left; width:100%; padding:2px 0; }
+  #legend .row.off { opacity:.4; }
+  #legend .row:focus-visible { outline:2px solid #2563eb; outline-offset:2px; border-radius:3px; }
+  #legend .sw { width:16px; height:16px; border-radius:3px; }
+  output { display:block; margin-top:8px; font-size:11px; color:#64748b; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="info" class="card">
+  <h1>The corridor, and the invaders within it</h1>
+  <p class="sub">San Juan River at Farmington · 2020 · Landsat, NMRipMap-labelled</p>
+  <div class="big"><b>23%</b><span>of the mapped riparian corridor is invasive<br>tamarisk / Russian&nbsp;olive</span></div>
+  <p>A watershed manager doesn't just want "where is the green corridor" — they want <b>how much of it
+  is the wrong plant.</b> Green is the predicted riparian-woody corridor (7.6&nbsp;km²); red is the
+  invasive share <b>within</b> it (1.7&nbsp;km²).</p>
+  <p class="note"><b>In-sample calibration (not independent validation):</b> the 23% masked prediction
+  <i>reproduces</i> the NMRipMap label proportion (15,656 / 67,625 woody pixels invasive = 23%) — the
+  model is well-calibrated to the 2020 labels it was trained on. A spatially-held-out test is the proper
+  next step. Invasive is masked to inside the corridor (the two classifiers are independent).</p>
+</div>
+
+<div id="legend" class="card">
+  <button type="button" class="row" data-layer="corridor" aria-pressed="true"><span class="sw" style="background:#16a34a"></span> riparian corridor (woody)</button>
+  <button type="button" class="row" data-layer="invasive" aria-pressed="true"><span class="sw" style="background:#e11d48"></span> invasive within corridor</button>
+  <output id="status" aria-live="polite">loading…</output>
+</div>
+
+<script>
+  const map = new maplibregl.Map({
+    container: "map", center: [-108.260, 36.745], zoom: 12,
+    style: { version: 8, sources: { sat: { type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" } },
+      layers: [{ id: "sat", type: "raster", source: "sat" }] }
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+  const BBOX = [[-108.33, 36.70], [-108.19, 36.79]];
+  const status = document.getElementById("status");
+  map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
+
+  map.on("load", () => {
+    map.addSource("corridor", { type: "geojson", data: "maps/present-extent-2020.geojson" });
+    map.addLayer({ id: "corridor", type: "fill", source: "corridor",
+      paint: { "fill-color": "#16a34a", "fill-opacity": 0.45 } });
+    map.addSource("invasive", { type: "geojson", data: "maps/present-invasive-in-corridor.geojson" });
+    map.addLayer({ id: "invasive", type: "fill", source: "invasive",
+      paint: { "fill-color": "#e11d48", "fill-opacity": 0.8, "fill-outline-color": "#881337" } });
+    map.fitBounds(BBOX, { padding: 30, duration: 0 });
+    map.on("idle", () => { if (status && status.textContent === "loading…")
+      status.textContent = "corridor 7.6 km² · invasive 1.7 km² (23%)"; });
+    document.querySelectorAll("#legend .row[data-layer]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const id = row.dataset.layer;
+        const vis = map.getLayoutProperty(id, "visibility") === "none" ? "visible" : "none";
+        map.setLayoutProperty(id, "visibility", vis);
+        row.classList.toggle("off", vis === "none");
+        row.setAttribute("aria-pressed", String(vis === "visible"));
+      });
+    });
+  });
+</script>
+</body>
+</html>

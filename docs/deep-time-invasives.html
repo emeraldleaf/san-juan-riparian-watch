@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Invasive extent over time — Farmington, 1990 → 2020</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+        integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<style>
+  :root { --ink:#0f172a; --panel:rgba(255,255,255,.94); --inv:#e11d48; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { position:absolute; inset:0; }
+  .card { position:absolute; background:var(--panel); color:var(--ink); border-radius:12px;
+    box-shadow:0 6px 28px rgba(0,0,0,.35); backdrop-filter:blur(6px); }
+  #info { top:16px; left:16px; max-width:min(400px,calc(100vw - 32px)); padding:18px 20px; line-height:1.5; }
+  #info h1 { margin:0 0 4px; font-size:19px; letter-spacing:-.2px; }
+  #info .sub { color:#475569; font-size:12.5px; margin:0 0 12px; }
+  #info p { margin:9px 0; font-size:13px; }
+  .warn { background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 10px; font-size:12px; color:#9a3412; }
+  .traj { display:flex; align-items:flex-end; gap:10px; height:80px; margin:14px 2px 4px; }
+  .traj .bar { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+  .traj .fill { width:100%; background:var(--inv); border-radius:3px 3px 0 0; opacity:.55; transition:opacity .15s; }
+  .traj .bar.on .fill { opacity:1; }
+  .traj .yr { font-size:11px; color:#475569; } .traj .pct { font-size:11px; font-weight:600; }
+  #slider { bottom:20px; left:50%; transform:translateX(-50%); padding:12px 20px; display:flex; align-items:center; gap:14px; }
+  #slider input { width:min(46vw,320px); }
+  #slider .now { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  #legend { bottom:20px; right:16px; padding:10px 13px; font-size:12.5px; display:flex; align-items:center; gap:8px; }
+  #legend .sw { width:15px; height:15px; border-radius:3px; background:var(--inv); }
+  output { font-size:11px; color:#64748b; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="info" class="card">
+  <h1>Invasive extent over time</h1>
+  <p class="sub">San Juan River at Farmington · tamarisk + Russian olive (combined) · Landsat TM/ETM+ ·
+  <b>exploratory</b></p>
+  <p>An attempt to map the invasive footprint back through the Landsat record, one sensor family
+  (Landsat-5/7, no OLI). The bars below are 5-year window composites — but treat them as <i>exploratory</i>
+  (see the warning).</p>
+  <div class="traj" id="traj" aria-label="invasive extent by 5-year window"></div>
+  <p class="warn"><b>⚠ Not a robust result.</b> Follow-up checks showed this reconstruction is
+  <b>unreliable before ~2000</b>: the pure-Landsat-5 1990 value swings ~1 pp with the compositing recipe
+  no matter what normalization is applied, so no trajectory shape can be claimed. The reliable,
+  label-validated product is <a href="extent-vs-invasive.html">the present-day corridor-vs-invasive
+  map</a> (23% of the corridor is invasive). Full story: <a href="2026-08-05-invasive-extent-over-time.md">the
+  write-up</a>.</p>
+</div>
+
+<div id="slider" class="card">
+  <span>1990</span>
+  <input id="yr" type="range" min="0" max="3" step="1" value="3" aria-label="year" />
+  <span>2020</span>
+  <span class="now" id="nowyr">2020</span>
+</div>
+
+<div id="legend" class="card"><span class="sw"></span> predicted invasive woody
+  <output id="status" aria-live="polite" style="margin-left:8px">loading…</output>
+</div>
+
+<script>
+  const YEARS = [1990, 2000, 2010, 2020];
+  const PCT = { 1990: 1.4, 2000: 1.4, 2010: 1.2, 2020: 3.0 };   // 5-year window composites
+  const MAXPCT = 3.0;
+  const map = new maplibregl.Map({
+    container: "map", center: [-108.260, 36.745], zoom: 12,
+    style: { version: 8, sources: { sat: { type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" } },
+      layers: [{ id: "sat", type: "raster", source: "sat" }] }
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+  const BBOX = [[-108.33, 36.70], [-108.19, 36.79]];
+  const status = document.getElementById("status");
+  const slider = document.getElementById("yr");
+  const nowyr = document.getElementById("nowyr");
+  map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
+
+  // trajectory mini-bars
+  const traj = document.getElementById("traj");
+  YEARS.forEach((y, i) => {
+    const bar = document.createElement("div");
+    bar.className = "bar"; bar.dataset.i = i;
+    bar.innerHTML = `<span class="pct">${PCT[y].toFixed(1)}%</span>`
+      + `<div class="fill" style="height:${6 + 64 * PCT[y] / MAXPCT}px"></div><span class="yr">${y}</span>`;
+    bar.addEventListener("click", () => { slider.value = i; show(i); });
+    traj.appendChild(bar);
+  });
+
+  function show(i) {
+    const y = YEARS[i];
+    nowyr.textContent = y;
+    YEARS.forEach((yy) => map.setLayoutProperty("inv-" + yy, "visibility", yy === y ? "visible" : "none"));
+    traj.querySelectorAll(".bar").forEach((b) => b.classList.toggle("on", +b.dataset.i === i));
+    status.textContent = y + ": " + PCT[y].toFixed(1) + "% of AOI invasive";
+  }
+
+  map.on("load", () => {
+    YEARS.forEach((y) => {
+      map.addSource("inv-" + y, { type: "geojson", data: "maps/deep-invasive-" + y + ".geojson" });
+      map.addLayer({ id: "inv-" + y, type: "fill", source: "inv-" + y,
+        layout: { visibility: "none" },
+        paint: { "fill-color": "#e11d48", "fill-opacity": 0.7, "fill-outline-color": "#881337" } });
+    });
+    map.fitBounds(BBOX, { padding: 30, duration: 0 });
+    slider.addEventListener("input", () => show(+slider.value));
+    show(3);
+  });
+</script>
+</body>
+</html>
