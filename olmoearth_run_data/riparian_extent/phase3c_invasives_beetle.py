@@ -4,7 +4,7 @@ The Stage-2 analogue of the settled Stage-1 extent LORO result, and the RF arm o
 `docs/specs/2026-08-01-stage2-invasives-beetle-gate.md` gate. Two CPU-only tests on the CSU 2017
 field points, point-sampled from Landsat (the only sensor reaching pre-beetle, 1984→):
 
-* **Test A — separability.** Spatial-CV (grouped by field trip) RF on invasive-vs-native from the
+* **Test A — separability.** Spatial-CV (leave-one-~2 km-block-out) RF on invasive-vs-native from the
   2020 phenology cube. Is the species signal even there? Pre-registered gate: AUROC ≥ 0.75.
 * **Test C1 — the beetle deep-time inversion.** The 3B trick: the *same points*, the *same CV folds*,
   scored on 2020 vs 2000 Landsat. A 2020-trained model learns "tamarisk browns before native"; pre-beetle
@@ -49,6 +49,7 @@ from phase3b_temporal import (
     _sample_scene,
     _search,
 )
+from riparian.delineation.validate import assign_spatial_folds
 from riparian.labels import csu_points, validate_layer
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -72,7 +73,6 @@ INVASIVE = csu_points.INVASIVE_LABELS
 NATIVE = frozenset({csu_points.NATIVE_RIPARIAN_WOODY})
 # The training year IS the label vintage — one derived fact, never a re-hardcoded literal.
 TRAIN_YEAR = validate_layer.IMAGERY_YEAR
-CV_SPLITS = 5
 SEPARABILITY_GATE = 0.75  # Test A pre-registered bar: below this the species signal is too weak → ABORT
 MIN_TAXON = 8  # min points per class to attempt a taxon-vs-native fold split (in-basin labels are scarce)
 
@@ -182,20 +182,29 @@ def _impute_with(x: np.ndarray, med: np.ndarray) -> np.ndarray:
     return np.where(np.isfinite(x), x, med)
 
 
-def beetle_cv(feats_by_year: dict[int, np.ndarray], y: np.ndarray,
-              trips: np.ndarray) -> dict[int, float]:
-    """Out-of-fold AUROC per year from a ``TRAIN_YEAR``-trained RF, over the same trip-grouped folds.
+def _positive_proba(rf: RandomForestClassifier, x: np.ndarray) -> np.ndarray:
+    """P(class == 1) for ``x``, robust to a fold whose training set saw only one class."""
+    if rf.classes_.shape[0] < 2:            # degenerate fold — training was single-class
+        return np.full(len(x), float(rf.classes_[0]))
+    pos = int(np.nonzero(rf.classes_ == 1)[0][0])
+    return rf.predict_proba(x)[:, pos]
 
-    Every fold trains on ``TRAIN_YEAR`` features and predicts held-out points' features in *each*
-    year, so the per-year AUROCs differ only by the year sampled — the train-year→pre-beetle gap
-    (and sign) is the beetle, with space and the fold split held common (the 3B isolation, cross-era).
+
+def beetle_cv(feats_by_year: dict[int, np.ndarray], y: np.ndarray,
+              blocks: np.ndarray) -> dict[int, float]:
+    """Out-of-fold AUROC per year from a ``TRAIN_YEAR``-trained RF, leave-one-spatial-block-out.
+
+    Each fold holds out exactly one ~2 km spatial block (``assign_spatial_folds``) — ``n_splits`` is
+    the block count — so nearby points never straddle train/test and every point is scored once. Every
+    fold trains on ``TRAIN_YEAR`` features and predicts held-out points' features in *each* year, so
+    the per-year AUROCs differ only by the year sampled — the train-year→pre-beetle gap (and sign) is
+    the beetle, with space and the fold split held common. Requires ≥ 2 blocks (guarded by the caller).
     """
     n = len(y)
-    n_splits = min(CV_SPLITS, len(set(trips)))
-    gkf = GroupKFold(n_splits=n_splits)
+    gkf = GroupKFold(n_splits=len(set(blocks)))   # leave-one-block-out
     oof = {yr: np.full(n, np.nan, np.float64) for yr in feats_by_year}
     train_feats = feats_by_year[TRAIN_YEAR]
-    for tr, te in gkf.split(train_feats, y, groups=trips):
+    for tr, te in gkf.split(train_feats, y, groups=blocks):
         # Fit imputation medians on the TRAIN rows only — a full-array median would leak held-out
         # (and other-year) values into the fill applied to test rows.
         med = np.nanmedian(train_feats[tr], axis=0)
@@ -204,7 +213,7 @@ def beetle_cv(feats_by_year: dict[int, np.ndarray], y: np.ndarray,
                                     max_features="sqrt", n_jobs=-1, random_state=0)
         rf.fit(_impute_with(train_feats[tr], med), y[tr])
         for yr, feats in feats_by_year.items():
-            oof[yr][te] = rf.predict_proba(_impute_with(feats[te], med))[:, 1]
+            oof[yr][te] = _positive_proba(rf, _impute_with(feats[te], med))
     return {yr: validate_layer.auc(p[y == 1], p[y == 0]) for yr, p in oof.items()}
 
 
@@ -236,7 +245,7 @@ def _report(taxon: str, scores: dict[int, float], is_control: bool) -> None:
 
 
 def _score_taxon(taxon: str, labels: np.ndarray, native: np.ndarray,
-                 feats_by_year: dict[int, np.ndarray], trips: np.ndarray) -> bool:
+                 feats_by_year: dict[int, np.ndarray], blocks: np.ndarray) -> bool:
     """Run + report Test A/C1 for one taxon vs native.
 
     Returns True iff the run should ABORT for this taxon: for the required signal taxon (tamarisk)
@@ -247,14 +256,15 @@ def _score_taxon(taxon: str, labels: np.ndarray, native: np.ndarray,
     is_taxon = labels == taxon
     mask = native | is_taxon
     n_pos, n_neg = int(is_taxon.sum()), int(native.sum())
-    if n_pos < MIN_TAXON or n_neg < MIN_TAXON:
-        # A required endpoint that can't be scored is a failure; a skipped control is not.
+    n_blocks = len(set(blocks[mask]))
+    # Need enough of each class AND ≥ 2 spatial blocks (leave-one-block-out is undefined otherwise).
+    if n_pos < MIN_TAXON or n_neg < MIN_TAXON or n_blocks < 2:
         level = logger.warning if is_control else logger.error
-        level("%s-vs-native unscorable — too few points (%d vs %d native, need ≥ %d each)%s",
-              taxon, n_pos, n_neg, MIN_TAXON, "" if is_control else " — ABORT (required endpoint)")
+        level("%s-vs-native unscorable — %d vs %d native (need ≥ %d each), %d spatial block(s)%s",
+              taxon, n_pos, n_neg, MIN_TAXON, n_blocks, "" if is_control else " — ABORT (required endpoint)")
         return not is_control
     sub = {yr: f[mask] for yr, f in feats_by_year.items()}
-    scores = beetle_cv(sub, is_taxon[mask].astype(int), trips[mask])
+    scores = beetle_cv(sub, is_taxon[mask].astype(int), blocks[mask])
     _report(taxon, scores, is_control)
     gate = scores[TRAIN_YEAR]
     if not is_control and (not np.isfinite(gate) or gate < SEPARABILITY_GATE):
@@ -269,9 +279,12 @@ def main() -> int:
     if TRAIN_YEAR not in a.years:
         raise SystemExit(f"--years must include the training year {TRAIN_YEAR}")
 
-    lonlat, labels, trips = _load_species_points(a.csv)
+    lonlat, labels, _trips = _load_species_points(a.csv)
     aoi = (float(lonlat[:, 0].min()) - 0.05, float(lonlat[:, 1].min()) - 0.05,
            float(lonlat[:, 0].max()) + 0.05, float(lonlat[:, 1].max()) + 0.05)
+    # Spatial-block folds (~2 km tiles) — the in-basin field data is one cluster, so leave-one-block-out
+    # is the workable leakage-free CV; leave-one-trip-out fails (a trip can be single-class).
+    blocks = assign_spatial_folds(lonlat[:, 1], lonlat[:, 0])
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
 
     feats_by_year = {yr: _year_features(cat, yr, lonlat, aoi, a.cache / f"landsat_{yr}_pts.npz")
@@ -281,7 +294,7 @@ def main() -> int:
     # Both always run (no short-circuit) so each reports; abort the run if any signal gate fails.
     aborted = False
     for taxon in (csu_points.TAMARISK, csu_points.RUSSIAN_OLIVE):
-        if _score_taxon(taxon, labels, native, feats_by_year, trips):
+        if _score_taxon(taxon, labels, native, feats_by_year, blocks):
             aborted = True
     return 1 if aborted else 0
 
