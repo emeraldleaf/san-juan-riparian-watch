@@ -185,6 +185,12 @@ That is what this project is for — and their recommendation is, in effect, its
   but never the pure-TM 1990, which swings ~1 pp regardless), so **no trajectory can be claimed**. What it
   delivered instead is the reliable **[present-day corridor-vs-invasive map](extent-vs-invasive.html)**:
   **23% of Farmington's corridor is invasive** — the model reproduces the NMRipMap label proportion (in-sample calibration, not an independent validation).
+- [**The beetle didn't break the discriminator — and the control proves we couldn't have seen it if it had**](2026-08-04-phase3c-beetle-null-result.md)
+  — the Stage-2 beetle-inversion CPU/RF arm, run on the real CSU field points. The pre-registered
+  prediction (tamarisk-vs-native inverts pre-beetle) is **falsified** — it holds 0.81–0.86 across
+  2020→2000 — and the pre-registered Russian-olive control **cratered 0.34**, vetoing the ~0.05 signal
+  as cross-sensor/small-sample noise. A clean negative with a clear cause: this in-basin data can't
+  resolve the beetle effect; the FM arm and the C2 defoliation test are the way forward.
 - [**FM-vs-RF, settled — the foundation model rescues the arroyo, ties on rivers**](2026-08-01-fm-vs-rf-loro-result.md)
   — the deploy decision, answered with a number. Fine-tuned OlmoEarth, leave-one-reach-out, unbiased
   test/val split: it **ties** the RF on the three river reaches (0.81–0.89 vs 0.85–0.91) and **rescues
