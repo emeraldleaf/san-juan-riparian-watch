@@ -12,6 +12,11 @@ sitemap: false
 <!-- Live agent endpoint. Empty -> the Q&A runs OFFLINE from a small pre-written set.
      Set to the deployed docintel URL (…/docs/ask), or append ?agent=https://host/docs/ask. -->
 <meta name="agent-url" content="">
+<meta property="og:title" content="Mapping the invaders of the San Juan">
+<meta property="og:description" content="Learning where riparian vegetation is — and how much is invasive tamarisk and Russian olive — from satellite time-series, with the rigor shown and a grounded AI agent to interrogate it.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%2316a34a'/%3E%3Cpath d='M16 12c-3 4-4 7 0 12' fill='none' stroke='%23e11d48' stroke-width='2'/%3E%3C/svg%3E">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
       integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
@@ -147,6 +152,18 @@ sitemap: false
   .tctrl input[type=range]{width:100%;accent-color:var(--accent);height:22px;cursor:pointer;}
   .tticks{display:flex;justify-content:space-between;font-size:12px;font-family:ui-monospace,Menlo,monospace;color:var(--muted);margin-top:1px;}
   .tticks span{cursor:pointer;padding:2px 4px;border-radius:4px;} .tticks span.on{color:var(--accent);font-weight:700;background:var(--accent-tint);}
+  /* swipe compare (RF vs FM) */
+  .swipe{position:relative;height:min(58vh,480px);width:100%;overflow:hidden;touch-action:pan-y;}
+  .swipe-map{position:absolute;inset:0;height:100%;width:100%;}
+  .swipe-top{clip-path:inset(0 0 0 50%);will-change:clip-path;}
+  .swipe-label{position:absolute;top:12px;z-index:3;font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px;
+    background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(4px);pointer-events:none;}
+  .swipe-label.left{left:12px;color:var(--rf);} .swipe-label.right{right:12px;color:var(--fm);}
+  .swipe-div{position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;transform:translateX(-1.5px);z-index:4;cursor:ew-resize;box-shadow:0 0 0 1px rgba(0,0,0,.25);}
+  .swipe-div:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .swipe-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;
+    background:#fff;color:#334155;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35);font-size:16px;font-weight:700;}
+  .swipe-status{position:absolute;bottom:10px;left:12px;z-index:3;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);}
 
   /* charts */
   svg.chart{display:block;width:100%;height:auto;overflow:visible;}
@@ -231,10 +248,17 @@ sitemap: false
   .k-list li::before{content:"›";color:var(--accent);font-weight:700;margin-right:8px;}
   .js-reveal .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease;}
   .js-reveal .reveal.in{opacity:1;transform:none;}
-  @media (prefers-reduced-motion:reduce){.js-reveal .reveal{opacity:1;transform:none;transition:none;}}
+  /* reading progress */
+  .progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:50;transition:width .08s linear;}
+  /* scoreboard bars sweep out on reveal */
+  .board .bar{transform:scaleX(0);transform-origin:left;transition:transform 1s cubic-bezier(.2,.8,.2,1);}
+  .reveal.in .board .bar{transform:scaleX(1);}
+  @media (prefers-reduced-motion:reduce){.js-reveal .reveal{opacity:1;transform:none;transition:none;}
+    .board .bar{transform:none;transition:none;}}
 </style>
 </head>
 <body>
+<div class="progress" id="progress" aria-hidden="true"></div>
 <div class="topbar"><div class="wrap">
   <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
   <nav class="topnav">
@@ -386,14 +410,17 @@ sitemap: false
   <p>Watch it on the ground. The foundation model (green) tracks the whole arroyo corridor; the
     per-pixel RF (orange) fires in one corner and misses the rest — the 0.557-vs-0.889 gap, made visible.</p>
   <figure class="fig" id="wrap-arroyo">
-    <div id="map-arroyo" class="maplib"></div>
-    <div class="maplegend" aria-label="Arroyo map legend">
-      <button type="button" class="row" data-map="arroyo" data-layer="a-fm" aria-pressed="true"><span class="sw" style="background:#16a34a"></span> FM prediction · 0.889</button>
-      <button type="button" class="row" data-map="arroyo" data-layer="a-rf" aria-pressed="true"><span class="sw" style="background:#f97316"></span> RF prediction · 0.557</button>
-      <button type="button" class="row" data-map="arroyo" data-layer="a-truth" aria-pressed="true"><span class="sw ring"></span> NMRipMap truth</button>
-      <output id="status-arroyo" aria-live="polite">loading…</output>
+    <div class="swipe" id="swipe">
+      <div id="map-rf" class="maplib swipe-map"></div>
+      <div id="map-fm" class="maplib swipe-map swipe-top"></div>
+      <div class="swipe-label left">RF · 0.557</div>
+      <div class="swipe-label right">FM · 0.889</div>
+      <div class="swipe-div" id="swipe-div" role="slider" tabindex="0" aria-label="Drag to compare Random Forest and foundation model" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><div class="swipe-handle">⇔</div></div>
+      <output id="status-arroyo" class="swipe-status" aria-live="polite">loading…</output>
     </div>
-    <figcaption>Malpais arroyo, held out entirely from training. Imagery © Esri.</figcaption>
+    <figcaption><b>Drag the divider.</b> Left = per-pixel Random Forest (orange, fires in one corner);
+      right = fine-tuned foundation model (green, tracks the corridor). Same held-out Malpais arroyo,
+      same NMRipMap truth. The 0.557→0.889 gap, as a thing you can scrub. Imagery © Esri.</figcaption>
   </figure>
   <div class="note"><span class="t">Why AUC, not accuracy</span>
     Malpais is 82% invasive; a model that guessed "invasive everywhere" would score 82% accuracy and be
@@ -556,6 +583,11 @@ sitemap: false
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.10});
   document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
 
+  var prog=document.getElementById('progress');
+  function onScroll(){ var h=document.documentElement, max=h.scrollHeight-h.clientHeight;
+    if(prog) prog.style.width=(max>0?(h.scrollTop/max*100):0)+'%'; }
+  addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
   var SAT={version:8,sources:{sat:{type:'raster',
     tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
     tileSize:256,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}},
@@ -583,24 +615,40 @@ sitemap: false
     });
   })();
 
+  /* ---------- arroyo swipe: RF (left) vs FM (right), locked together ---------- */
   (function(){
     var status=document.getElementById('status-arroyo');
-    var map=new maplibregl.Map({container:'map-arroyo',center:[-108.760,36.850],zoom:11.7,style:SAT});
-    map.addControl(new maplibregl.NavigationControl(),'top-right');
-    map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}));
     var BBOX=[[-108.83,36.805],[-108.69,36.895]];
-    MAPS.arroyo={map:map,bbox:BBOX,ready:false};
-    map.on('error',function(e){ if(status) status.textContent='map error: '+(e.error&&e.error.message);});
-    map.on('load',function(){
-      map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
-      map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#94a3b8','line-width':1.1,'line-opacity':0.85}});
-      map.addSource('a-fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
-      map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.5}});
-      map.addSource('a-rf',{type:'geojson',data:'maps/rf_malpais_points.geojson'});
-      map.addLayer({id:'a-rf',type:'circle',source:'a-rf',paint:{'circle-radius':3.4,'circle-color':'#f97316','circle-opacity':0.9,'circle-stroke-width':0.5,'circle-stroke-color':'#7c2d12'}});
-      map.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
-      map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='FM covers the corridor · RF fires in one corner';});
-    });
+    var mapRF=new maplibregl.Map({container:'map-rf',center:[-108.760,36.850],zoom:11.7,style:SAT,attributionControl:false});
+    var mapFM=new maplibregl.Map({container:'map-fm',center:[-108.760,36.850],zoom:11.7,style:SAT});
+    mapFM.addControl(new maplibregl.NavigationControl(),'top-right');
+    MAPS.arroyo={map:mapFM,bbox:BBOX,ready:false};
+    function truth(m){ m.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
+      m.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1,'line-opacity':0.8}}); }
+    mapRF.on('load',function(){ truth(mapRF);
+      mapRF.addSource('rf',{type:'geojson',data:'maps/rf_malpais_points.geojson'});
+      mapRF.addLayer({id:'rf',type:'circle',source:'rf',paint:{'circle-radius':3.4,'circle-color':'#f97316','circle-opacity':0.92,'circle-stroke-width':0.5,'circle-stroke-color':'#7c2d12'}});
+      mapRF.fitBounds(BBOX,{padding:20,duration:0}); });
+    mapFM.on('load',function(){ truth(mapFM);
+      mapFM.addSource('fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
+      mapFM.addLayer({id:'fm',type:'fill',source:'fm',paint:{'fill-color':'#16a34a','fill-opacity':0.55}});
+      mapFM.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
+      mapFM.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='drag to compare'; }); });
+    var lock=false;
+    function sync(a,b){ a.on('move',function(){ if(lock)return; lock=true;
+      b.jumpTo({center:a.getCenter(),zoom:a.getZoom(),bearing:a.getBearing(),pitch:a.getPitch()}); lock=false; }); }
+    sync(mapRF,mapFM); sync(mapFM,mapRF);
+    var swipe=document.getElementById('swipe'), divi=document.getElementById('swipe-div'), top=document.getElementById('map-fm');
+    function setX(frac){ frac=Math.max(0,Math.min(1,frac)); var pct=frac*100;
+      divi.style.left=pct+'%'; top.style.clipPath='inset(0 0 0 '+pct+'%)'; divi.setAttribute('aria-valuenow',Math.round(pct)); }
+    function fromClientX(cx){ var r=swipe.getBoundingClientRect(); setX((cx-r.left)/r.width); }
+    var dragging=false;
+    divi.addEventListener('pointerdown',function(e){ dragging=true; try{divi.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
+    window.addEventListener('pointermove',function(e){ if(dragging) fromClientX(e.clientX); });
+    window.addEventListener('pointerup',function(){ dragging=false; });
+    divi.addEventListener('keydown',function(e){ var p=parseFloat(divi.getAttribute('aria-valuenow'))||50;
+      if(e.key==='ArrowLeft'){ setX((p-4)/100); e.preventDefault(); } else if(e.key==='ArrowRight'){ setX((p+4)/100); e.preventDefault(); } });
+    setX(0.5);
   })();
 
   /* ---------- time slider: invasive over the epochs (honest about pre-2000) ---------- */
