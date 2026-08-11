@@ -1,0 +1,458 @@
+---
+layout: null
+sitemap: false
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask the San Juan — a live map of where the invaders are</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The live agent endpoint. Empty by default -> the Q&A runs OFFLINE from a small
+     pre-written set. Set this to the deployed docintel URL (…/docs/ask) to go live,
+     or append ?agent=https://host/docs/ask to the page URL to try one ad-hoc. -->
+<meta name="agent-url" content="">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+      integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+        integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --ground:#f7f4ee; --panel:#fffdf8; --ink:#17211f; --muted:#5d6b64;
+    --line:#e2ddd1; --teal:#0e6b6b; --teal-2:#0a4f4f; --sediment:#cbbf9f;
+    --invasive:#c1443a; --native:#2f8f5b; --water:#2b6b8f;
+    --accent:var(--teal); --shadow:0 1px 2px rgba(20,40,35,.06),0 8px 30px rgba(20,40,35,.06);
+    --maxw:720px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){ --ground:#0f1b1d; --panel:#152628; --ink:#e7e9e4; --muted:#9fb0a8;
+      --line:#243a3c; --teal:#3fb8b0; --teal-2:#2a8f88; --sediment:#8a7f5f;
+      --invasive:#e0685e; --native:#5cbd85; --water:#5aa2c6; --accent:var(--teal);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.34);}
+  }
+  :root[data-theme="dark"]{ --ground:#0f1b1d; --panel:#152628; --ink:#e7e9e4; --muted:#9fb0a8;
+    --line:#243a3c; --teal:#3fb8b0; --teal-2:#2a8f88; --sediment:#8a7f5f;
+    --invasive:#e0685e; --native:#5cbd85; --water:#5aa2c6; --accent:var(--teal);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.34);}
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:17px;-webkit-font-smoothing:antialiased;}
+  .serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px;}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:600;}
+  h1{font-size:clamp(34px,6vw,54px);line-height:1.04;margin:.35em 0 .3em;text-wrap:balance;font-weight:600;}
+  h2{font-size:clamp(24px,4vw,32px);line-height:1.12;margin:0 0 .35em;text-wrap:balance;font-weight:600;}
+  h3{font-size:19px;margin:0 0 .2em;font-weight:700;}
+  p{margin:0 0 1em;}
+  a{color:var(--teal);text-underline-offset:3px;}
+  strong{font-weight:700;}
+
+  .topbar{position:sticky;top:0;z-index:40;backdrop-filter:blur(8px);
+    background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line);}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:52px;max-width:1000px;}
+  .brand{font-size:13px;font-weight:700;letter-spacing:.02em;display:flex;gap:9px;align-items:center;}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--invasive);box-shadow:0 0 0 3px color-mix(in srgb,var(--invasive) 22%,transparent);}
+  .tog{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:20px;
+    padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;}
+  .tog:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+  .hero{padding:64px 0 26px;position:relative;}
+  .hero .thesis{border-left:3px solid var(--invasive);padding:2px 0 2px 18px;margin:24px 0 8px;
+    font-size:20px;color:var(--ink);}
+  .hero .thesis .serif{font-style:italic;}
+  .lede{font-size:19px;color:var(--muted);max-width:60ch;}
+
+  .flow{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 8px;}
+  .flow .step{flex:1 1 120px;min-width:110px;border:1px solid var(--line);background:var(--panel);
+    border-radius:12px;padding:11px 13px;box-shadow:var(--shadow);}
+  .flow .step .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);font-weight:700;}
+  .flow .step .v{font-size:14px;font-weight:600;margin-top:2px;}
+
+  section{padding:40px 0;border-top:1px solid var(--line);}
+  .section-num{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0;}
+  .stat{border:1px solid var(--line);border-radius:13px;padding:15px 16px;background:var(--panel);box-shadow:var(--shadow);}
+  .stat .num{font-size:30px;font-weight:600;line-height:1;letter-spacing:-.01em;}
+  .stat .lab{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.35;}
+  .stat.win .num{color:var(--native);} .stat.lose .num{color:var(--invasive);} .stat.teal .num{color:var(--teal);}
+
+  .tbl{width:100%;border-collapse:collapse;margin:14px 0;font-size:15px;}
+  .tbl th,.tbl td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);}
+  .tbl th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+  .tbl td.n{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;text-align:right;}
+  .tbl tr.hi td{background:color-mix(in srgb,var(--native) 12%,transparent);}
+
+  .note{background:color-mix(in srgb,var(--sediment) 16%,transparent);border:1px solid var(--line);
+    border-left:3px solid var(--sediment);border-radius:10px;padding:13px 16px;font-size:15px;margin:16px 0;}
+  .note.warn{border-left-color:var(--invasive);background:color-mix(in srgb,var(--invasive) 8%,transparent);}
+
+  /* map */
+  .mapwrap{margin:22px 0 6px;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    background:var(--panel);box-shadow:var(--shadow);position:relative;}
+  #map{height:min(62vh,520px);width:100%;}
+  .maplegend{position:absolute;bottom:12px;right:12px;background:color-mix(in srgb,var(--panel) 94%,transparent);
+    border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12.5px;box-shadow:var(--shadow);z-index:2;}
+  .maplegend .row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;background:none;border:0;
+    font:inherit;color:var(--ink);text-align:left;width:100%;padding:2px 0;}
+  .maplegend .row.off{opacity:.4;}
+  .maplegend .row:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:3px;}
+  .maplegend .sw{width:14px;height:14px;border-radius:3px;}
+  .maplegend output{display:block;margin-top:7px;font-size:11px;color:var(--muted);}
+  figcaption{font-size:13.5px;color:var(--muted);padding:11px 15px;border-top:1px solid var(--line);}
+
+  /* Q&A — live agent */
+  .qa{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);
+    overflow:hidden;margin:22px 0;}
+  .qa-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;}
+  .qa-head .av{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--teal),var(--teal-2));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;}
+  .qa-head .t{font-size:14px;font-weight:700;} .qa-head .s{font-size:12px;color:var(--muted);}
+  .qa-head .live{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
+    border:1px solid var(--line);color:var(--muted);}
+  .qa-head .live.on{color:var(--native);border-color:color-mix(in srgb,var(--native) 45%,var(--line));}
+  .qa-head .live .pip{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:5px;}
+  .chat{padding:14px 16px;max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:11px;}
+  .msg{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.55;white-space:pre-wrap;}
+  .msg.a{align-self:flex-start;background:color-mix(in srgb,var(--teal) 9%,var(--panel));border:1px solid var(--line);}
+  .msg.u{align-self:flex-end;background:var(--teal);color:#fff;}
+  .msg .cites{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .msg .cite{font-size:11px;background:color-mix(in srgb,var(--water) 14%,transparent);color:var(--water);
+    border:1px solid color-mix(in srgb,var(--water) 30%,var(--line));border-radius:20px;padding:2px 9px;font-weight:600;}
+  .msg .geo{font-size:11px;background:color-mix(in srgb,var(--invasive) 12%,transparent);color:var(--invasive);
+    border:1px solid color-mix(in srgb,var(--invasive) 30%,var(--line));border-radius:20px;padding:2px 9px;
+    font-weight:600;cursor:pointer;}
+  .msg.think{color:var(--muted);font-style:italic;}
+  .qs{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px;}
+  .qs button{border:1px solid var(--line);background:var(--ground);color:var(--ink);border-radius:20px;
+    padding:7px 13px;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s;}
+  .qs button:hover{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 8%,var(--ground));}
+  .askrow{display:flex;gap:8px;padding:0 16px 16px;}
+  .askrow input{flex:1;border:1px solid var(--line);background:var(--ground);color:var(--ink);
+    border-radius:20px;padding:9px 14px;font-size:14px;font-family:inherit;}
+  .askrow input:disabled{opacity:.6;}
+  .askrow button{border:0;background:var(--teal);color:#fff;border-radius:20px;padding:9px 16px;font-weight:600;cursor:pointer;}
+  .askrow button:disabled{opacity:.6;cursor:default;}
+  .disc{font-size:12px;color:var(--muted);padding:0 18px 16px;}
+
+  footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);font-size:14px;}
+  .k-list{list-style:none;padding:0;margin:8px 0;} .k-list li{padding:3px 0;}
+  .k-list li::before{content:"›";color:var(--teal);font-weight:700;margin-right:8px;}
+  .js-reveal .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease;}
+  .js-reveal .reveal.in{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){.js-reveal .reveal{opacity:1;transform:none;transition:none;}}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <div class="brand"><span class="dot"></span> San Juan Riparian Watch — Live map</div>
+  <button class="tog" id="tog" aria-label="Toggle light or dark theme">◐ Theme</button>
+</div></div>
+
+<main>
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Interactive · San Juan River basin</div>
+  <h1 class="serif">Where are the invaders — and can you just ask?</h1>
+  <div class="thesis"><span class="serif">A green corridor is easy. The question a manager actually
+    has is <b>how much of it is the wrong plant</b> — and where.</span></div>
+  <p class="lede">This is the San Juan riparian corridor at Farmington, learned from satellite
+    time-series and NMRipMap labels. Scroll the findings, then ask the grounded agent at the
+    bottom — it answers from the project's own documents and cites them.</p>
+  <div class="flow">
+    <div class="step"><div class="k">Sensor</div><div class="v">Landsat / Sentinel-2</div></div>
+    <div class="step"><div class="k">Labels</div><div class="v">NMRipMap (native vs invasive)</div></div>
+    <div class="step"><div class="k">Signal</div><div class="v">Phenology · SWIR</div></div>
+    <div class="step"><div class="k">Ask</div><div class="v">Grounded, cited agent</div></div>
+  </div>
+</div></header>
+
+<section class="reveal"><div class="wrap">
+  <div class="section-num">01 · The corridor, and the invaders within it</div>
+  <h2 class="serif">23% of the mapped corridor is the wrong plant</h2>
+  <p>Green is the predicted riparian-woody corridor (<b>7.6&nbsp;km²</b>); red is the invasive
+    tamarisk / Russian-olive share <b>within</b> it (<b>1.7&nbsp;km²</b>). Toggle either layer in the
+    legend. Pan and zoom — this is the real prediction, on satellite imagery.</p>
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="maplegend" aria-label="Map legend and layer toggles">
+      <button type="button" class="row" data-layer="corridor" aria-pressed="true"><span class="sw" style="background:#2f8f5b"></span> riparian corridor (woody)</button>
+      <button type="button" class="row" data-layer="invasive" aria-pressed="true"><span class="sw" style="background:#c1443a"></span> invasive within corridor</button>
+      <button type="button" class="row" data-layer="askhi" aria-pressed="true"><span class="sw" style="background:#2b6b8f"></span> agent's answer location</button>
+      <output id="mapstatus" aria-live="polite">loading…</output>
+    </div>
+    <figcaption>San Juan River at Farmington · 2020 · Landsat, NMRipMap-labelled. Imagery © Esri.</figcaption>
+  </div>
+  <div class="note"><b>In-sample calibration (not independent validation):</b> the 23% masked
+    prediction <i>reproduces</i> the NMRipMap label proportion (15,656 / 67,625 woody pixels invasive
+    = 23%) — the model is well-calibrated to the 2020 labels it was trained on. A spatially-held-out
+    test is the proper next step. Invasive is masked to inside the corridor (the two classifiers are
+    independent).</div>
+</div></section>
+
+<section class="reveal"><div class="wrap">
+  <div class="section-num">02 · RF vs the foundation model</div>
+  <h2 class="serif">On rivers they tie. The arroyo is where they part.</h2>
+  <p>Across the four river-corridor reaches, a Random Forest and a fine-tuned foundation model
+    transfer about equally — roughly <b>0.80 AUC</b> apiece. The split shows up on the one
+    morphology the RF had no sibling to learn from: a dry <b>arroyo</b>.</p>
+  <div class="stats">
+    <div class="stat lose"><div class="num">0.557</div><div class="lab">RF, held-out arroyo (Malpais) — its one weak fold</div></div>
+    <div class="stat win"><div class="num">0.889</div><div class="lab">Fine-tuned foundation model, same arroyo</div></div>
+    <div class="stat teal"><div class="num">≈ tie</div><div class="lab">On the four river reaches (~0.80 AUC each)</div></div>
+  </div>
+  <p>That single number — the arroyo the per-pixel RF can't generalise to — is what the foundation
+    model's spatial context buys, and why it ships for the <b>invasive</b> task. For plain riparian
+    <b>extent</b>, RF is as good and free of a GPU.</p>
+</div></section>
+
+<section class="reveal"><div class="wrap">
+  <div class="section-num">03 · The beetle that didn't break it</div>
+  <h2 class="serif">A pre-registered control vetoed our own hypothesis</h2>
+  <p>We predicted a today-trained tamarisk classifier would <b>invert</b> before the tamarisk beetle
+    arrived (~2004–07), when the greenness signal flips. It didn't — tamarisk-vs-native holds across
+    the eras. And the negative control (Russian olive, which the beetle doesn't touch) moved
+    <b>seven times more</b> than the tamarisk "signal," so the data simply can't resolve a beetle
+    effect. Declaring the control in advance let it kill the result instead of us over-reading noise.</p>
+  <table class="tbl">
+    <thead><tr><th>taxon vs native (AUROC)</th><th class="n">2020</th><th class="n">2015</th><th class="n">2000 pre-beetle</th><th class="n">Δ</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td>tamarisk (signal)</td><td class="n">0.849</td><td class="n">0.813</td><td class="n">0.862</td><td class="n">+0.013</td></tr>
+      <tr><td>Russian olive (control)</td><td class="n">0.891</td><td class="n">0.767</td><td class="n">0.553</td><td class="n">−0.338</td></tr>
+    </tbody>
+  </table>
+  <p class="disc" style="padding:0">A control that should sit still instead cratered 0.34 — dominated by
+    the Landsat-5↔8 sensor change and small-sample drift. The honest read: beetle-robust discriminator,
+    and this in-basin sample is too small to say more.</p>
+</div></section>
+
+<section class="reveal"><div class="wrap">
+  <div class="section-num">04 · How far back can we see?</div>
+  <h2 class="serif">A trajectory we chose not to claim</h2>
+  <p>We tried to reconstruct invasive extent back to 1990 on the Landsat archive. The honest answer is
+    a <b>documented negative</b>: multi-year window composites, spectral indices and relative
+    radiometric normalisation stabilised the estimate across <b>2000–2010</b>, but before ~2000 —
+    pure Landsat-5 TM — single-year swings of ~1 percentage point swamp any trend. So there is
+    <b>no over-time trajectory claim here</b>, only the reliable present-day product above.</p>
+  <div class="note warn"><b>Why this is in the story:</b> the discipline that makes the 23% trustworthy
+    is the same one that makes us <i>not</i> draw a 1990→2020 line. A result you can't reproduce under
+    a reasonable change of recipe isn't a result yet.</div>
+</div></section>
+
+<section class="reveal"><div class="wrap">
+  <div class="section-num">05 · Ask the agent</div>
+  <h2 class="serif">Ask about any of this — it answers from the documents</h2>
+  <div class="qa">
+    <div class="qa-head"><div class="av">◑</div>
+      <div><div class="t">Riparian document agent</div><div class="s">Grounded in the watershed corpus + these findings</div></div>
+      <div class="live" id="livebadge" title="agent status"><span class="pip"></span><span id="livetext">offline</span></div>
+    </div>
+    <div class="chat" id="chat" role="log" aria-live="polite" aria-atomic="false">
+      <div class="msg a">Ask about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model
+        decision. Tap a question below, or type your own.</div>
+    </div>
+    <div class="qs" id="qs"></div>
+    <div class="askrow">
+      <input id="ask" type="text" placeholder="e.g. how much of the corridor is invasive?" aria-label="Ask a question">
+      <button id="send">Ask</button>
+    </div>
+    <div class="disc" id="disc">Connecting to the live agent…</div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <h3 class="serif" style="color:var(--ink);font-size:20px">The honest positioning</h3>
+  <ul class="k-list">
+    <li>Riparian <b>extent</b> is already solved for this basin (CO-RIP, κ 0.80) — the RF reproduces it; that's the control, not the contribution.</li>
+    <li>The invasive discriminator is <b>phenology / SWIR</b>, not NDVI — and it looks <b>beetle-robust</b>, though the in-basin sample is too small to prove it.</li>
+    <li>The foundation model earns its keep on <b>under-represented morphology</b> (the arroyo), not on the river corridors where RF already transfers.</li>
+    <li>What we won't claim: a pre-2000 trajectory. What is real: a present-day, corridor-masked, native-vs-invasive product.</li>
+  </ul>
+  <p style="margin-top:14px;font-size:13px">San Juan Riparian Watch · imagery via Microsoft Planetary
+    Computer · labels via NMRipMap · answers grounded + cited by a private RAG backend behind the
+    <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docintel/API_CONTRACT.md">public <code>/docs/ask</code> contract</a>.
+    See also the <a href="method-map.html">method walkthrough</a> and the
+    <a href="extent-vs-invasive.html">full-screen corridor map</a>.</p>
+</div></footer>
+</main>
+
+<script>
+(function(){
+  var root=document.documentElement, tog=document.getElementById('tog');
+  root.classList.add('js-reveal');
+  function cur(){var t=root.getAttribute('data-theme'); if(t)return t;
+    return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+  tog.addEventListener('click',function(){root.setAttribute('data-theme',cur()==='dark'?'light':'dark');});
+
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+
+  /* ---------- the flagship map ---------- */
+  var mapStatus=document.getElementById('mapstatus');
+  var map=new maplibregl.Map({
+    container:'map', center:[-108.260,36.745], zoom:11.6,
+    style:{version:8, sources:{sat:{type:'raster',
+      tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize:256, attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}},
+      layers:[{id:'sat',type:'raster',source:'sat'}]}
+  });
+  map.addControl(new maplibregl.NavigationControl(),'top-right');
+  map.addControl(new maplibregl.ScaleControl({maxWidth:120,unit:'metric'}));
+  var BBOX=[[-108.33,36.70],[-108.19,36.79]];
+  map.on('error',function(e){ if(mapStatus) mapStatus.textContent='map error: '+(e.error&&e.error.message);});
+  var mapReady=false;
+  map.on('load',function(){
+    map.addSource('corridor',{type:'geojson',data:'maps/present-extent-2020.geojson'});
+    map.addLayer({id:'corridor',type:'fill',source:'corridor',
+      paint:{'fill-color':'#2f8f5b','fill-opacity':0.42}});
+    map.addSource('invasive',{type:'geojson',data:'maps/present-invasive-in-corridor.geojson'});
+    map.addLayer({id:'invasive',type:'fill',source:'invasive',
+      paint:{'fill-color':'#c1443a','fill-opacity':0.8,'fill-outline-color':'#7f2a24'}});
+    // empty highlight source the agent can fill with a resolved answer-location
+    map.addSource('askhi',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({id:'askhi',type:'line',source:'askhi',
+      paint:{'line-color':'#2b6b8f','line-width':3,'line-opacity':0.9}});
+    map.fitBounds(BBOX,{padding:24,duration:0});
+    map.on('idle',function(){ if(mapStatus&&mapStatus.textContent==='loading…')
+      mapStatus.textContent='corridor 7.6 km² · invasive 1.7 km² (23%)';});
+    mapReady=true;
+    document.querySelectorAll('.maplegend .row[data-layer]').forEach(function(row){
+      row.addEventListener('click',function(){
+        var id=row.dataset.layer;
+        if(!map.getLayer(id))return;
+        var vis=map.getLayoutProperty(id,'visibility')==='none'?'visible':'none';
+        map.setLayoutProperty(id,'visibility',vis);
+        row.classList.toggle('off',vis==='none');
+        row.setAttribute('aria-pressed',String(vis==='visible'));
+      });
+    });
+  });
+  function showOnMap(features){
+    if(!mapReady||!map.getSource('askhi'))return false;
+    map.getSource('askhi').setData({type:'FeatureCollection',features:features});
+    try{
+      var b=new maplibregl.LngLatBounds();
+      features.forEach(function(f){ eachCoord(f.geometry,function(c){b.extend(c);}); });
+      if(!b.isEmpty()) map.fitBounds(b,{padding:60,maxZoom:13,duration:600});
+    }catch(_){}
+    document.getElementById('map').scrollIntoView({behavior:'smooth',block:'center'});
+    return true;
+  }
+  function eachCoord(geom,cb){ if(!geom)return; var c=geom.coordinates;
+    (function walk(a){ if(typeof a[0]==='number'){cb(a);return;} a.forEach(walk); })(c); }
+
+  /* ---------- the agent (live /docs/ask, offline fallback) ---------- */
+  var params=new URLSearchParams(location.search);
+  var AGENT_URL=(params.get('agent')||(document.querySelector('meta[name="agent-url"]')||{}).content||'').trim();
+
+  var chat=document.getElementById('chat'), qs=document.getElementById('qs'),
+      ask=document.getElementById('ask'), send=document.getElementById('send'),
+      disc=document.getElementById('disc'), badge=document.getElementById('livebadge'),
+      livetext=document.getElementById('livetext');
+  var LIVE=false, busy=false;
+
+  var SUGGEST=["How much of the corridor is invasive?","Does the foundation model beat the RF?",
+    "Did the tamarisk beetle break the classifier?","Why won't you claim a pre-2000 trajectory?",
+    "What is the phenology signal?"];
+  SUGGEST.forEach(function(q){var b=document.createElement('button');b.textContent=q;
+    b.addEventListener('click',function(){ if(!busy) answer(q); }); qs.appendChild(b);});
+
+  // Offline fallback answers — grounded in the findings on this page.
+  var FALLBACK=[
+    {k:["invasive","corridor","23","how much","percent","share"],
+     a:"About 23% of the mapped riparian corridor at Farmington is invasive tamarisk / Russian olive — 1.7 km² of invasive inside a 7.6 km² woody corridor. That figure is in-sample calibration to the 2020 NMRipMap labels, not an independent validation."},
+    {k:["foundation","fm","beat","rf","random forest","tie","arroyo","malpais"],
+     a:"On the four river-corridor reaches they tie at ~0.80 AUC. They part on the lone arroyo (Malpais): RF 0.557, the fine-tuned foundation model 0.889. That under-represented morphology is why the foundation model ships for the invasive task; for plain extent, RF is as good and needs no GPU."},
+    {k:["beetle","diorhabda","invert","inversion","control","russian olive"],
+     a:"No inversion. Tamarisk-vs-native holds 0.85 / 0.81 / 0.86 across 2020 / 2015 / 2000. The pre-registered negative control (Russian olive) moved 0.34 over the same span — about seven times the tamarisk 'signal' — so the data can't resolve a beetle effect. The control vetoes the claim."},
+    {k:["trajectory","1990","pre-2000","over time","history","deep time","past"],
+     a:"We won't claim a pre-2000 trajectory. Window composites, indices and relative radiometric normalisation stabilised 2000–2010, but before ~2000 (pure Landsat-5 TM) single-year swings of ~1 percentage point swamp any trend. It's a documented negative — only the present-day product is reliable."},
+    {k:["phenology","swir","ndvi","senescen","season","signal","discriminat"],
+     a:"The discriminator is phenology plus the short-wave-infrared water signature across a 12-month series — tamarisk greens and senesces on a different schedule than native cottonwood. Plain NDVI greenness is near-random for it; the timing and SWIR carry the signal."}
+  ];
+  function fallbackAnswer(text){
+    var t=text.toLowerCase(),best=null,bs=0;
+    FALLBACK.forEach(function(it){var s=0;it.k.forEach(function(k){ if(t.indexOf(k)>=0)s+=k.length;});
+      if(s>bs){bs=s;best=it;}});
+    return bs>0?best.a:"Offline right now, I can speak to what's on this page: the 23% invasive share, the RF-vs-foundation-model arroyo split, the beetle control, the pre-2000 negative, or the phenology signal.";
+  }
+
+  function bubbleUser(text){var d=document.createElement('div');d.className='msg u';d.textContent=text;
+    chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+  function bubbleThinking(){var d=document.createElement('div');d.className='msg a think';d.textContent='…thinking';
+    chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
+  function fillAnswer(node,textVal,citations,geoms){
+    node.classList.remove('think'); node.textContent=textVal;   // textContent: never render model output as HTML
+    if(citations&&citations.length){
+      var c=document.createElement('div');c.className='cites';
+      var seen={};
+      citations.forEach(function(ci){var s=(ci.source_file||ci.title||'').toString();
+        if(!s||seen[s])return;seen[s]=1;
+        var sp=document.createElement('span');sp.className='cite';sp.textContent='◆ '+s;c.appendChild(sp);});
+      if(c.children.length) node.appendChild(c);
+    }
+    if(geoms&&geoms.length){
+      var g=document.createElement('div');g.className='cites';
+      var feats=[];
+      geoms.forEach(function(rg){ if(!rg)return;
+        var label=rg.mention_text||rg.ref||'location';
+        var sp=document.createElement('span');sp.className='geo';sp.textContent='📍 '+label;
+        if(rg.geom){var feat={type:'Feature',geometry:rg.geom,properties:{}};feats.push(feat);
+          sp.addEventListener('click',function(){showOnMap([feat]);});}
+        g.appendChild(sp);});
+      if(g.children.length) node.appendChild(g);
+      if(feats.length) showOnMap(feats);
+    }
+    chat.scrollTop=chat.scrollHeight;
+  }
+
+  async function askLive(q){
+    var r=await fetch(AGENT_URL,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({question:q,top_k:8})});
+    if(!r.ok) throw new Error('agent '+r.status);
+    return await r.json();
+  }
+
+  function answer(text){
+    if(busy)return; busy=true; setBusy(true);
+    bubbleUser(text);
+    var node=bubbleThinking();
+    if(LIVE){
+      askLive(text).then(function(res){
+        fillAnswer(node, res.answer||'(no answer returned)', res.citations, res.resolved_geometries);
+      }).catch(function(err){
+        // live failed mid-session: degrade to the offline answer, note it once
+        fillAnswer(node, fallbackAnswer(text)+'\n\n(the live agent was unreachable just now — that was a pre-written answer.)');
+        setLive(false);
+      }).finally(function(){ busy=false; setBusy(false); });
+    }else{
+      setTimeout(function(){ fillAnswer(node, fallbackAnswer(text)); busy=false; setBusy(false); },200);
+    }
+  }
+  function setBusy(b){ ask.disabled=b; send.disabled=b; }
+  function setLive(on){ LIVE=on;
+    badge.classList.toggle('on',on); livetext.textContent=on?'live':'offline';
+    disc.textContent = on
+      ? 'Live: answers are generated by Claude, grounded in the watershed corpus, with citations.'
+      : 'Offline: pre-written answers about this page. The live agent (grounded + cited) turns on when its endpoint is configured.';
+  }
+  function go(){var v=ask.value.trim(); if(!v||busy)return; ask.value=''; answer(v);}
+  send.addEventListener('click',go);
+  ask.addEventListener('keydown',function(e){if(e.key==='Enter')go();});
+
+  // Probe the endpoint's /health to decide live vs offline.
+  setLive(false);
+  if(AGENT_URL){
+    disc.textContent='Connecting to the live agent…';
+    var healthUrl=AGENT_URL.replace(/\/docs\/ask\/?$/,'/health');
+    fetch(healthUrl,{method:'GET'}).then(function(r){return r.ok?r.json():Promise.reject();})
+      .then(function(){ setLive(true); }).catch(function(){ setLive(false); });
+  }
+})();
+</script>
+</body>
+</html>

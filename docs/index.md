@@ -20,6 +20,7 @@ question that actually matters to a watershed manager:
 
 | Document | What it is |
 |---|---|
+| **[▸ Live story map — ask the agent](story.html)** | The scrollytelling tour of the findings (23% invasive corridor · the RF-vs-foundation-model arroyo split · the beetle-control null · the pre-2000 negative) over the live Farmington map, ending in a **grounded, cited AI agent** you can ask. The agent is Claude behind the private RAG backend via the public `/docs/ask` contract; the page falls back to pre-written answers when the endpoint isn't configured. |
 | **[▸ Interactive method map](method-map.html)** | The whole method, made explorable — inputs → the phenology data cube → RF vs a fine-tuned foundation model → the output maps (with the real chips) → the honest findings, plus a guided Q&A. **Start here for the visual tour.** |
 | **[▸ Live extent map — Bloomfield reach](extent-map.html)** | The actual **product** artifact: predicted riparian extent (8,511 polygons, 8.0% of the AOI) from the pooled RF, over a reach it never trained on, on satellite imagery. The honest RF baseline the foundation model must beat. |
 | **[▸ FM vs RF — the arroyo](fm-vs-rf-malpais.html)** | The vivid win: over the held-out Malpais arroyo the FM (green, AUROC **0.889**) tracks the corridor while the RF (orange dots, **0.557**) fires in one corner. The foundation model's spatial context, made visible. |
