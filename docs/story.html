@@ -119,6 +119,10 @@ sitemap: false
   .note.warn{border-left-color:var(--warn);}
   .note.info{border-left-color:var(--accent);}
   .note .t{font-weight:700;display:block;margin-bottom:2px;}
+  .pull{font-size:20px;line-height:1.42;border-left:3px solid var(--accent);padding:4px 0 4px 20px;margin:20px 0;color:var(--ink);font-weight:500;text-wrap:balance;}
+  .pull em{font-style:normal;color:var(--invasive);font-weight:650;}
+  .tbl tr.bad td{background:color-mix(in srgb,var(--invasive) 8%,transparent);}
+  .tbl tr.bad td:last-child{color:var(--invasive);font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.04em;}
 
   /* figure card (charts + maps) */
   .fig{margin:22px 0 6px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
@@ -255,6 +259,30 @@ sitemap: false
   .reveal.in .board .bar{transform:scaleX(1);}
   @media (prefers-reduced-motion:reduce){.js-reveal .reveal{opacity:1;transform:none;transition:none;}
     .board .bar{transform:none;transition:none;}}
+  /* hero background motif */
+  .hero::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(55% 55% at 12% -5%, color-mix(in srgb,var(--accent) 13%,transparent), transparent 70%),
+               radial-gradient(45% 45% at 92% 10%, color-mix(in srgb,var(--native) 11%,transparent), transparent 72%);}
+  .hero-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+  .hero-bg svg{width:120%;height:100%;}
+  .hero-bg .flow{fill:none;stroke:var(--accent);stroke-width:1;opacity:.12;}
+  @keyframes drift{from{transform:translateX(0);}to{transform:translateX(-40px);}}
+  .hero-bg .g1{animation:drift 26s linear infinite alternate;}
+  .hero-bg .g2{animation:drift 34s linear infinite alternate-reverse;}
+  .hero-bg .g3{animation:drift 30s linear infinite alternate;}
+  @media (prefers-reduced-motion:reduce){.hero-bg .flow{animation:none;}}
+  /* chart lines draw in on reveal (solid lines only; dashed recipe lines stay dashed) */
+  .chart polyline:not([stroke-dasharray]){stroke-dasharray:900;stroke-dashoffset:900;}
+  .reveal.in .chart polyline:not([stroke-dasharray]){animation:draw 1.5s ease .15s forwards;}
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  @media (prefers-reduced-motion:reduce){.chart polyline:not([stroke-dasharray]){stroke-dasharray:none;stroke-dashoffset:0;animation:none;}}
+  /* how-it's-built architecture strip */
+  .arch{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;margin:6px 0;}
+  .arch .an{flex:1 1 108px;min-width:96px;border:1px solid var(--line);border-radius:11px;background:var(--panel-2);padding:11px 12px;}
+  .arch .an .ak{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);font-weight:700;}
+  .arch .an .av{font-size:12.5px;font-weight:650;margin-top:3px;}
+  .arch .aa{align-self:center;color:var(--subtle);font-size:16px;padding:0 3px;}
+  @media (max-width:640px){.arch .aa{transform:rotate(90deg);} .arch .an{flex-basis:100%;}}
 </style>
 </head>
 <body>
@@ -269,7 +297,15 @@ sitemap: false
 </div></div>
 
 <main>
-<header class="hero"><div class="wrap">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="none">
+      <path class="flow g1" d="M-20,54 C80,34 150,86 240,58 C320,34 372,74 420,52"/>
+      <path class="flow g2" d="M-20,112 C90,92 150,138 250,108 C338,82 380,124 420,102"/>
+      <path class="flow g3" d="M-20,168 C70,150 176,192 262,160 C348,132 392,170 420,156"/>
+    </svg>
+  </div>
+  <div class="wrap">
   <div class="eyebrow">Satellite remote sensing · foundation models · San Juan River basin</div>
   <h1>Finding the invaders, and knowing when not to trust the map</h1>
   <div class="thesis">Tamarisk and Russian olive have taken over Western riparian corridors. A green
@@ -353,7 +389,7 @@ sitemap: false
       <polyline fill="none" stroke="var(--native)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
         points="20,125 45.5,125 70.9,115 96.4,85 121.8,55 147.3,38 172.7,35 198.2,50 223.6,80 249.1,110 274.5,122 300,125"></polyline>
       <!-- tamarisk -->
-      <polyline fill="none" stroke="var(--invasive)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="0"
+      <polyline fill="none" stroke="var(--invasive)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
         points="20,125 45.5,122 70.9,105 96.4,75 121.8,50 147.3,40 172.7,40 198.2,42 223.6,55 249.1,75 274.5,100 300,118"></polyline>
       <text class="c-lab" x="20" y="145">Jan</text><text class="c-lab" x="147" y="145" text-anchor="middle">Jul</text><text class="c-lab" x="300" y="145" text-anchor="end">Dec</text>
       <text class="c-labb" x="150" y="33" fill="var(--invasive)">tamarisk</text>
@@ -531,9 +567,57 @@ sitemap: false
     credibility.</div>
 </div></section>
 
+<!-- ── AI-ASSISTED METHOD ──────────────────────────────────────────── -->
+<section class="reveal" id="ai-method"><div class="wrap">
+  <div class="kicker"><span class="n">07</span> · The other method — how the work itself stays honest</div>
+  <h2>AI-assisted research that catches its own errors</h2>
+  <p>This was built fast, with heavy AI assistance — which is exactly where research quietly goes wrong.
+    Hallucinated code is the <em>easy</em> failure; a compiler catches it. The dangerous ones are
+    <strong>semantic</strong>: they compile, pass the tests, and read beautifully.</p>
+  <blockquote class="pull">AI-assisted research fails by producing work that is fast, fluent, plausible,
+    and <em>wrong</em> — and the wrongness is invisible precisely because the output looks finished.
+    Exhortation doesn't fix this. Gates do.</blockquote>
+  <table class="tbl">
+    <thead><tr><th>Failure mode</th><th>Caught by</th></tr></thead>
+    <tbody>
+      <tr><td>Hallucinated API call</td><td class="n">the compiler</td></tr>
+      <tr><td>Wrong logic</td><td class="n">a unit test</td></tr>
+      <tr class="bad"><td>A retracted result still published as fact</td><td class="n">nothing</td></tr>
+      <tr class="bad"><td>A model scored against 45%-wrong labels</td><td class="n">nothing</td></tr>
+      <tr class="bad"><td>A novelty claim already falsified by a 2018 paper</td><td class="n">nothing</td></tr>
+    </tbody>
+  </table>
+  <p>So honesty here is <strong>mechanized, not exhorted.</strong> Retired numbers, withdrawn claims and
+    orphaned docs are caught by drift gates that run identically on a laptop and in CI. The finding, stated
+    plainly in <a href="method.md">the method write-up</a>: <strong>every rule that was merely
+    <em>documented</em> eventually drifted; every rule that was <em>mechanized</em> held.</strong></p>
+  <div class="note warn"><span class="t">The most honest receipt</span>
+    The project's own merge gate was <strong>theatre for 25 of its first 29 merged PRs</strong> — a
+    skipped AI review still posts a green check, and "no findings" is indistinguishable from "no review."
+    It was caught only because a reviewer asked a question that couldn't be answered without checking.
+    That failure is kept in the record, not scrubbed — which is the whole point.</div>
+  <h3 style="margin-top:28px">How it's built</h3>
+  <p>The same discipline runs through the stack — a reproducible EO pipeline, a typed spatial store, two
+    model tracks, a services API, and the grounded agent, each behind its own gate.</p>
+  <div class="arch">
+    <div class="an"><div class="ak">Ingest</div><div class="av">STAC ETL · Planetary Computer</div></div>
+    <div class="aa">→</div>
+    <div class="an"><div class="ak">Store</div><div class="av">PostGIS medallion · bronze→gold</div></div>
+    <div class="aa">→</div>
+    <div class="an"><div class="ak">Model</div><div class="av">Random Forest · OlmoEarth FM</div></div>
+    <div class="aa">→</div>
+    <div class="an"><div class="ak">Serve</div><div class="av">.NET API · MVT vector tiles</div></div>
+    <div class="aa">→</div>
+    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid-RAG agent</div></div>
+  </div>
+  <p style="margin-top:18px">The agent below is part of the same discipline: <strong>no source, no
+    claim.</strong> Grounding is enforced backend-side, so every sentence it returns is pinned to a
+    retrieved document you can open.</p>
+</div></section>
+
 <!-- ── AGENT ───────────────────────────────────────────────────────── -->
 <section class="reveal" id="agent"><div class="wrap">
-  <div class="kicker"><span class="n">07</span> · Interrogate it</div>
+  <div class="kicker"><span class="n">08</span> · Interrogate it</div>
   <h2>Ask the agent — it answers from the documents, and cites them</h2>
   <p>The findings above, the methods, and the underlying watershed literature are indexed in a
     hybrid-retrieval RAG system (dense + BM25). Ask anything: the answer is generated by Claude,
@@ -587,6 +671,18 @@ sitemap: false
   function onScroll(){ var h=document.documentElement, max=h.scrollHeight-h.clientHeight;
     if(prog) prog.style.width=(max>0?(h.scrollTop/max*100):0)+'%'; }
   addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+  // KPI count-up: animate every numeric token in each hero stat, preserving separators (→, %, .)
+  function countUp(el,dur){
+    var final=el.textContent, tokens=final.match(/[0-9]*\.?[0-9]+|[^0-9]+/g)||[final], start=null;
+    function fr(ts){ if(start===null)start=ts; var p=Math.min(1,(ts-start)/dur), e=1-Math.pow(1-p,3);
+      el.textContent=tokens.map(function(t){ if(/^[0-9]*\.?[0-9]+$/.test(t)){ var d=(t.split('.')[1]||'').length; return (parseFloat(t)*e).toFixed(d); } return t; }).join('');
+      if(p<1) requestAnimationFrame(fr); else el.textContent=final; }
+    requestAnimationFrame(fr);
+  }
+  if(!matchMedia('(prefers-reduced-motion:reduce)').matches){
+    document.querySelectorAll('.kpi .n').forEach(function(el,i){ setTimeout(function(){ countUp(el,900); },120+i*90); });
+  }
 
   var SAT={version:8,sources:{sat:{type:'raster',
     tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
