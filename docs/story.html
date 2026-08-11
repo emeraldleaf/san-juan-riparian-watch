@@ -132,6 +132,21 @@ sitemap: false
   .maplegend .sw{width:14px;height:14px;border-radius:4px;flex:none;}
   .maplegend .sw.ring{background:transparent;border:2px solid var(--truth);}
   .maplegend output{display:block;margin-top:7px;font-size:11px;color:var(--muted);}
+  /* time slider */
+  .tbadge{position:absolute;top:12px;left:12px;z-index:2;background:color-mix(in srgb,var(--panel) 92%,transparent);
+    border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow);backdrop-filter:blur(4px);display:flex;align-items:center;gap:9px;}
+  .tbadge b{font-size:17px;font-weight:800;letter-spacing:-.02em;}
+  .tbadge .cf{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;}
+  .tbadge .cf.ok{color:var(--native);background:color-mix(in srgb,var(--native) 12%,transparent);}
+  .tbadge .cf.mid{color:var(--accent);background:var(--accent-tint);}
+  .tbadge .cf.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);}
+  .twarn{position:absolute;top:12px;right:12px;max-width:56%;z-index:2;background:color-mix(in srgb,var(--warn) 13%,var(--panel));
+    border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line));border-left:3px solid var(--warn);
+    border-radius:10px;padding:8px 11px;font-size:12px;line-height:1.4;color:var(--ink);box-shadow:var(--shadow);}
+  .tctrl{padding:15px 18px 8px;}
+  .tctrl input[type=range]{width:100%;accent-color:var(--accent);height:22px;cursor:pointer;}
+  .tticks{display:flex;justify-content:space-between;font-size:12px;font-family:ui-monospace,Menlo,monospace;color:var(--muted);margin-top:1px;}
+  .tticks span{cursor:pointer;padding:2px 4px;border-radius:4px;} .tticks span.on{color:var(--accent);font-weight:700;background:var(--accent-tint);}
 
   /* charts */
   svg.chart{display:block;width:100%;height:auto;overflow:visible;}
@@ -451,6 +466,24 @@ sitemap: false
     radiometric normalization). Before 2000 they disagree by percentage points; 2000–2020 they converge —
     and the real rise there is <b>~2.7% → 3.5%</b>, scarcely larger than the ±0.6&nbsp;pp method noise.
     So: <b>no pre-2000 trajectory claim</b> — only the present-day product.</figcaption></figure>
+
+  <p style="margin-top:24px">See it directly. Drag the year: the map shows the model's actual invasive
+    prediction for each epoch, over the same corridor (green reference). Watch the flag in the corner —
+    from ~2000 on the estimate is stable; slide to 1990 and it turns amber, because that pure Landsat-5
+    map moves with the compositing recipe. <strong>This isn't a growth animation — it's a demonstration
+    of where the record stops being trustworthy.</strong></p>
+  <figure class="fig" id="wrap-time">
+    <div id="map-time" class="maplib"></div>
+    <div class="tbadge"><b id="tyear">2020</b><span class="cf ok" id="tconf">present-day · calibrated</span></div>
+    <div class="twarn" id="twarn" hidden>⚠ Not robust before ~2000 — the pre-beetle Landsat-5 estimate moves with the compositing recipe. Shown to demonstrate the limit, not a trend.</div>
+    <div class="tctrl">
+      <input type="range" id="yr" min="0" max="3" step="1" value="3" aria-label="Select year from 1990 to 2020">
+      <div class="tticks"><span>1990</span><span>2000</span><span>2010</span><span>2020</span></div>
+      <output id="status-time" aria-live="polite" style="font-size:11px;color:var(--muted)"></output>
+    </div>
+    <figcaption>Invasive-woody prediction over the Farmington corridor, per composite epoch. Green =
+      the 2020 riparian corridor reference; red = invasive prediction for the selected year. Imagery © Esri.</figcaption>
+  </figure>
 </div></section>
 
 <!-- ── RIGOR ───────────────────────────────────────────────────────── -->
@@ -568,6 +601,47 @@ sitemap: false
       map.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
       map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='FM covers the corridor · RF fires in one corner';});
     });
+  })();
+
+  /* ---------- time slider: invasive over the epochs (honest about pre-2000) ---------- */
+  (function(){
+    var YEARS=['1990','2000','2010','2020'];
+    var CONF={ '1990':{c:'warn',t:'not robust · recipe-dependent',warn:true},
+               '2000':{c:'mid',t:'stable window (edge)',warn:false},
+               '2010':{c:'mid',t:'stable window',warn:false},
+               '2020':{c:'ok',t:'present-day · calibrated',warn:false} };
+    var cache={}, ready=false;
+    var yearEl=document.getElementById('tyear'), confEl=document.getElementById('tconf'),
+        warnEl=document.getElementById('twarn'), slider=document.getElementById('yr'),
+        ticks=document.querySelectorAll('.tticks span'), status=document.getElementById('status-time');
+    var map=new maplibregl.Map({container:'map-time',center:[-108.260,36.745],zoom:11.4,style:SAT});
+    map.addControl(new maplibregl.NavigationControl(),'top-right');
+    map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}));
+    var BBOX=[[-108.33,36.70],[-108.19,36.79]];
+    function setEpoch(idx){
+      var y=YEARS[idx], cf=CONF[y];
+      if(yearEl) yearEl.textContent=y;
+      if(confEl){ confEl.textContent=cf.t; confEl.className='cf '+cf.c; }
+      if(warnEl) warnEl.hidden=!cf.warn;
+      ticks.forEach(function(s,k){ s.classList.toggle('on',k===idx); });
+      if(!ready) return;
+      function apply(gj){ if(map.getSource('epoch')) map.getSource('epoch').setData(gj); }
+      if(cache[y]){ apply(cache[y]); if(status) status.textContent=''; return; }
+      if(status) status.textContent='loading '+y+' composite…';
+      fetch('maps/deep-invasive-'+y+'.geojson').then(function(r){return r.json();})
+        .then(function(gj){ cache[y]=gj; apply(gj); if(status) status.textContent=''; })
+        .catch(function(){ if(status) status.textContent='could not load '+y; });
+    }
+    map.on('load',function(){
+      map.addSource('t-corridor',{type:'geojson',data:'maps/present-extent-2020.geojson'});
+      map.addLayer({id:'t-corridor',type:'line',source:'t-corridor',paint:{'line-color':'#16a34a','line-width':1.3,'line-opacity':0.9}});
+      map.addSource('epoch',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+      map.addLayer({id:'epoch',type:'fill',source:'epoch',paint:{'fill-color':'#e11d48','fill-opacity':0.72,'fill-outline-color':'#7f1d3a'}});
+      map.fitBounds(BBOX,{padding:22,duration:0}); ready=true; setEpoch(parseInt(slider.value,10));
+    });
+    if(slider) slider.addEventListener('input',function(){ setEpoch(parseInt(slider.value,10)); });
+    ticks.forEach(function(s,k){ s.addEventListener('click',function(){ if(slider) slider.value=k; setEpoch(k); }); });
+    setEpoch(slider?parseInt(slider.value,10):3);
   })();
 
   document.querySelectorAll('.maplegend .row[data-layer]').forEach(function(row){
