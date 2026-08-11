@@ -187,6 +187,19 @@ sitemap: false
   @keyframes glow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 0%,transparent);}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 14%,transparent);}}
   .msg.think{color:var(--muted);animation:glow 1.8s ease-in-out infinite;}
   @media (prefers-reduced-motion:reduce){.msg.think{animation:none;}}
+  /* rendered markdown inside an answer bubble */
+  .msg .md{white-space:normal;}
+  .msg .md>:first-child{margin-top:0;} .msg .md>:last-child{margin-bottom:0;}
+  .msg .md p{margin:0 0 .55em;}
+  .msg .md ul,.msg .md ol{margin:.2em 0 .55em;padding-left:1.25em;}
+  .msg .md li{margin:2px 0;}
+  .msg .md h4{font-size:14px;font-weight:700;margin:.5em 0 .3em;}
+  .msg .md strong{font-weight:700;}
+  .msg .md a{color:var(--accent);}
+  .msg .md code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--panel-2);padding:1px 5px;border-radius:5px;}
+  .msg .md table{border-collapse:collapse;width:100%;margin:.45em 0;font-size:12.5px;display:block;overflow-x:auto;}
+  .msg .md th,.msg .md td{border:1px solid var(--line);padding:5px 8px;text-align:left;}
+  .msg .md th{background:var(--panel-2);font-weight:700;}
   .qs{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px;}
   .qs button{border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s;}
   .qs button:hover{border-color:var(--accent);background:var(--accent-tint);color:var(--accent-2);}
@@ -624,8 +637,43 @@ sitemap: false
 
   function bubbleUser(text){var d=document.createElement('div');d.className='msg u';d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
   function bubbleThinking(){var d=document.createElement('div');d.className='msg a think';d.textContent='…thinking';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
+  // Safe markdown -> HTML: HTML-escape FIRST (model output can never inject tags),
+  // then convert a known token set. Handles bold, italic, code, links, headings,
+  // ordered/unordered lists, and GFM tables — what the LLM actually emits.
+  function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function mdInline(s){ return s
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'); }
+  function mdToHtml(md){
+    var lines=escH(md).replace(/\r/g,'').split('\n'), out=[], i=0, n=lines.length;
+    function isSep(l){return l.indexOf('-')>=0 && /^\s*\|?[\s:|-]*\|?\s*$/.test(l);}
+    function cells(l){return l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(function(x){return mdInline(x.trim());});}
+    while(i<n){ var line=lines[i];
+      if(/^\s*$/.test(line)){i++;continue;}
+      if(/^\s*\|.*\|\s*$/.test(line) && i+1<n && isSep(lines[i+1])){
+        var head=cells(line); i+=2; var rows=[];
+        while(i<n && /^\s*\|.*\|\s*$/.test(lines[i])){rows.push(cells(lines[i]));i++;}
+        out.push('<table><thead><tr>'+head.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+
+          rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>'); continue; }
+      var h=line.match(/^\s*#{1,6}\s+(.*)$/);
+      if(h){ out.push('<h4>'+mdInline(h[1].trim())+'</h4>'); i++; continue; }
+      if(/^\s*\d+\.\s+/.test(line)){ var it=[];
+        while(i<n && /^\s*\d+\.\s+/.test(lines[i])){it.push('<li>'+mdInline(lines[i].replace(/^\s*\d+\.\s+/,''))+'</li>');i++;}
+        out.push('<ol>'+it.join('')+'</ol>'); continue; }
+      if(/^\s*[-*+]\s+/.test(line)){ var it2=[];
+        while(i<n && /^\s*[-*+]\s+/.test(lines[i])){it2.push('<li>'+mdInline(lines[i].replace(/^\s*[-*+]\s+/,''))+'</li>');i++;}
+        out.push('<ul>'+it2.join('')+'</ul>'); continue; }
+      var para=[line]; i++;
+      while(i<n && !/^\s*$/.test(lines[i]) && !/^\s*(\d+\.|[-*+]|#{1,6})\s+/.test(lines[i]) && !/^\s*\|.*\|\s*$/.test(lines[i])){para.push(lines[i]);i++;}
+      out.push('<p>'+mdInline(para.join(' '))+'</p>');
+    }
+    return out.join('');
+  }
   function fillAnswer(node,textVal,citations,geoms){
-    node.classList.remove('think'); node.textContent=textVal;
+    node.classList.remove('think'); node.innerHTML='';
+    var mdiv=document.createElement('div'); mdiv.className='md'; mdiv.innerHTML=mdToHtml(textVal||''); node.appendChild(mdiv);
     if(citations&&citations.length){
       var c=document.createElement('div');c.className='cites';var seen={};
       citations.forEach(function(ci){var s=(ci.source_file||ci.title||'').toString(); if(!s||seen[s])return;seen[s]=1;
