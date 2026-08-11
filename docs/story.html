@@ -722,8 +722,10 @@ sitemap: false
     function truth(m){ m.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
       m.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1,'line-opacity':0.8}}); }
     mapRF.on('load',function(){ truth(mapRF);
-      mapRF.addSource('rf',{type:'geojson',data:'maps/rf_malpais_points.geojson'});
-      mapRF.addLayer({id:'rf',type:'circle',source:'rf',paint:{'circle-radius':3.4,'circle-color':'#f97316','circle-opacity':0.92,'circle-stroke-width':0.5,'circle-stroke-color':'#7c2d12'}});
+      // RF as a FILL (same representation as FM) so the swipe is like-for-like — RF
+      // just predicts far less: it fills only one corner. That sparseness IS the 0.557.
+      mapRF.addSource('rf',{type:'geojson',data:'maps/rf_malpais.geojson'});
+      mapRF.addLayer({id:'rf',type:'fill',source:'rf',paint:{'fill-color':'#f97316','fill-opacity':0.6,'fill-outline-color':'#7c2d12'}});
       mapRF.fitBounds(BBOX,{padding:20,duration:0}); });
     mapFM.on('load',function(){ truth(mapFM);
       mapFM.addSource('fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
