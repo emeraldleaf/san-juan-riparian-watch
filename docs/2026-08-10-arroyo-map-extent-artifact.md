@@ -80,6 +80,23 @@ So the Bloomfield FM-vs-RF map — which uses the RF layer the same way — is *
 the RF export does cover the full reach. The Malpais RF was a one-off partial export, not a systemic
 RF-mapping defect. That parity check is now the fix: it belongs in the map-layer checklist.
 
+## Follow-up (2026-08-12) — the valid full-extent RF, generated
+
+Rather than leave the arroyo without a real RF map, the prediction was regenerated properly: trained
+**leave-malpais-out** on the three river reaches and predicted the **full** cached arroyo grid
+(1598×1289 px), in memory-safe row-blocks. Two results:
+
+1. **It reproduces the metric** — held-out arroyo AUROC **0.561** (vs the documented 0.557; RF
+   run-to-run variance). The scored number was always sound, and now the map is too.
+2. **It settles "one corner."** Over the full grid the RF fires on just **0.1% of pixels — 157 polygons
+   in a thin strip** spanning the reach's length but almost no width. So the original "one corner" was
+   the partial export; the *true* RF behavior on the arroyo is **massive under-prediction** — it
+   recognizes only the thinnest channel pixels and misses the corridor the FM (and NMRipMap truth)
+   capture. The 0.561 AUROC — barely above random — made spatially honest.
+
+The valid layer is `docs/maps/rf_malpais_full.geojson` (full-extent). An honest RF-vs-FM map can now be
+rebuilt from it — the withdrawal was of the *artifact*, not of the comparison itself.
+
 ## Fixes required
 
 - **`story.html`** — remove or reframe the arroyo swipe: either regenerate the RF extent over the
