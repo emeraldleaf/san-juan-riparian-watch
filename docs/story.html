@@ -156,18 +156,6 @@ sitemap: false
   .tctrl input[type=range]{width:100%;accent-color:var(--accent);height:22px;cursor:pointer;}
   .tticks{display:flex;justify-content:space-between;font-size:12px;font-family:ui-monospace,Menlo,monospace;color:var(--muted);margin-top:1px;}
   .tticks span{cursor:pointer;padding:2px 4px;border-radius:4px;} .tticks span.on{color:var(--accent);font-weight:700;background:var(--accent-tint);}
-  /* swipe compare (RF vs FM) */
-  .swipe{position:relative;height:min(58vh,480px);width:100%;overflow:hidden;touch-action:pan-y;}
-  .swipe-map{position:absolute;inset:0;height:100%;width:100%;}
-  .swipe-top{clip-path:inset(0 0 0 50%);will-change:clip-path;}
-  .swipe-label{position:absolute;top:12px;z-index:3;font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px;
-    background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(4px);pointer-events:none;}
-  .swipe-label.left{left:12px;color:var(--rf);} .swipe-label.right{right:12px;color:var(--fm);}
-  .swipe-div{position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;transform:translateX(-1.5px);z-index:4;cursor:ew-resize;box-shadow:0 0 0 1px rgba(0,0,0,.25);}
-  .swipe-div:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-  .swipe-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;
-    background:#fff;color:#334155;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.35);font-size:16px;font-weight:700;}
-  .swipe-status{position:absolute;bottom:10px;left:12px;z-index:3;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);}
 
   /* charts */
   svg.chart{display:block;width:100%;height:auto;overflow:visible;}
@@ -443,20 +431,20 @@ sitemap: false
     mean 0.88) and leaves <b>one</b> hole — the arroyo, because it's the only arroyo. That gap is the
     foundation model's single predicted win, and it delivers.</figcaption></figure>
 
-  <p>Watch it on the ground. The foundation model (green) tracks the whole arroyo corridor; the
-    per-pixel RF (orange) fires in one corner and misses the rest — the 0.557-vs-0.889 gap, made visible.</p>
+  <p>The scoreboard above is the evidence — a scored, leave-one-reach-out transfer on the shared label
+    set. The map below shows the winning model against reality: the foundation model's prediction (green)
+    over the NMRipMap riparian truth (outline) for the same held-out arroyo.</p>
   <figure class="fig" id="wrap-arroyo">
-    <div class="swipe" id="swipe">
-      <div id="map-rf" class="maplib swipe-map"></div>
-      <div id="map-fm" class="maplib swipe-map swipe-top"></div>
-      <div class="swipe-label left">RF · 0.557</div>
-      <div class="swipe-label right">FM · 0.889</div>
-      <div class="swipe-div" id="swipe-div" role="slider" tabindex="0" aria-label="Drag to compare Random Forest and foundation model" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><div class="swipe-handle">⇔</div></div>
-      <output id="status-arroyo" class="swipe-status" aria-live="polite">loading…</output>
+    <div id="map-arroyo" class="maplib"></div>
+    <div class="maplegend" aria-label="Arroyo map legend">
+      <button type="button" class="row" data-map="arroyo" data-layer="a-fm" aria-pressed="true"><span class="sw" style="background:#16a34a"></span> FM prediction · 0.889</button>
+      <button type="button" class="row" data-map="arroyo" data-layer="a-truth" aria-pressed="true"><span class="sw ring"></span> NMRipMap truth</button>
+      <output id="status-arroyo" aria-live="polite">loading…</output>
     </div>
-    <figcaption><b>Drag the divider.</b> Left = per-pixel Random Forest (orange, fires in one corner);
-      right = fine-tuned foundation model (green, tracks the corridor). Same held-out Malpais arroyo,
-      same NMRipMap truth. The 0.557→0.889 gap, as a thing you can scrub. Imagery © Esri.</figcaption>
+    <figcaption>The foundation model against ground truth over the held-out Malpais arroyo. The RF-vs-FM
+      comparison is the <b>scored</b> one above (0.557 vs 0.889), not a map overlay — an earlier RF-vs-FM
+      overlay compared layers of unequal extent and was withdrawn
+      (<a href="2026-08-10-arroyo-map-extent-artifact.md">the catch</a>). Imagery © Esri.</figcaption>
   </figure>
   <div class="note"><span class="t">Why AUC, not accuracy</span>
     Malpais is 82% invasive; a model that guessed "invasive everywhere" would score 82% accuracy and be
@@ -711,42 +699,24 @@ sitemap: false
     });
   })();
 
-  /* ---------- arroyo swipe: RF (left) vs FM (right), locked together ---------- */
+  /* ---------- arroyo: FM prediction vs NMRipMap truth (RF is the scored bar, not a map:
+       its export covers only part of the reach — see the extent-artifact note) ---------- */
   (function(){
     var status=document.getElementById('status-arroyo');
+    var map=new maplibregl.Map({container:'map-arroyo',center:[-108.760,36.850],zoom:11.7,style:SAT});
+    map.addControl(new maplibregl.NavigationControl(),'top-right');
+    map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}));
     var BBOX=[[-108.83,36.805],[-108.69,36.895]];
-    var mapRF=new maplibregl.Map({container:'map-rf',center:[-108.760,36.850],zoom:11.7,style:SAT,attributionControl:false});
-    var mapFM=new maplibregl.Map({container:'map-fm',center:[-108.760,36.850],zoom:11.7,style:SAT});
-    mapFM.addControl(new maplibregl.NavigationControl(),'top-right');
-    MAPS.arroyo={map:mapFM,bbox:BBOX,ready:false};
-    function truth(m){ m.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
-      m.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1,'line-opacity':0.8}}); }
-    mapRF.on('load',function(){ truth(mapRF);
-      // RF as a FILL (same representation as FM) so the swipe is like-for-like — RF
-      // just predicts far less: it fills only one corner. That sparseness IS the 0.557.
-      mapRF.addSource('rf',{type:'geojson',data:'maps/rf_malpais.geojson'});
-      mapRF.addLayer({id:'rf',type:'fill',source:'rf',paint:{'fill-color':'#f97316','fill-opacity':0.6,'fill-outline-color':'#7c2d12'}});
-      mapRF.fitBounds(BBOX,{padding:20,duration:0}); });
-    mapFM.on('load',function(){ truth(mapFM);
-      mapFM.addSource('fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
-      mapFM.addLayer({id:'fm',type:'fill',source:'fm',paint:{'fill-color':'#16a34a','fill-opacity':0.55}});
-      mapFM.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
-      mapFM.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='drag to compare'; }); });
-    var lock=false;
-    function sync(a,b){ a.on('move',function(){ if(lock)return; lock=true;
-      b.jumpTo({center:a.getCenter(),zoom:a.getZoom(),bearing:a.getBearing(),pitch:a.getPitch()}); lock=false; }); }
-    sync(mapRF,mapFM); sync(mapFM,mapRF);
-    var swipe=document.getElementById('swipe'), divi=document.getElementById('swipe-div'), top=document.getElementById('map-fm');
-    function setX(frac){ frac=Math.max(0,Math.min(1,frac)); var pct=frac*100;
-      divi.style.left=pct+'%'; top.style.clipPath='inset(0 0 0 '+pct+'%)'; divi.setAttribute('aria-valuenow',Math.round(pct)); }
-    function fromClientX(cx){ var r=swipe.getBoundingClientRect(); setX((cx-r.left)/r.width); }
-    var dragging=false;
-    divi.addEventListener('pointerdown',function(e){ dragging=true; try{divi.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
-    window.addEventListener('pointermove',function(e){ if(dragging) fromClientX(e.clientX); });
-    window.addEventListener('pointerup',function(){ dragging=false; });
-    divi.addEventListener('keydown',function(e){ var p=parseFloat(divi.getAttribute('aria-valuenow'))||50;
-      if(e.key==='ArrowLeft'){ setX((p-4)/100); e.preventDefault(); } else if(e.key==='ArrowRight'){ setX((p+4)/100); e.preventDefault(); } });
-    setX(0.5);
+    MAPS.arroyo={map:map,bbox:BBOX,ready:false};
+    map.on('error',function(e){ if(status) status.textContent='map error: '+(e.error&&e.error.message);});
+    map.on('load',function(){
+      map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
+      map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1.1,'line-opacity':0.85}});
+      map.addSource('a-fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
+      map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.5}});
+      map.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
+      map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='FM prediction vs labeled truth'; });
+    });
   })();
 
   /* ---------- time slider: invasive over the epochs (honest about pre-2000) ---------- */
@@ -840,7 +810,7 @@ sitemap: false
     {k:["invasive","corridor","23","how much","percent","share"],
      a:"About 23% of the mapped riparian corridor at Farmington is invasive tamarisk / Russian olive — 1.7 km² of invasive inside a 7.6 km² woody corridor. That figure is in-sample calibration to the 2020 NMRipMap labels, not an independent validation."},
     {k:["foundation","fm","beat","rf","random forest","tie","arroyo","malpais","olmoearth"],
-     a:"On the four river-corridor reaches they tie at ~0.80–0.88 AUC. They part on the lone arroyo (Malpais): RF transfers at 0.557, the fine-tuned foundation model at 0.889 — the FM tracks the whole corridor while the RF fires in one corner. That under-represented morphology is why the foundation model ships for the invasive task; for plain extent, RF is as good and needs no GPU."},
+     a:"On the four river-corridor reaches they tie at ~0.80–0.88 AUC. They part on the lone arroyo (Malpais): RF transfers at 0.557 (barely above random), the fine-tuned foundation model at 0.889. That under-represented morphology — the one landform type the RF had no training sibling for — is why the foundation model ships for the invasive task; for plain extent, RF is as good and needs no GPU."},
     {k:["beetle","diorhabda","invert","inversion","control","russian olive"],
      a:"No inversion. Tamarisk-vs-native holds 0.85 / 0.81 / 0.86 across 2020 / 2015 / 2000. The pre-registered negative control (Russian olive) moved 0.34 over the same span — about seven times the tamarisk 'signal' — so the data can't resolve a beetle effect. The control vetoes the claim."},
     {k:["trajectory","1990","pre-2000","over time","history","deep time","past","5x","growth"],
