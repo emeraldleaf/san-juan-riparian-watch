@@ -23,8 +23,7 @@
   #info .stat b { display:block; font-size:22px; line-height:1.1; }
   #info .stat .fm b { color:#15803d; } #info .stat .rf b { color:#c2410c; }
   #info .stat span { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
-  .caveat { font-size:11.5px; color:#334155; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:10px;
-    border-left:3px solid #d97706; padding-left:10px; background:rgba(217,119,6,.06); border-radius:0 6px 6px 0; }
+  .caveat { font-size:11.5px; color:#334155; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:10px; }
   .caveat a { color:#b45309; }
   #legend { bottom:16px; right:16px; padding:12px 14px; font-size:12.5px; }
   #legend .row { display:flex; align-items:center; gap:8px; margin:4px 0; cursor:pointer; user-select:none; }
@@ -43,26 +42,28 @@
     <div class="rf"><b>0.557</b><span>RF riparian AUC</span></div>
   </div>
   <p>A narrow desert wash — the one morphology unlike the wide-river reaches the models trained on. On a
-  scored, <b>leave-one-reach-out</b> transfer measured on the shared label set, the per-pixel <b>RF is
-  near-chance (0.557)</b> while the foundation model, reading spatial context, reaches <b>0.889</b>. That
-  gap is why the FM earns its keep on under-represented morphology.</p>
-  <p style="margin-bottom:4px"><b>On the map:</b> green = FM predicted riparian, blue outline = NMRipMap
-  truth. The foundation model tracks the corridor.</p>
-  <p class="caveat"><b>Why no RF layer on the map:</b> an earlier version overlaid the RF prediction here,
-  but its export covers only ~1/5 of the reach — so the overlay compared <b>unequal extents</b> and was not
-  a valid RF-vs-FM map. It was withdrawn; the number above (0.557 vs 0.889) is the scored metric and is
-  unaffected. <a href="2026-08-10-arroyo-map-extent-artifact.md">The catch, and the lesson.</a></p>
+  scored <b>leave-one-reach-out</b> transfer, the per-pixel RF is near-chance (0.557) while the foundation
+  model, reading spatial context, reaches 0.889.</p>
+  <p style="margin-bottom:4px"><b>On the map</b> (over the NMRipMap-labeled reach): green = FM predicted
+  riparian, orange = RF predicted riparian, blue outline = NMRipMap truth. The RF <b>barely fires</b> — a
+  thin channel sliver over ~0.1% of the reach — while the FM tracks the corridor. Near-random ranking,
+  made spatial.</p>
+  <p class="caveat"><b>Note on the RF layer:</b> an earlier version of this map used a partial RF export
+  (~1/5 of the reach) and was withdrawn as an invalid comparison. This uses the <b>regenerated
+  full-extent</b> RF prediction (reproduces AUROC 0.561 vs the documented 0.557).
+  <a href="2026-08-10-arroyo-map-extent-artifact.md">The catch, and the lesson.</a></p>
 </div>
 
 <div id="legend" class="card">
   <div class="row" data-layer="fm-fill"><span class="sw" style="background:#22c55e"></span> FM riparian (0.889)</div>
+  <div class="row" data-layer="rf-fill"><span class="sw" style="background:#f97316"></span> RF riparian (0.557)</div>
   <div class="row" data-layer="truth-line"><span class="sw" style="background:transparent;border:2px solid #38bdf8"></span> NMRipMap truth</div>
   <output id="status" aria-live="polite" style="display:block;margin-top:8px;font-size:11px;color:#64748b">loading…</output>
 </div>
 
 <script>
   const map = new maplibregl.Map({
-    container: "map", center: [-108.747, 36.880], zoom: 12,
+    container: "map", center: [-108.747, 36.850], zoom: 12,
     style: { version: 8, sources: { sat: { type: "raster",
       tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
       tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" } },
@@ -70,20 +71,23 @@
   });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
-  const BBOX = [[-108.8217, 36.8096], [-108.6729, 36.9508]];
+  const BBOX = [[-108.82, 36.806], [-108.696, 36.893]];  // the NMRipMap-labeled reach
   const status = document.getElementById("status");
   map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
 
   map.on("load", () => {
-    map.addSource("fm", { type: "geojson", data: "maps/fm_malpais.geojson" });
-    map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
-      paint: { "fill-color": "#22c55e", "fill-opacity": 0.5 } });
     map.addSource("truth", { type: "geojson", data: "maps/truth_malpais.geojson" });
     map.addLayer({ id: "truth-line", type: "line", source: "truth",
       paint: { "line-color": "#38bdf8", "line-width": 1.5, "line-opacity": 0.95 } });
+    map.addSource("fm", { type: "geojson", data: "maps/fm_malpais.geojson" });
+    map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.45 } });
+    map.addSource("rf", { type: "geojson", data: "maps/rf_malpais_full.geojson" });
+    map.addLayer({ id: "rf-fill", type: "fill", source: "rf",
+      paint: { "fill-color": "#f97316", "fill-opacity": 0.9, "fill-outline-color": "#7c2d12" } });
     map.fitBounds(BBOX, { padding: 30, duration: 0 });
     map.on("idle", () => { if (status && status.textContent === "loading…")
-      status.textContent = "FM prediction vs labeled truth"; });
+      status.textContent = "RF barely fires · FM tracks the corridor"; });
     document.querySelectorAll("#legend .row[data-layer]").forEach((row) => {
       row.addEventListener("click", () => {
         const id = row.dataset.layer;

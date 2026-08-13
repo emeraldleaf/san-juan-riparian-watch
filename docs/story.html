@@ -431,19 +431,22 @@ sitemap: false
     mean 0.88) and leaves <b>one</b> hole — the arroyo, because it's the only arroyo. That gap is the
     foundation model's single predicted win, and it delivers.</figcaption></figure>
 
-  <p>The scoreboard above is the evidence — a scored, leave-one-reach-out transfer on the shared label
-    set. The map below shows the winning model against reality: the foundation model's prediction (green)
-    over the NMRipMap riparian truth (outline) for the same held-out arroyo.</p>
+  <p>All three on the ground, over the labeled reach: the foundation model (green) tracks the corridor;
+    NMRipMap truth (outline) is reality; and the Random Forest (orange), transferred to this arroyo,
+    <strong>barely fires</strong> — a thin channel sliver over ~0.1% of the reach. Near-random ranking
+    (0.557 AUC), made spatial. Both model layers are full-extent leave-one-reach-out predictions.</p>
   <figure class="fig" id="wrap-arroyo">
     <div id="map-arroyo" class="maplib"></div>
     <div class="maplegend" aria-label="Arroyo map legend">
       <button type="button" class="row" data-map="arroyo" data-layer="a-fm" aria-pressed="true"><span class="sw" style="background:#16a34a"></span> FM prediction · 0.889</button>
+      <button type="button" class="row" data-map="arroyo" data-layer="a-rf" aria-pressed="true"><span class="sw" style="background:#f97316"></span> RF prediction · 0.557</button>
       <button type="button" class="row" data-map="arroyo" data-layer="a-truth" aria-pressed="true"><span class="sw ring"></span> NMRipMap truth</button>
       <output id="status-arroyo" aria-live="polite">loading…</output>
     </div>
-    <figcaption>The foundation model against ground truth over the held-out Malpais arroyo. The RF-vs-FM
-      comparison is the <b>scored</b> one above (0.557 vs 0.889), not a map overlay — an earlier RF-vs-FM
-      overlay compared layers of unequal extent and was withdrawn
+    <figcaption>RF vs FM over the held-out Malpais arroyo — both full-extent leave-one-reach-out
+      predictions, viewed over the NMRipMap-labeled reach. The RF under-predicts massively (a thin
+      sliver); the FM tracks the corridor — the 0.557-vs-0.889 gap. An earlier version used a partial RF
+      export and was withdrawn; this uses the regenerated full-extent RF
       (<a href="2026-08-10-arroyo-map-extent-artifact.md">the catch</a>). Imagery © Esri.</figcaption>
   </figure>
   <div class="note"><span class="t">Why AUC, not accuracy</span>
@@ -699,23 +702,26 @@ sitemap: false
     });
   })();
 
-  /* ---------- arroyo: FM prediction vs NMRipMap truth (RF is the scored bar, not a map:
-       its export covers only part of the reach — see the extent-artifact note) ---------- */
+  /* ---------- arroyo: RF vs FM vs NMRipMap truth over the held-out reach. Both RF
+       (rf_malpais_full) and FM are full-extent leave-one-reach-out predictions; the view is
+       fit to the labeled reach where truth exists — the valid comparison region. ---------- */
   (function(){
     var status=document.getElementById('status-arroyo');
     var map=new maplibregl.Map({container:'map-arroyo',center:[-108.760,36.850],zoom:11.7,style:SAT});
     map.addControl(new maplibregl.NavigationControl(),'top-right');
     map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}));
-    var BBOX=[[-108.83,36.805],[-108.69,36.895]];
+    var BBOX=[[-108.82,36.806],[-108.696,36.893]];   // the NMRipMap-labeled reach
     MAPS.arroyo={map:map,bbox:BBOX,ready:false};
     map.on('error',function(e){ if(status) status.textContent='map error: '+(e.error&&e.error.message);});
     map.on('load',function(){
       map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
       map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1.1,'line-opacity':0.85}});
       map.addSource('a-fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
-      map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.5}});
+      map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.45}});
+      map.addSource('a-rf',{type:'geojson',data:'maps/rf_malpais_full.geojson'});
+      map.addLayer({id:'a-rf',type:'fill',source:'a-rf',paint:{'fill-color':'#f97316','fill-opacity':0.9,'fill-outline-color':'#7c2d12'}});
       map.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
-      map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='FM prediction vs labeled truth'; });
+      map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='RF barely fires · FM tracks the corridor'; });
     });
   })();
 
