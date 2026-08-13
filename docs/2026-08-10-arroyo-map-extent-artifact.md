@@ -88,11 +88,13 @@ Rather than leave the arroyo without a real RF map, the prediction was regenerat
 
 1. **It reproduces the metric** — held-out arroyo AUROC **0.561** (vs the documented 0.557; RF
    run-to-run variance). The scored number was always sound, and now the map is too.
-2. **It settles "one corner."** Over the full grid the RF fires on just **0.1% of pixels — 157 polygons
-   in a thin strip** spanning the reach's length but almost no width. So the original "one corner" was
-   the partial export; the *true* RF behavior on the arroyo is **massive under-prediction** — it
-   recognizes only the thinnest channel pixels and misses the corridor the FM (and NMRipMap truth)
-   capture. The 0.561 AUROC — barely above random — made spatially honest.
+2. **It settles "one corner."** Over the full grid the RF fires on just **0.1% of pixels (157 polygons)**,
+   confined to the **wetter eastern end** of the reach — the part whose spectra resemble the river reaches
+   it trained on — and misses the western dry wash the FM (and NMRipMap truth) capture. So the original
+   "one corner" was the partial export; the *true* RF behavior is **genuine under-prediction**. And this
+   time the confinement was **verified, not assumed**: the cached S2 cube is 100% valid across the full
+   width (west half 100%, east half 100%), so the east-only firing is model behavior, not a data gap —
+   exactly the extent/coverage check this whole note is about, applied to its own follow-up.
 
 The valid layer is `docs/maps/rf_malpais_full.geojson` (full-extent). An honest RF-vs-FM map can now be
 rebuilt from it — the withdrawal was of the *artifact*, not of the comparison itself.

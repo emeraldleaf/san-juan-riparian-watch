@@ -433,8 +433,11 @@ sitemap: false
 
   <p>All three on the ground, over the labeled reach: the foundation model (green) tracks the corridor;
     NMRipMap truth (outline) is reality; and the Random Forest (orange), transferred to this arroyo,
-    <strong>barely fires</strong> — a thin channel sliver over ~0.1% of the reach. Near-random ranking
-    (0.557 AUC), made spatial. Both model layers are full-extent leave-one-reach-out predictions.</p>
+    fires <strong>only in the wetter eastern end</strong> — the part whose spectra resemble the river
+    reaches it trained on — and misses the western dry wash that FM and truth both capture. That's
+    genuine under-prediction (~0.1% of pixels; <strong>verified against a fully-covered cube</strong>,
+    not a data gap), and it's the 0.557-vs-0.889 gap made spatial: to the eye, the FM is simply more
+    accurate. Both model layers are full-extent leave-one-reach-out predictions.</p>
   <figure class="fig" id="wrap-arroyo">
     <div id="map-arroyo" class="maplib"></div>
     <div class="maplegend" aria-label="Arroyo map legend">
@@ -444,10 +447,11 @@ sitemap: false
       <output id="status-arroyo" aria-live="polite">loading…</output>
     </div>
     <figcaption>RF vs FM over the held-out Malpais arroyo — both full-extent leave-one-reach-out
-      predictions, viewed over the NMRipMap-labeled reach. The RF under-predicts massively (a thin
-      sliver); the FM tracks the corridor — the 0.557-vs-0.889 gap. An earlier version used a partial RF
-      export and was withdrawn; this uses the regenerated full-extent RF
-      (<a href="2026-08-10-arroyo-map-extent-artifact.md">the catch</a>). Imagery © Esri.</figcaption>
+      predictions, viewed over the NMRipMap-labeled reach. The RF fires only in the wetter east and
+      misses the western wash; the FM tracks the whole corridor — the 0.557-vs-0.889 gap. (An earlier
+      version used a partial RF export and was withdrawn; this uses the regenerated full-extent RF,
+      verified against a fully-covered cube — <a href="2026-08-10-arroyo-map-extent-artifact.md">the
+      catch</a>.) Imagery © Esri.</figcaption>
   </figure>
   <div class="note"><span class="t">Why AUC, not accuracy</span>
     Malpais is 82% invasive; a model that guessed "invasive everywhere" would score 82% accuracy and be

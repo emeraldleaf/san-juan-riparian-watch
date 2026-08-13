@@ -45,9 +45,10 @@
   scored <b>leave-one-reach-out</b> transfer, the per-pixel RF is near-chance (0.557) while the foundation
   model, reading spatial context, reaches 0.889.</p>
   <p style="margin-bottom:4px"><b>On the map</b> (over the NMRipMap-labeled reach): green = FM predicted
-  riparian, orange = RF predicted riparian, blue outline = NMRipMap truth. The RF <b>barely fires</b> — a
-  thin channel sliver over ~0.1% of the reach — while the FM tracks the corridor. Near-random ranking,
-  made spatial.</p>
+  riparian, orange = RF predicted riparian, blue outline = NMRipMap truth. The RF fires <b>only in the
+  wetter eastern end</b> — where the spectra resemble the river reaches it trained on — and misses the
+  western dry wash that the FM tracks. Genuine under-prediction (~0.1% of pixels, verified against a
+  fully-covered cube), and the 0.557-vs-0.889 gap made spatial.</p>
   <p class="caveat"><b>Note on the RF layer:</b> an earlier version of this map used a partial RF export
   (~1/5 of the reach) and was withdrawn as an invalid comparison. This uses the <b>regenerated
   full-extent</b> RF prediction (reproduces AUROC 0.561 vs the documented 0.557).
