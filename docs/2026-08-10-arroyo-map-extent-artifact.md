@@ -64,6 +64,22 @@ picture was decoration that got promoted to evidence.
    the mechanism is written down in the corpus. Grounding pins claims to sources; it does not verify that
    the claim matches the pixels.
 
+## Scope check — was this systemic?
+
+Applying the lesson immediately: every multi-layer overlay on the site was checked for extent parity
+(max/min layer-width ratio). **The artifact was isolated to Malpais RF.**
+
+| overlay | layers | width ratio | verdict |
+|---|---|---|---|
+| Bloomfield | `fm_bloomfield` · `extent-bloomfield-rf` · `nmripmap-bloomfield` | 1.1× | ✅ valid — RF covers the full reach |
+| Farmington flagship | `present-extent-2020` · `present-invasive-in-corridor` | 1.0× | ✅ valid |
+| deep-time epochs | `deep-invasive-{1990,2000,2010,2020}` | 1.0× | ✅ valid — the time slider is sound |
+| **Malpais** | `fm_malpais` · `rf_malpais` · `truth_malpais` | **5.6×** | ⚠ the artifact (this note) |
+
+So the Bloomfield FM-vs-RF map — which uses the RF layer the same way — is **legitimate**, because there
+the RF export does cover the full reach. The Malpais RF was a one-off partial export, not a systemic
+RF-mapping defect. That parity check is now the fix: it belongs in the map-layer checklist.
+
 ## Fixes required
 
 - **`story.html`** — remove or reframe the arroyo swipe: either regenerate the RF extent over the
