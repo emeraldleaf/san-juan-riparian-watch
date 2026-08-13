@@ -6,14 +6,15 @@ sitemap: false
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Mapping the invaders of the San Juan — a research story</title>
+<title>Mapping the invaders — an independent field test of OlmoEarth</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Learning where riparian vegetation is — and how much of it is invasive tamarisk and Russian olive — from satellite time-series, with the rigor shown and a grounded AI agent to interrogate it.">
+<meta name="description" content="An independent, leave-one-reach-out field evaluation of Ai2's OlmoEarth foundation model on San Juan riparian mapping — where it beats a Random Forest and where it ties — with the whole interactive running on Ai2's open stack (OlmoEarth + OLMo).">
+<meta name="keywords" content="OlmoEarth, Ai2, Allen Institute for AI, OLMo, Earth-observation foundation model, remote sensing, riparian, tamarisk, invasive species, leave-one-reach-out, Sentinel-2, Landsat, RAG, San Juan River">
 <!-- Live agent endpoint. Empty -> the Q&A runs OFFLINE from a small pre-written set.
      Set to the deployed docintel URL (…/docs/ask), or append ?agent=https://host/docs/ask. -->
 <meta name="agent-url" content="">
-<meta property="og:title" content="Mapping the invaders of the San Juan">
-<meta property="og:description" content="Learning where riparian vegetation is — and how much is invasive tamarisk and Russian olive — from satellite time-series, with the rigor shown and a grounded AI agent to interrogate it.">
+<meta property="og:title" content="Mapping the invaders — an independent field test of OlmoEarth">
+<meta property="og:description" content="Ai2's OlmoEarth vs a Random Forest on San Juan riparian mapping (leave-one-reach-out), with the whole interactive running on Ai2's open stack — OlmoEarth sees, OLMo answers.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%2316a34a'/%3E%3Cpath d='M16 12c-3 4-4 7 0 12' fill='none' stroke='%23e11d48' stroke-width='2'/%3E%3C/svg%3E">
@@ -97,6 +98,13 @@ sitemap: false
   .chip{font-size:11.5px;font-weight:600;color:var(--muted);background:var(--panel-2);
     border:1px solid var(--line);border-radius:20px;padding:5px 11px;}
   .chip b{color:var(--ink);font-weight:700;}
+  .chip.ai2{background:var(--accent-tint);border-color:color-mix(in srgb,var(--accent) 32%,var(--line));color:var(--accent-2);}
+  .chip.ai2 b{color:var(--accent-2);}
+  .ai2note{display:flex;gap:12px;align-items:flex-start;margin:18px 0 4px;padding:14px 16px;border-radius:14px;
+    background:var(--accent-tint);border:1px solid color-mix(in srgb,var(--accent) 26%,var(--line));box-shadow:var(--shadow);}
+  .ai2note .badge{flex:none;font-size:11px;font-weight:800;letter-spacing:.02em;color:#fff;background:var(--accent);
+    border-radius:8px;padding:5px 9px;margin-top:1px;}
+  .ai2note p{margin:0;font-size:14px;} .ai2note b{color:var(--accent-2);}
 
   section{padding:46px 0;border-top:1px solid var(--line);}
   .kicker{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle);font-weight:700;margin-bottom:6px;}
@@ -294,30 +302,38 @@ sitemap: false
     </svg>
   </div>
   <div class="wrap">
-  <div class="eyebrow">Satellite remote sensing · foundation models · San Juan River basin</div>
+  <div class="eyebrow">Ai2 OlmoEarth · an independent field evaluation · San Juan River basin</div>
   <h1>Finding the invaders, and knowing when not to trust the map</h1>
   <div class="thesis">Tamarisk and Russian olive have taken over Western riparian corridors. A green
     map is easy; the honest question is <strong>how much of the corridor is the wrong plant, where,
     and how sure can we be.</strong></div>
   <p class="lede">This maps riparian woody vegetation and its invasive share from Landsat / Sentinel-2
-    time-series, benchmarks a Random Forest against a fine-tuned Earth-observation <strong>foundation
-    model</strong>, and — the part most projects skip — shows the tests that made two tempting results
-    fall apart. At the end, a grounded AI agent lets you interrogate the whole thing.</p>
+    time-series and puts a Random Forest head-to-head with <strong>Ai2's OlmoEarth</strong>
+    foundation model — a real, leave-one-reach-out field test of where the FM earns its keep and where
+    it ties. It also shows the tests that made two tempting results fall apart. And the grounded agent
+    that answers your questions at the end runs on <strong>Ai2's OLMo</strong>: OlmoEarth sees, OLMo speaks.</p>
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
-    <div class="kpi"><div class="n b">0.557→0.889</div><div class="l">RF→foundation-model AUC on the held-out arroyo</div></div>
+    <div class="kpi"><div class="n b">0.557→0.889</div><div class="l">RF→OlmoEarth AUC on the held-out arroyo</div></div>
     <div class="kpi"><div class="n">1984→</div><div class="l">Landsat archive depth we probed — and where it breaks</div></div>
     <div class="kpi"><div class="n g">2</div><div class="l">tempting results a pre-registered test killed</div></div>
   </div>
 
   <div class="stack">
+    <span class="chip ai2"><b>OlmoEarth</b> · Ai2 EO foundation model</span>
+    <span class="chip ai2"><b>OLMo</b> · Ai2 open LLM (the agent)</span>
     <span class="chip"><b>STAC</b> · Microsoft Planetary Computer</span>
     <span class="chip"><b>Sentinel-2</b> 10 m · <b>Landsat</b> 30 m, 1984→</span>
-    <span class="chip"><b>OlmoEarth</b> foundation model</span>
     <span class="chip">Random Forest · 144-D spectro-temporal</span>
-    <span class="chip"><b>PostGIS</b> medallion ETL</span>
-    <span class="chip">Grounded <b>RAG</b> agent (this page)</span>
+    <span class="chip"><b>PostGIS</b> medallion ETL · hybrid RAG</span>
+  </div>
+
+  <div class="ai2note">
+    <span class="badge">Ai2 stack</span>
+    <p>Built end-to-end on the Allen Institute for AI's open models: <b>OlmoEarth</b> (Earth-observation
+      foundation model) delineates the vegetation, and <b>OLMo</b> (open LLM) grounds every answer in the
+      documents. An independent test and an application of Ai2's models — not a benchmark they ran themselves.</p>
   </div>
 </div></header>
 
@@ -411,12 +427,14 @@ sitemap: false
 
 <!-- ── FINDING 2: RF vs FM ────────────────────────────────────────── -->
 <section class="reveal" id="models"><div class="wrap">
-  <div class="kicker"><span class="n">03</span> · Random Forest vs a foundation model</div>
+  <div class="kicker"><span class="n">03</span> · The OlmoEarth field test — Random Forest vs Ai2's foundation model</div>
   <h2>On rivers they tie. One arroyo decides it.</h2>
   <p>The real test isn't in-sample accuracy — it's <strong>leave-one-reach-out transfer</strong>: train
     on some reaches, predict a reach the model has never seen. A per-pixel Random Forest, pooled across
     four morphologically diverse reaches, transfers <em>well</em> to unseen river corridors. But it has
-    exactly one hole — the lone <strong>arroyo</strong>, the only example of its kind.</p>
+    exactly one hole — the lone <strong>arroyo</strong>, the only example of its kind. That gap is
+    precisely OlmoEarth's predicted opening: <strong>spatial context on under-represented morphology</strong>.
+    This is the honest field test of whether the FM earns it.</p>
 
   <figure class="fig"><div class="body">
     <div class="board" role="img" aria-label="Leave-one-reach-out transfer AUC: Farmington 0.905, Aztec/Animas 0.886, Kirtland 0.845, Malpais arroyo 0.557, where the foundation model reaches 0.889.">
@@ -427,9 +445,13 @@ sitemap: false
     </div>
     <div class="baseline">Bars = Random Forest transfer AUC (0.5 = random, at the left edge). The green
       tick on the arroyo is the fine-tuned foundation model: <b>0.557 → 0.889</b>.</div>
-  </div><figcaption>Diverse-reach pooling closes transfer for the <b>common</b> morphology (rivers,
-    mean 0.88) and leaves <b>one</b> hole — the arroyo, because it's the only arroyo. That gap is the
-    foundation model's single predicted win, and it delivers.</figcaption></figure>
+  </div><figcaption><b>OlmoEarth eval card.</b> Task: riparian extent. Protocol: leave-one-reach-out
+    transfer over 4 morphologically diverse reaches, scored once on the held-out reach (shared NMRipMap
+    labels). Result: RF and OlmoEarth tie on the <b>common</b> morphology (rivers, mean 0.88); OlmoEarth
+    wins the <b>under-represented</b> one — the arroyo, its single predicted opening — <b>0.557 → 0.889</b>.
+    Model: OlmoEarth (Ai2) fine-tuned on the pooled reaches. Reproducible: <a
+    href="2026-08-01-fm-vs-rf-loro-result.md">the LORO result</a> · <a
+    href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">the pre-registered eval contract</a>.</figcaption></figure>
 
   <p>All three on the ground, over the labeled reach: the foundation model (green) tracks the corridor;
     NMRipMap truth (outline) is reality; and the Random Forest (orange), transferred to this arroyo,
@@ -599,11 +621,11 @@ sitemap: false
     <div class="aa">→</div>
     <div class="an"><div class="ak">Store</div><div class="av">PostGIS medallion · bronze→gold</div></div>
     <div class="aa">→</div>
-    <div class="an"><div class="ak">Model</div><div class="av">Random Forest · OlmoEarth FM</div></div>
+    <div class="an"><div class="ak">Model</div><div class="av">Random Forest · OlmoEarth (Ai2)</div></div>
     <div class="aa">→</div>
     <div class="an"><div class="ak">Serve</div><div class="av">.NET API · MVT vector tiles</div></div>
     <div class="aa">→</div>
-    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid-RAG agent</div></div>
+    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid RAG on OLMo</div></div>
   </div>
   <p style="margin-top:18px">The agent below is part of the same discipline: <strong>no source, no
     claim.</strong> Grounding is enforced backend-side, so every sentence it returns is pinned to a
@@ -615,9 +637,10 @@ sitemap: false
   <div class="kicker"><span class="n">08</span> · Interrogate it</div>
   <h2>Ask the agent — it answers from the documents, and cites them</h2>
   <p>The findings above, the methods, and the underlying watershed literature are indexed in a
-    hybrid-retrieval RAG system (dense + BM25). Ask anything: the answer is generated by Claude,
-    <strong>grounded in the retrieved sources with clickable citations</strong>, and a mention of a reach
-    flies the map to it. No source, no claim.</p>
+    hybrid-retrieval RAG system (dense + BM25). Ask anything: the answer is generated by <strong>OLMo,
+    Ai2's open language model</strong>, <strong>grounded in the retrieved sources with clickable
+    citations</strong>, and a mention of a reach flies the map to it. No source, no claim — so the same
+    Ai2 stack that <em>maps</em> the vegetation also <em>explains</em> it.</p>
   <div class="qa">
     <div class="qa-head"><div class="av">◑</div>
       <div><div class="t">Riparian document agent</div><div class="s">Hybrid RAG over the corpus + these findings</div></div>
@@ -644,10 +667,13 @@ sitemap: false
     <li>The foundation model earns its keep on <strong>under-represented morphology</strong> (the arroyo), not on the river corridors where RF already transfers.</li>
     <li>What we won't claim: a pre-2000 trajectory. What is real: a present-day, corridor-masked, native-vs-invasive product.</li>
   </ul>
-  <p style="margin-top:14px;font-size:13px">San Juan Riparian Watch · imagery via Microsoft Planetary
-    Computer · labels via NMRipMap · answers grounded + cited by a private RAG backend behind the
+  <p style="margin-top:14px;font-size:13px"><b>Built on the Allen Institute for AI's open models</b> —
+    <a href="https://allenai.org/olmo">OlmoEarth</a> (Earth-observation foundation model) for delineation,
+    <a href="https://allenai.org/olmo">OLMo</a> for the grounded agent. Imagery via Microsoft Planetary
+    Computer · labels via NMRipMap · answers cited by a private RAG backend behind the
     <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docintel/API_CONTRACT.md">public <code>/docs/ask</code> contract</a>.
-    See also the <a href="method-map.html">method walkthrough</a>.</p>
+    OlmoEarth evaluation: <a href="2026-08-01-fm-vs-rf-loro-result.md">LORO result</a> ·
+    <a href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">eval contract</a> · <a href="method.md">method</a>.</p>
 </div></footer>
 </main>
 
@@ -912,7 +938,7 @@ sitemap: false
   }
   function setBusy(b){ ask.disabled=b; send.disabled=b; }
   function setLive(on){ LIVE=on; badge.classList.toggle('on',on); livetext.textContent=on?'live':'offline';
-    disc.textContent = on ? 'Live: answers are generated by Claude, grounded in the watershed corpus, with clickable citations.'
+    disc.textContent = on ? 'Live: answers are generated by OLMo (Ai2), grounded in the watershed corpus, with clickable citations.'
       : 'Offline: pre-written answers about this page. The live agent (grounded + cited) turns on when its endpoint is configured.'; }
   function go(){var v=ask.value.trim(); if(!v||busy)return; ask.value=''; answer(v);}
   send.addEventListener('click',go);
