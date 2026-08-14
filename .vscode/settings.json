@@ -8,7 +8,40 @@
 
   "files.associations": {
     "*.sql": "sql"
-  }
+  },
+
+  // --- Memory: keep the language servers + file watcher off the heavy dirs ---
+  // This repo is on a flaky external drive; watching/indexing pgdata, backups,
+  // regenerated geojson maps, ingested data and build output made Pylance, the
+  // C# Roslyn server and the watcher balloon (they re-scan on every edit). These
+  // excludes keep steady-state RAM down. All reversible — delete a line to restore.
+  "files.watcherExclude": {
+    "**/pgdata/**": true,
+    "**/backups/**": true,
+    "**/data/raw/**": true,
+    "**/node_modules/**": true,
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "**/.oe-tmp/**": true,
+    "**/*.dump": true
+  },
+  "search.exclude": {
+    "**/pgdata": true,
+    "**/backups": true,
+    "**/data/raw": true,
+    "**/node_modules": true,
+    "**/bin": true,
+    "**/obj": true,
+    "**/*.geojson": true,
+    "**/*.dump": true
+  },
+  "python.analysis.exclude": [
+    "**/pgdata/**",
+    "**/backups/**",
+    "**/data/**",
+    "**/node_modules/**"
+  ],
+  "python.analysis.diagnosticMode": "openFilesOnly"
 
   // Deliberately NO "chat.tools.terminal.autoApprove" entry for `dev.sh --update full`.
   // A full reload truncates silver.riparian_buffers, and the FK cascade takes
