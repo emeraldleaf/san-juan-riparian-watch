@@ -27,7 +27,7 @@
     --grid:#e2e8f0;
     --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
     --shadow-lg:0 4px 12px rgba(15,23,42,.08),0 18px 44px rgba(15,23,42,.10);
-    --maxw:780px;
+    --maxw:900px;
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){ --ground:#0a0f1c; --panel:#0f1829; --panel-2:#16223a; --ink:#e6edf6; --muted:#93a3b8;
@@ -135,7 +135,7 @@
   .fig .body{padding:18px 18px 6px;}
   figcaption{font-size:13px;color:var(--muted);padding:11px 16px;border-top:1px solid var(--line);background:var(--panel-2);}
   figcaption b{color:var(--ink);}
-  .maplib{height:min(58vh,480px);width:100%;}
+  .maplib{height:min(64vh,560px);width:100%;}
   .maplegend{position:absolute;bottom:12px;right:12px;background:color-mix(in srgb,var(--panel) 92%,transparent);
     border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:var(--shadow);z-index:2;backdrop-filter:blur(4px);}
   .maplegend .row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;background:none;border:0;
@@ -805,8 +805,9 @@
     var m=MAPS[which]; if(!m||!m.ready)return;
     var wrap=document.getElementById('wrap-'+which);
     m.map.fitBounds(m.bbox,{padding:24,duration:700});
-    if(wrap){ wrap.scrollIntoView({behavior:'smooth',block:'center'});
-      wrap.classList.add('pulse'); setTimeout(function(){wrap.classList.remove('pulse');},1600); }
+    // update + pulse the map in place — do NOT scroll the page (the maps are above the
+    // chat, so scrolling to them yanks the reader up mid-conversation).
+    if(wrap){ wrap.classList.add('pulse'); setTimeout(function(){wrap.classList.remove('pulse');},1600); }
   }
   function showGeom(features){
     var m=MAPS.corridor; if(!m||!m.ready||!m.map.getSource('askhi'))return false;
@@ -815,8 +816,7 @@
       features.forEach(function(f){ eachCoord(f.geometry,function(c){b.extend(c);}); });
       if(!b.isEmpty()) m.map.fitBounds(b,{padding:60,maxZoom:13,duration:600});
     }catch(_){}
-    var wrap=document.getElementById('wrap-corridor'); if(wrap){wrap.scrollIntoView({behavior:'smooth',block:'center'});}
-    return true;
+    return true;   // update the map in place; don't scroll the page (keeps the reader in the chat)
   }
   function linkAnswerToMap(text){
     var t=(text||'').toLowerCase();
