@@ -922,10 +922,28 @@ sitemap: false
     chat.scrollTop=chat.scrollHeight;
     linkAnswerToMap(textVal);
   }
+  var SESSION='';   // full-app /query threads conversation via session_id (multi-turn)
+  function citeUrlFor(src){  // clickable source: our findings docs -> GitHub blob
+    if(!src) return null;
+    var stem=src.replace(/\.(md|pdf|html?)$/,'');
+    if(stem.indexOf('findings-')===0)
+      return 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/'+stem.replace(/^findings-/,'')+'.md';
+    return null;
+  }
   async function askLive(q){
-    var r=await fetch(AGENT_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q,top_k:8})});
+    var isQuery=/\/query\/?$/.test(AGENT_URL);   // full Quartzose app (guards+cache+multi-turn) vs thin /docs/ask
+    var body=isQuery ? {query:q, session_id:(SESSION||undefined), use_cache:true} : {question:q, top_k:8};
+    var r=await fetch(AGENT_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
     if(!r.ok) throw new Error('agent '+r.status);
-    return await r.json();
+    var res=await r.json();
+    if(isQuery){
+      if(res.session_id) SESSION=res.session_id;                 // remember the thread
+      var seen={}, cites=[];
+      (res.contexts||[]).forEach(function(c){var s=(c.metadata||{}).source_file;
+        if(s&&!seen[s]){seen[s]=1; cites.push({source_file:s, source_url:citeUrlFor(s)});}});
+      return {answer:res.answer, citations:cites, resolved_geometries:[]};
+    }
+    return res;   // /docs/ask already returns {answer, citations, resolved_geometries}
   }
   function answer(text){
     if(busy)return; busy=true; setBusy(true);
@@ -947,7 +965,7 @@ sitemap: false
   setLive(false);
   if(AGENT_URL){
     disc.textContent='Connecting to the live agent…';
-    var healthUrl=AGENT_URL.replace(/\/docs\/ask\/?$/,'/health');
+    var healthUrl=AGENT_URL.replace(/\/(docs\/ask|query)\/?$/,'/health');
     fetch(healthUrl,{method:'GET'}).then(function(r){return r.ok?r.json():Promise.reject();})
       .then(function(){ setLive(true); }).catch(function(){ setLive(false); });
   }
