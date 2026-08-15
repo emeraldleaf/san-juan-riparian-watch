@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy</title>
+<meta name="description" content="What this site processes, why, and your rights — a plain-language privacy notice.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0c0e'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%234f46e5'/%3E%3C/svg%3E">
+<link href="fonts.css" rel="stylesheet">
+<link href="hub.css" rel="stylesheet">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
+  <a class="back" href="index.html">← back to the story</a>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">// privacy</div>
+  <h1>Privacy notice</h1>
+  <p class="lede">A plain-language account of what this site processes and why. It's a personal portfolio
+    project, not a commercial service, and it's built to collect as little as possible.</p>
+</div></header>
+
+<div class="wrap">
+
+<section>
+  <h2>Reading the pages</h2>
+  <p>Just browsing the site sets <strong>no cookies</strong>, runs <strong>no analytics or trackers</strong>,
+    and loads <strong>no third-party fonts or scripts that would expose your IP</strong> — the fonts are
+    served from this domain. Standard web-server access logs (including IP address) may be kept briefly for
+    security and abuse prevention, on the basis of legitimate interest.</p>
+</section>
+
+<section>
+  <h2>Using the chat agent</h2>
+  <p>If you ask the agent a question, that request is processed to answer it:</p>
+  <table>
+    <thead><tr><th>Data</th><th>Purpose &amp; handling</th></tr></thead>
+    <tbody>
+      <tr><td>Your question</td><td>Sent to the retrieval pipeline and to a large-language-model provider to generate a grounded answer. Please don't enter personal or sensitive information — it isn't needed to ask about the science.</td></tr>
+      <tr><td>Model provider</td><td>Generation runs on a third-party, OpenAI-compatible LLM API via <strong>OpenRouter</strong> (the model is selectable — e.g. Qwen, Llama, or Ai2's OLMo), which may process the request <strong>outside the EU</strong>. Responses are scrubbed for personal identifiers before they're returned.</td></tr>
+      <tr><td>IP address</td><td>Used transiently for per-IP rate-limiting and abuse prevention (legitimate interest). Not used to profile or track you across sites.</td></tr>
+      <tr><td>Session id</td><td>A random identifier generated fresh on each page load, held in memory to thread a single conversation. It is not a persistent cookie and does not identify you.</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><span class="t">Retention</span>
+    Operational logs and traces are kept only as long as needed for security and debugging, then discarded.
+    There is no marketing, no advertising, and no sale or sharing of data for those purposes.</div>
+</section>
+
+<section>
+  <h2>Third parties</h2>
+  <div class="tags">
+    <span class="tag"><b>OpenRouter</b> — LLM generation (model-agnostic)</span>
+    <span class="tag"><b>Esri</b> — satellite basemap tiles</span>
+    <span class="tag"><b>Hetzner</b> (EU) — hosting</span>
+  </div>
+  <p>Map tiles are requested from Esri's imagery service when you view a map; your browser contacts them
+    directly, as it would for any embedded map.</p>
+</section>
+
+<section>
+  <h2>Your rights</h2>
+  <p>Under the GDPR you can request access to, correction of, or erasure of any personal data held about you,
+    and you may object to processing or lodge a complaint with a supervisory authority. Because the site keeps
+    essentially no identifying records, there is usually nothing to retrieve — but if you have a question or a
+    request, contact <a href="mailto:joshua.dell@outlook.com">joshua.dell@outlook.com</a>.</p>
+</section>
+
+</div>
+
+<footer><div class="wrap">
+  Part of <a href="index.html">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="privacy.html">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
+</div></footer>
+</body>
+</html>
