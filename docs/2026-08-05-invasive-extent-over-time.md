@@ -47,7 +47,7 @@ year, and it is too spectrally distant to reconcile. The middle of the record (r
 the L5+L7 mix overlaps the training sensor) reconstructs reasonably; the pure-TM deep past does not. And
 even the stabilised part barely moves — **2000 → 2020 is only ~0.8% → 1.4%** of area (the invasive layer is
 now gated to woody vegetation, which removed non-vegetation false positives — a metal water tank was being
-called tamarisk — and roughly halved the earlier estimate), a rise *at the level of the ±0.6 pp method-noise
+called tamarisk — and cut the earlier estimate by ~60–70%), a rise *at the level of the ±0.6 pp method-noise
 on the anchor itself*. The dramatic "5×" was an artifact of an under-sampled 1990.
 
 **So: no trajectory claim.** Continuing to tune the recipe past here would be fishing for a prettier line

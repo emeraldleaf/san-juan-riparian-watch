@@ -547,7 +547,7 @@
     href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">the pre-registered eval contract</a>.</figcaption></figure>
 
   <p>Here are all three over the labeled reach. The foundation model (green) tracks the corridor; the
-    NMRipMap truth (outline) is ground reality; and the Random Forest (orange), dropped into an arroyo it
+    NMRipMap reference labels (outline) are the comparison baseline; and the Random Forest (orange), dropped into an arroyo it
     never trained on, fires <strong>only in the wetter eastern end</strong>, the stretch whose spectra
     resemble the river reaches it did learn, while missing the dry western wash that both the foundation
     model and the truth pick up. That's genuine under-prediction, not a data gap (~0.1% of pixels,
@@ -859,7 +859,7 @@
     tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
     tileSize:256,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}},
     layers:[{id:'sat',type:'raster',source:'sat'}]};
-  function eachCoord(geom,cb){ if(!geom)return; (function walk(a){ if(typeof a[0]==='number'){cb(a);return;} a.forEach(walk); })(geom.coordinates); }
+  function eachCoord(geom,cb){ if(!geom)return; if(geom.type==='GeometryCollection'){ (geom.geometries||[]).forEach(function(g){eachCoord(g,cb);}); return; } if(!geom.coordinates)return; (function walk(a){ if(typeof a[0]==='number'){cb(a);return;} a.forEach(walk); })(geom.coordinates); }
   var MAPS={};
 
   (function(){
@@ -894,12 +894,12 @@
     MAPS.arroyo={map:map,bbox:BBOX,ready:false};
     map.on('error',function(e){ if(status) status.textContent='map error: '+(e.error&&e.error.message);});
     map.on('load',function(){
-      map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
-      map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1.1,'line-opacity':0.85}});
       map.addSource('a-fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
       map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.45}});
       map.addSource('a-rf',{type:'geojson',data:'maps/rf_malpais_full.geojson'});
       map.addLayer({id:'a-rf',type:'fill',source:'a-rf',paint:{'fill-color':'#f97316','fill-opacity':0.9,'fill-outline-color':'#7c2d12'}});
+      map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
+      map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1.1,'line-opacity':0.85}});
       map.fitBounds(BBOX,{padding:20,duration:0}); MAPS.arroyo.ready=true;
       map.on('idle',function(){ if(status&&status.textContent==='loading…') status.textContent='RF barely fires · FM tracks the corridor'; });
     });
@@ -931,8 +931,8 @@
       if(cache[y]){ apply(cache[y]); if(status) status.textContent=''; return; }
       if(status) status.textContent='loading '+y+' composite…';
       fetch('maps/deep-invasive-'+y+'.geojson').then(function(r){return r.json();})
-        .then(function(gj){ cache[y]=gj; apply(gj); if(status) status.textContent=''; })
-        .catch(function(){ if(status) status.textContent='could not load '+y; });
+        .then(function(gj){ cache[y]=gj; if(slider&&YEARS[parseInt(slider.value,10)]!==y) return; apply(gj); if(status) status.textContent=''; })
+        .catch(function(){ if((!slider||YEARS[parseInt(slider.value,10)]===y) && status) status.textContent='could not load '+y; });
     }
     map.on('load',function(){
       map.addSource('t-corridor',{type:'geojson',data:'maps/present-extent-2020.geojson'});
@@ -979,7 +979,13 @@
   }
 
   var params=new URLSearchParams(location.search);
-  var AGENT_URL=(params.get('agent')||(document.querySelector('meta[name="agent-url"]')||{}).content||'').trim();
+  function _sameOrigin(u){ if(!u) return false; if(u.charAt(0)==='/') return true; try{ return new URL(u,location.href).origin===location.origin; }catch(_){ return false; } }
+  var _apParam=(params.get('agent')||'').trim();
+  var _apMeta=((document.querySelector('meta[name="agent-url"]')||{}).content||'').trim();
+  // Only honor a URL-supplied agent endpoint if it is same-origin — never post the
+  // visitor's question to an attacker-controlled absolute URL from a crafted link.
+  var AGENT_URL=(_sameOrigin(_apParam)?_apParam:_apMeta).trim();
+  function withTimeout(ms){ var c=new AbortController(); var id=setTimeout(function(){c.abort();},ms); return {signal:c.signal, clear:function(){clearTimeout(id);}}; }
   var chat=document.getElementById('chat'), qs=document.getElementById('qs'),
       ask=document.getElementById('ask'), send=document.getElementById('send'),
       disc=document.getElementById('disc'), badge=document.getElementById('livebadge'),
@@ -1077,7 +1083,7 @@
       if(feats.length) showGeom(feats);
     }
     chat.scrollTop=chat.scrollHeight;
-    linkAnswerToMap(textVal);
+    if(!(geoms&&geoms.length)) linkAnswerToMap(textVal);
   }
   var SESSION='';   // full-app /query threads conversation via session_id (multi-turn)
   // External reference sources cited by the corpus link to their canonical page
@@ -1115,7 +1121,8 @@
   async function askLive(q){
     var isQuery=/\/query\/?$/.test(AGENT_URL);   // full Quartzose app (guards+cache+multi-turn) vs thin /docs/ask
     var body=isQuery ? {query:q, session_id:(SESSION||undefined), use_cache:true, model_tier:TIER} : {question:q, top_k:8};
-    var r=await fetch(AGENT_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    var _t=withTimeout(60000), r;
+    try{ r=await fetch(AGENT_URL,{method:'POST',headers:{'content-type':'application/json'},signal:_t.signal,body:JSON.stringify(body)}); } finally { _t.clear(); }
     if(!r.ok) throw new Error('agent '+r.status);
     var res=await r.json();
     if(isQuery){
@@ -1218,8 +1225,9 @@
   if(AGENT_URL){
     disc.textContent='Connecting to the live agent…';
     var healthUrl=AGENT_URL.replace(/\/(docs\/ask|query)\/?$/,'/health');
-    fetch(healthUrl,{method:'GET'}).then(function(r){return r.ok?r.json():Promise.reject();})
-      .then(function(){ setLive(true); loadModels(); }).catch(function(){ setLive(false); });
+    var _ht=withTimeout(8000);
+    fetch(healthUrl,{method:'GET',signal:_ht.signal}).then(function(r){return r.ok?r.json():Promise.reject();})
+      .then(function(){ setLive(true); loadModels(); }).catch(function(){ setLive(false); }).finally(function(){ _ht.clear(); });
   }
 })();
 </script>

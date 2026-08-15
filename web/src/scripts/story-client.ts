@@ -34,7 +34,12 @@ if (!matchMedia('(prefers-reduced-motion:reduce)').matches) {
 }
 
 const SAT: any = { version: 8, sources: { sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' } }, layers: [{ id: 'sat', type: 'raster', source: 'sat' }] };
-function eachCoord(geom: any, cb: (c: number[]) => void) { if (!geom) return; (function walk(a: any) { if (typeof a[0] === 'number') { cb(a); return; } a.forEach(walk); })(geom.coordinates); }
+function eachCoord(geom: any, cb: (c: number[]) => void) {
+  if (!geom) return;
+  if (geom.type === 'GeometryCollection') { (geom.geometries || []).forEach((g: any) => eachCoord(g, cb)); return; }
+  if (!geom.coordinates) return;
+  (function walk(a: any) { if (typeof a[0] === 'number') { cb(a); return; } a.forEach(walk); })(geom.coordinates);
+}
 const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
 
 // ---- corridor ----

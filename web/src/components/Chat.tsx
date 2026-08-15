@@ -177,8 +177,15 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
       copy[copy.length - 1] = { role: 'assistant', text: clean, html: mdToHtml(clean || ''), citations, geoms };
       return copy;
     });
-    if (geoms && geoms.length) { const feats = geoms.filter((g) => g?.geom).map((g) => ({ type: 'Feature', geometry: g.geom, properties: {} })); if (feats.length) emitGeom(feats); }
-    emitAnswerToMap(clean);
+    // A resolved geometry highlights the corridor map. Only fall back to
+    // keyword-routing (which flies to a *different* map with no highlight layer)
+    // when there is no resolved geometry to show.
+    let shownGeom = false;
+    if (geoms && geoms.length) {
+      const feats = geoms.filter((g) => g?.geom).map((g) => ({ type: 'Feature', geometry: g.geom, properties: {} }));
+      if (feats.length) { emitGeom(feats); shownGeom = true; }
+    }
+    if (!shownGeom) emitAnswerToMap(clean);
   }, []);
 
   const askLiveStream = useCallback(async (q: string, onToken: (partial: string) => void) => {

@@ -247,8 +247,12 @@ def predict_extent(rf: RandomForestClassifier, med: np.ndarray, ref: BandStats, 
         gprob = grf.predict_proba(np.where(np.isfinite(x), x, gmed))[:, 1]
         gprob[~valid] = 0.0
         binary &= (gprob >= gthr).reshape(h, w).astype("uint8")  # invasive AND woody-extent
+    # Record the gate cutoff too: different --gate-threshold values yield
+    # different geometries, so the output must be self-describing.
+    gate_thr = float(gate[2]) if gate is not None else None
     feats = [{"type": "Feature", "geometry": transform_geom(UTM, "EPSG:4326", g),
-              "properties": {"class": target, "min_prob": threshold, "extent_gated": gate is not None}}
+              "properties": {"class": target, "min_prob": threshold,
+                             "extent_gated": gate is not None, "gate_threshold": gate_thr}}
              for g, v in shapes(binary, mask=binary.astype(bool), transform=affine) if v == 1]
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps({"type": "FeatureCollection", "features": feats}))
@@ -308,6 +312,8 @@ def main() -> int:
     a = ap.parse_args()
     if not 0.0 <= a.threshold <= 1.0:
         ap.error(f"--threshold must be a probability in [0, 1], got {a.threshold}")
+    if not 0.0 <= a.gate_threshold <= 1.0:
+        ap.error(f"--gate-threshold must be a probability in [0, 1], got {a.gate_threshold}")
     affine, h, w = _grid(FARM)
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
     logger.info("label year %d — building training composite", a.label_year)

@@ -77,16 +77,17 @@
   map.on("error", (e) => { if (status) status.textContent = "map error: " + (e.error && e.error.message); });
 
   map.on("load", () => {
-    map.addSource("truth", { type: "geojson", data: "maps/truth_malpais.geojson" });
-    map.addLayer({ id: "truth-line", type: "line", source: "truth",
-      paint: { "line-color": "#38bdf8", "line-width": 1.5, "line-opacity": 0.95 } });
     map.addSource("fm", { type: "geojson", data: "maps/fm_malpais.geojson" });
     map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
       paint: { "fill-color": "#22c55e", "fill-opacity": 0.45 } });
     map.addSource("rf", { type: "geojson", data: "maps/rf_malpais_full.geojson" });
     map.addLayer({ id: "rf-fill", type: "fill", source: "rf",
       paint: { "fill-color": "#f97316", "fill-opacity": 0.9, "fill-outline-color": "#7c2d12" } });
+    map.addSource("truth", { type: "geojson", data: "maps/truth_malpais.geojson" });
+    map.addLayer({ id: "truth-line", type: "line", source: "truth",
+      paint: { "line-color": "#38bdf8", "line-width": 1.5, "line-opacity": 0.95 } });
     map.fitBounds(BBOX, { padding: 30, duration: 0 });
+    map.setMaxBounds(map.getBounds());
     map.on("idle", () => { if (status && status.textContent === "loading…")
       status.textContent = "RF barely fires · FM tracks the corridor"; });
     document.querySelectorAll("#legend .row[data-layer]").forEach((row) => {

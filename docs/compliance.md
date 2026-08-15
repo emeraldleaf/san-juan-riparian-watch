@@ -58,3 +58,5 @@ record that can be linked to the requester**.
 ## 6. Review
 Revisit this record if the data flows change — notably if analytics, accounts, cookies, or trace
 persistence are ever enabled, or if the LLM/hosting providers change.
+
+The encoding-loop and enforcement gates that keep this record honest: **See CLAUDE.md**.
