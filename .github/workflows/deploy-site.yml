@@ -1,0 +1,42 @@
+name: Deploy site
+
+# Build the Astro + React-islands site and publish it to the Caddy web root on
+# the box. Runs on a SELF-HOSTED runner that lives ON the box, so deploys need
+# no inbound SSH and never depend on a developer's (dynamic) home IP.
+
+on:
+  push:
+    branches: [main, feat/live-story-map]
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, riparian-box]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish to Caddy web root
+        run: |
+          rsync -a --delete web/dist/ "$SITE_DIR/"
+          echo "Published $(find web/dist -type f | wc -l) files to $SITE_DIR"
+        env:
+          SITE_DIR: /root/riparian-rag-harness/deploy/site

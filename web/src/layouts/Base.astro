@@ -1,0 +1,43 @@
+---
+// Shared document shell: head, self-hosted fonts, theme boot, and a <slot/> for
+// page content. Page-specific CSS (story.css / hub.css) is imported per page.
+interface Props {
+  title: string;
+  description?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+}
+const {
+  title,
+  description = '',
+  ogTitle = title,
+  ogDescription = description,
+} = Astro.props;
+const favicon =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%2316a34a'/%3E%3Cpath d='M16 12c-3 4-4 7 0 12' fill='none' stroke='%23e11d48' stroke-width='2'/%3E%3C/svg%3E";
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  {description && <meta name="description" content={description} />}
+  <meta property="og:title" content={ogTitle} />
+  {ogDescription && <meta property="og:description" content={ogDescription} />}
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href={favicon} />
+  <link href="/fonts.css" rel="stylesheet" />
+  {/* Set the saved theme before first paint to avoid a flash. */}
+  <script is:inline>
+    try {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <slot />
+</body>
+</html>
