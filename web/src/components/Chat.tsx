@@ -127,6 +127,14 @@ function fallbackAnswer(text: string): string {
 function emitAnswerToMap(text: string) { try { window.dispatchEvent(new CustomEvent('story:answer', { detail: { text } })); } catch {} }
 function emitGeom(features: any[]) { try { window.dispatchEvent(new CustomEvent('story:geom', { detail: { features } })); } catch {} }
 
+// Abort a fetch that stalls so the UI never gets stuck on "Connecting…" or busy.
+// On timeout the fetch rejects (AbortError) and the caller's existing fallback runs.
+function withTimeout(ms: number) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(id) };
+}
+
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: 'Ask about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision. Tap a question below, or type your own, answers cite their sources, and a reach mention flies the map.' },
@@ -149,15 +157,17 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   useEffect(() => {
     if (!AGENT_URL) return;
     const healthUrl = AGENT_URL.replace(/\/(docs\/ask|query)\/?$/, '/health');
-    fetch(healthUrl).then((r) => (r.ok ? r.json() : Promise.reject())).then(() => {
+    const ht = withTimeout(8000);
+    fetch(healthUrl, { signal: ht.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then(() => {
       setLive(true);
       if (!isQuery) return;
       const url = AGENT_URL.replace(/\/query\/?$/, '/agent/models');
-      fetch(url).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+      const mt = withTimeout(8000);
+      fetch(url, { signal: mt.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
         if (d?.default) { setTier(d.default); tierRef.current = d.default; }
         setTiers(d?.tiers || null);
-      }).catch(() => {});
-    }).catch(() => setLive(false));
+      }).catch(() => {}).finally(() => mt.clear());
+    }).catch(() => setLive(false)).finally(() => ht.clear());
   }, [AGENT_URL, isQuery]);
 
   const finalize = useCallback((text: string, citations: Cite[], geoms: Geom[]) => {
@@ -173,39 +183,55 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
 
   const askLiveStream = useCallback(async (q: string, onToken: (partial: string) => void) => {
     const url = AGENT_URL.replace(/\/query\/?$/, '/query/stream');
-    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
-    if (!r.ok || !r.body) throw new Error('agent ' + r.status);
-    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '', full = ''; const ctx: any[] = [];
-    for (;;) {
-      const out = await reader.read(); if (out.done) break;
-      buf += dec.decode(out.value, { stream: true }); const blocks = buf.split('\n\n'); buf = blocks.pop() || '';
-      for (const block of blocks) {
-        let ev = 'message', data = '';
-        block.split('\n').forEach((ln) => { if (ln.indexOf('event:') === 0) ev = ln.slice(6).trim(); else if (ln.indexOf('data:') === 0) data += ln.slice(5).trim(); });
-        if (!data) continue; let d: any; try { d = JSON.parse(data); } catch { continue; }
-        if (ev === 'token' && d.token) { full += d.token; onToken(full); }
-        else if (ev === 'context') { if (Array.isArray(d)) ctx.push(...d); else if (d?.contexts) ctx.push(...d.contexts); else if (d) ctx.push(d); }
-        else if (ev === 'done') { if (d.session_id) sessionRef.current = d.session_id; }
-        else if (ev === 'error' || ev === 'security') throw new Error(d.error || 'blocked');
+    // Abort a stream that goes silent (no data for 30s) so the UI can't hang;
+    // the timer resets on every chunk, so a long-but-active answer is fine.
+    const ctrl = new AbortController();
+    let idle: ReturnType<typeof setTimeout>;
+    const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctrl.abort(), 30000); };
+    bump();
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
+      if (!r.ok || !r.body) throw new Error('agent ' + r.status);
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '', full = ''; const ctx: any[] = [];
+      for (;;) {
+        const out = await reader.read(); if (out.done) break;
+        bump();
+        buf += dec.decode(out.value, { stream: true }); const blocks = buf.split('\n\n'); buf = blocks.pop() || '';
+        for (const block of blocks) {
+          let ev = 'message', data = '';
+          block.split('\n').forEach((ln) => { if (ln.indexOf('event:') === 0) ev = ln.slice(6).trim(); else if (ln.indexOf('data:') === 0) data += ln.slice(5).trim(); });
+          if (!data) continue; let d: any; try { d = JSON.parse(data); } catch { continue; }
+          if (ev === 'token' && d.token) { full += d.token; onToken(full); }
+          else if (ev === 'context') { if (Array.isArray(d)) ctx.push(...d); else if (d?.contexts) ctx.push(...d.contexts); else if (d) ctx.push(d); }
+          else if (ev === 'done') { if (d.session_id) sessionRef.current = d.session_id; }
+          else if (ev === 'error' || ev === 'security') throw new Error(d.error || 'blocked');
+        }
       }
+      const seen: Record<string, boolean> = {}; const cites: Cite[] = [];
+      ctx.forEach((c) => { const s = (c?.metadata || {}).source_file || c?.source_file; if (s && !seen[s]) { seen[s] = true; cites.push({ source_file: s, source_url: citeUrlFor(s) }); } });
+      return { answer: full, citations: cites };
+    } finally {
+      clearTimeout(idle);
     }
-    const seen: Record<string, boolean> = {}; const cites: Cite[] = [];
-    ctx.forEach((c) => { const s = (c?.metadata || {}).source_file || c?.source_file; if (s && !seen[s]) { seen[s] = true; cites.push({ source_file: s, source_url: citeUrlFor(s) }); } });
-    return { answer: full, citations: cites };
   }, [AGENT_URL]);
 
   const askLive = useCallback(async (q: string) => {
     const body = isQuery ? { query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current } : { question: q, top_k: 8 };
-    const r = await fetch(AGENT_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) throw new Error('agent ' + r.status);
-    const res = await r.json();
-    if (isQuery) {
-      if (res.session_id) sessionRef.current = res.session_id;
-      const seen: Record<string, boolean> = {}; const cites: Cite[] = [];
-      (res.contexts || []).forEach((c: any) => { const s = (c.metadata || {}).source_file; if (s && !seen[s]) { seen[s] = true; cites.push({ source_file: s, source_url: citeUrlFor(s) }); } });
-      return { answer: res.answer, citations: cites, geoms: [] as Geom[] };
+    const t = withTimeout(60000);
+    try {
+      const r = await fetch(AGENT_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: t.signal, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error('agent ' + r.status);
+      const res = await r.json();
+      if (isQuery) {
+        if (res.session_id) sessionRef.current = res.session_id;
+        const seen: Record<string, boolean> = {}; const cites: Cite[] = [];
+        (res.contexts || []).forEach((c: any) => { const s = (c.metadata || {}).source_file; if (s && !seen[s]) { seen[s] = true; cites.push({ source_file: s, source_url: citeUrlFor(s) }); } });
+        return { answer: res.answer, citations: cites, geoms: [] as Geom[] };
+      }
+      return res;
+    } finally {
+      t.clear();
     }
-    return res;
   }, [AGENT_URL, isQuery]);
 
   const answer = useCallback((text: string) => {

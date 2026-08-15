@@ -72,12 +72,14 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
   MAPS.arroyo = { map, bbox: BBOX, ready: false };
   map.on('error', (e: any) => { if (status) status.textContent = 'map error: ' + (e.error && e.error.message); });
   map.on('load', () => {
-    map.addSource('a-truth', { type: 'geojson', data: 'maps/truth_malpais.geojson' });
-    map.addLayer({ id: 'a-truth', type: 'line', source: 'a-truth', paint: { 'line-color': '#e2e8f0', 'line-width': 1.1, 'line-opacity': 0.85 } });
+    // Fills first, then the NMRipMap truth outline on top — otherwise the opaque
+    // RF fill hides the boundaries the map is meant to let you compare against.
     map.addSource('a-fm', { type: 'geojson', data: 'maps/fm_malpais.geojson' });
     map.addLayer({ id: 'a-fm', type: 'fill', source: 'a-fm', paint: { 'fill-color': '#16a34a', 'fill-opacity': 0.45 } });
     map.addSource('a-rf', { type: 'geojson', data: 'maps/rf_malpais_full.geojson' });
     map.addLayer({ id: 'a-rf', type: 'fill', source: 'a-rf', paint: { 'fill-color': '#f97316', 'fill-opacity': 0.9, 'fill-outline-color': '#7c2d12' } });
+    map.addSource('a-truth', { type: 'geojson', data: 'maps/truth_malpais.geojson' });
+    map.addLayer({ id: 'a-truth', type: 'line', source: 'a-truth', paint: { 'line-color': '#e2e8f0', 'line-width': 1.1, 'line-opacity': 0.85 } });
     map.fitBounds(BBOX, { padding: 20, duration: 0 }); MAPS.arroyo.ready = true;
     map.on('idle', () => { if (status && status.textContent === 'loading…') status.textContent = 'RF barely fires · FM tracks the corridor'; });
   });
@@ -112,7 +114,13 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
     const apply = (gj: any) => { const src = map.getSource('epoch') as any; if (src) src.setData(gj); };
     if (cache[y]) { apply(cache[y]); if (status) status.textContent = ''; return; }
     if (status) status.textContent = 'loading ' + y + ' composite…';
-    fetch('maps/deep-invasive-' + y + '.geojson').then((r) => r.json()).then((gj) => { cache[y] = gj; apply(gj); if (status) status.textContent = ''; }).catch(() => { if (status) status.textContent = 'could not load ' + y; });
+    fetch('maps/deep-invasive-' + y + '.geojson').then((r) => r.json()).then((gj) => {
+      cache[y] = gj;
+      // A slower earlier request must not overwrite a newer selection: only
+      // apply if this year is still the one the slider points at.
+      if (YEARS[parseInt(slider?.value || '3', 10)] !== y) return;
+      apply(gj); if (status) status.textContent = '';
+    }).catch(() => { if (YEARS[parseInt(slider?.value || '3', 10)] === y && status) status.textContent = 'could not load ' + y; });
   }
   map.on('load', () => {
     map.addSource('t-corridor', { type: 'geojson', data: 'maps/present-extent-2020.geojson' });
