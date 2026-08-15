@@ -23,6 +23,7 @@
     "**/bin/**": true,
     "**/obj/**": true,
     "**/.oe-tmp/**": true,
+    "**/*.geojson": true,
     "**/*.dump": true
   },
   "search.exclude": {
@@ -32,13 +33,14 @@
     "**/node_modules": true,
     "**/bin": true,
     "**/obj": true,
+    "**/.oe-tmp": true,
     "**/*.geojson": true,
     "**/*.dump": true
   },
   "python.analysis.exclude": [
     "**/pgdata/**",
     "**/backups/**",
-    "**/data/**",
+    "**/data/raw/**",
     "**/node_modules/**"
   ],
   "python.analysis.diagnosticMode": "openFilesOnly"
