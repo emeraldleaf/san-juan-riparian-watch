@@ -66,13 +66,23 @@ function citeUrlFor(src: string): string | null {
   return null;
 }
 
-const escH = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Escape ALL HTML-significant chars incl. quotes — the result is assigned via
+// dangerouslySetInnerHTML, so an unescaped " in a model-supplied link URL could
+// break out of href and inject an attribute. escH runs before mdInline, so by
+// the time links are built the URL can no longer contain a raw quote or angle.
+const escH = (s: string) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 function mdInline(s: string): string {
   return s
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"'<>]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 function mdToHtml(md: string): string {
   const lines = escH(md).replace(/\r/g, '').split('\n');

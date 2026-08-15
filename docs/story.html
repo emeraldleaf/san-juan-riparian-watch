@@ -1018,12 +1018,12 @@
   // Safe markdown -> HTML: HTML-escape FIRST (model output can never inject tags),
   // then convert a known token set. Handles bold, italic, code, links, headings,
   // ordered/unordered lists, and GFM tables, what the LLM actually emits.
-  function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
   function mdInline(s){ return s
     .replace(/`([^`]+)`/g,'<code>$1</code>')
     .replace(/\*\*([^*]+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'); }
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"'<>]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'); }
   function mdToHtml(md){
     var lines=escH(md).replace(/\r/g,'').split('\n'), out=[], i=0, n=lines.length;
     function isSep(l){return l.indexOf('-')>=0 && /^\s*\|?[\s:|-]*\|?\s*$/.test(l);}
