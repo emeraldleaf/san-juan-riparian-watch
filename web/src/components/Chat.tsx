@@ -19,11 +19,11 @@ type Msg = {
 type Tier = { id: string; label: string; note: string; available: boolean };
 
 const SUGGEST = [
-  'How much of the corridor is invasive?',
-  'Does OlmoEarth beat the Random Forest on the arroyo?',
-  'How was riparian vegetation derived from satellite imagery?',
+  "What are the biggest threats to this project's central claim, and how does it defend against them?",
+  'What did this project get wrong, and how did it catch it?',
+  'Summarize the project — its methods, findings, and what makes it novel.',
+  'Does OlmoEarth beat the Random Forest on the arroyo, and why?',
   'How was this agent built?',
-  'What engineering method kept the project honest?',
 ];
 
 const FALLBACK: { k: string[]; a: string }[] = [
@@ -325,6 +325,23 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   }, [busy, live, isQuery, askLive, askLiveStream, finalize]);
 
   const go = () => { const v = input.trim(); if (!v || busy) return; setInput(''); answer(v); };
+
+  // Contextual "ask" chips elsewhere on the page dispatch `story:ask`; when one
+  // fires, scroll the agent into view and ask the question. answerRef keeps the
+  // latest answer() so the once-registered listener never goes stale.
+  const answerRef = useRef(answer);
+  useEffect(() => { answerRef.current = answer; }, [answer]);
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = (e as CustomEvent)?.detail?.q;
+      if (typeof q !== 'string' || !q) return;
+      try { document.getElementById('agent')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+      setTimeout(() => answerRef.current(q), 450);
+    };
+    window.addEventListener('story:ask', onAsk as EventListener);
+    return () => window.removeEventListener('story:ask', onAsk as EventListener);
+  }, []);
+
   const olmo = tiers?.find((t) => t.id === 'olmo');
   const activeNote = tiers?.find((t) => t.id === tier)?.note || '';
 
