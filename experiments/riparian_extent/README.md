@@ -28,7 +28,7 @@
 
 Configs in the [`allenai/olmoearth_projects`](https://github.com/allenai/olmoearth_projects)
 shape, so they can be dropped into an `olmoearth_projects` checkout at
-`olmoearth_run_data/riparian_extent/` and run with `rslearn` + `olmoearth_run`.
+`experiments/riparian_extent/` and run with `rslearn` + `olmoearth_run`.
 
 Modelled on their **`mangrove`** project, which is the closest published analog to Stage 1:
 segment a woody vegetation class near water from a Sentinel-2 time series, validated against

@@ -46,7 +46,7 @@ number.
   Colorado Plateau, though **0 inside the San Juan basin** — hence *train the beetle signature on the
   ecoregion-matched Plateau pool and transfer*, per the [pool decision](../decisions/2026-07-12-beetle-training-pool-ecoregion-matched.md)).
 - **Sensor:** Landsat (30 m) — the only sensor reaching pre-beetle (1984→). Point-sampled, the
-  [3B harness](../../olmoearth_run_data/riparian_extent/phase3b_temporal.py). Landsat-5 TM for 2000,
+  [3B harness](../../experiments/riparian_extent/phase3b_temporal.py). Landsat-5 TM for 2000,
   Landsat-8 OLI for 2015/2020; the `landsat-c2-l2` collection serves common-name bands across sensors.
 
 ## The three nested tests
@@ -116,7 +116,7 @@ Pre-registered so the result cannot be rationalized after the fact:
 ## The cheap first move — no GPU
 
 **Test A + C1's RF arm is CPU-only** (point-sampling + RF, the 3B harness). Scaffolded at
-[`phase3c_invasives_beetle.py`](../../olmoearth_run_data/riparian_extent/phase3c_invasives_beetle.py),
+[`phase3c_invasives_beetle.py`](../../experiments/riparian_extent/phase3c_invasives_beetle.py),
 ready to run the moment the Landsat 2000/2015/2020 pulls land. If it shows the inversion, **the single
 plot — invasive-vs-native AUROC crossing below 0.5 as you walk back through the beetle era — is a
 publishable result on its own**, and it justifies the FM/GPU arm. Highest information-per-dollar move in
@@ -125,7 +125,7 @@ the Stage-2 program; it does not depend on a rented GPU.
 ## Reproduce
 
 ```bash
-cd olmoearth_run_data/riparian_extent
+cd experiments/riparian_extent
 export PYTHONPATH=../../python-etl
 # CPU arm — Test A (separability) + Test C1 (beetle deep-time inversion) on the CSU points
 python phase3c_invasives_beetle.py --csv TabletData_2017.csv --years 2020 2015 2000

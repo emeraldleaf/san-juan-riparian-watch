@@ -22,7 +22,7 @@ A transient STAC search failure must never masquerade as a no-data month: the fe
 ``SEARCH-FAILED`` months explicitly rather than silently writing NaN (method receipt).
 
 Usage:
-    PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py \\
+    PYTHONPATH=python-etl python experiments/riparian_extent/phase3a_cross_sensor.py \\
         --gdb .tmp/nmripmap_gdb/.../GRSJ_Version2_0Plus_North.gdb --dest .tmp/xsensor.npz
     # add --score-only to re-score a cached cube without re-fetching.
 """

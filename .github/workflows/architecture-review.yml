@@ -17,7 +17,7 @@ on:
   pull_request:
     paths:
       - 'python-etl/**'
-      - 'olmoearth_run_data/**'
+      - 'experiments/**'
       - 'RiparianPoc.Api/**'
       - 'sql/**'
       - 'frontend/src/**'

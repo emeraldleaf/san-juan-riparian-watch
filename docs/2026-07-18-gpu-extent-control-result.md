@@ -19,7 +19,7 @@ RTX A6000 · **WandB:** `models-n-a6901/san-juan-riparian` (`extent-honest-diag`
 
 ## What ran
 
-The [Phase-1 launch kit](../olmoearth_run_data/riparian_extent/LAUNCH.md) executed end-to-end for the
+The [Phase-1 launch kit](../experiments/riparian_extent/LAUNCH.md) executed end-to-end for the
 first time — the whole pipeline works: materialise → `rslearn model fit` → `predict` → score → overlay.
 
 | | |

@@ -60,7 +60,7 @@ and you find out after you've paid.
 >    median NDVI from a dormant-contaminated **0.320 to 0.463** (physically sensible for lush summer
 >    riparian) and the AUC to **0.752**. Still healthy, now honest.
 >
-> Reproduce with `olmoearth_run_data/riparian_extent/validate_materialized.py`, which scores the
+> Reproduce with `experiments/riparian_extent/validate_materialized.py`, which scores the
 > **materialised cube** (the exact training pixels), peak-season and water-excluded — not the ad-hoc
 > harness the 0.777 came from.
 >
@@ -240,7 +240,7 @@ Principles this phase reinforced, worth applying beyond it:
 ```bash
 # temp MUST live on the data drive — all four, not just TMPDIR (finding 17)
 export TMPDIR=.tmp TMP=.tmp TEMP=.tmp CPL_TMPDIR=.tmp GDAL_CACHEMAX=256
-DS=olmoearth_run_data/riparian_extent/dataset
+DS=experiments/riparian_extent/dataset
 
 .venv-olmoearth/bin/python -m rslearn.main dataset prepare     --root "$DS" --workers 8
 .venv-olmoearth/bin/python -m rslearn.main dataset ingest      --root "$DS" --workers 4
@@ -248,7 +248,7 @@ DS=olmoearth_run_data/riparian_extent/dataset
 # then verify_materialized() — never trust the exit code
 
 PYTHONPATH=python-etl \
-.venv-olmoearth/bin/python olmoearth_run_data/riparian_extent/make_dryrun_config.py "$DS" .tmp/dryrun.yaml --epochs 3
+.venv-olmoearth/bin/python experiments/riparian_extent/make_dryrun_config.py "$DS" .tmp/dryrun.yaml --epochs 3
 PYTHONPATH=python-etl \
 .venv-olmoearth/bin/python -m rslearn.main model fit --config .tmp/dryrun.yaml
 ```

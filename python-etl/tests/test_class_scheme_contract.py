@@ -19,7 +19,7 @@ import yaml
 
 from riparian.labels.nmripmap import PHASE1_CLASS_IDS
 
-MODEL_YAML = Path(__file__).resolve().parents[2] / "olmoearth_run_data/riparian_extent/model.yaml"
+MODEL_YAML = Path(__file__).resolve().parents[2] / "experiments/riparian_extent/model.yaml"
 
 
 def _num_classes(cfg: dict) -> int:

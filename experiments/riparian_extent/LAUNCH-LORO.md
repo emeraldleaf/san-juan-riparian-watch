@@ -29,7 +29,7 @@ The Phase-0 discipline: prove the wiring on a laptop before renting. Already run
 (1 clean NANO epoch, `val_loss` finite/decreasing) — reproduce if the datasets change:
 
 ```bash
-cd olmoearth_run_data/riparian_extent
+cd experiments/riparian_extent
 export PYTHONPATH=../../python-etl
 
 # 1. Combine the 4 reaches into ONE dataset (hardlinks — ~no extra disk), tagged by reach.

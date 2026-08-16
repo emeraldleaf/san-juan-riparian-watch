@@ -7,7 +7,7 @@ cross-reach comparability is not a nicety; it is the difference between a valid 
 experiment and a garbage one. We learned that empirically, and the receipt is at the bottom.
 
 **Diagram:** [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg) draws the whole flow.
-**Code:** [`olmoearth_run_data/riparian_extent/materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py) — one command, any reach.
+**Code:** [`experiments/riparian_extent/materialize_reach.py`](../experiments/riparian_extent/materialize_reach.py) — one command, any reach.
 **Canon:** the one-line rule ("every reach uses identical compositing") is in *CLAUDE.md → Reach-cube
 materialization*; this doc is its detail. See CLAUDE.md.
 

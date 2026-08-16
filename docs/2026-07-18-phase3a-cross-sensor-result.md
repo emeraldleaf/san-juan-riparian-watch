@@ -1,7 +1,7 @@
 # Phase 3A — the cross-sensor gate: RF's Sentinel-2 → Landsat penalty is small (+0.046 AUC)
 
 **Date:** 2026-07-18 · **Status:** first 3A data point · reproducible via
-[`phase3a_cross_sensor.py`](../olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py) ·
+[`phase3a_cross_sensor.py`](../experiments/riparian_extent/phase3a_cross_sensor.py) ·
 spec: [Phase 3 — deep-time change](specs/2026-07-18-phase3-deeptime-change.md)
 
 ## Why this gate exists
@@ -65,7 +65,7 @@ but that is the next measured gate, not an assumption.
 ## Reproduce
 
 ```
-PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py \
+PYTHONPATH=python-etl python experiments/riparian_extent/phase3a_cross_sensor.py \
     --gdb <path>/GRSJ_Version2_0Plus_North.gdb --dest .tmp/xsensor.npz
 ```
 

@@ -308,7 +308,7 @@ def to_class_features(
     """Build a GeoJSON FeatureCollection carrying integer class ids.
 
     This is the ``label`` vector layer consumed by the OlmoEarth scaffold
-    (``olmoearth_run_data/riparian_extent/``), which rasterizes it to ``label_raster``.
+    (``experiments/riparian_extent/``), which rasterizes it to ``label_raster``.
 
     Args:
         polys: Labeled polygons from :func:`fetch_labeled`.

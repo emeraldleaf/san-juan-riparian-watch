@@ -196,10 +196,10 @@ transfer.
 
 ## Reproduce
 
-On a CUDA GPU with the datasets built ([`materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py)):
+On a CUDA GPU with the datasets built ([`materialize_reach.py`](../experiments/riparian_extent/materialize_reach.py)):
 
 ```bash
-cd olmoearth_run_data/riparian_extent
+cd experiments/riparian_extent
 export PYTHONPATH=../../python-etl
 python build_loro_dataset.py --dest dataset_loro          # combine 4 reaches, tag by reach, rasterize
 for reach in malpais farmington kirtland aztec_animas; do
@@ -208,4 +208,4 @@ done                                                       # read test_riparian_
 ```
 
 Full runbook, including the GPU-box setup:
-[`LAUNCH-LORO.md`](../olmoearth_run_data/riparian_extent/LAUNCH-LORO.md).
+[`LAUNCH-LORO.md`](../experiments/riparian_extent/LAUNCH-LORO.md).

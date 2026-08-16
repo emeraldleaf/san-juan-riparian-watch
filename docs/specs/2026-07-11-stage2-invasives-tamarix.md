@@ -223,7 +223,7 @@ OlmoEarth `mangrove` recipe and the saltcedar phenology literature. **The late-s
 must see the whole year, and must not average it away.
 
 **Model.** Fine-tune `OLMOEARTH_V1_BASE` with a segmentation decoder (`FreezeUnfreeze`, unfreeze
-at epoch 20 / 10× LR), per the `mangrove` config. Scaffold: `olmoearth_run_data/riparian_extent/`.
+at epoch 20 / 10× LR), per the `mangrove` config. Scaffold: `experiments/riparian_extent/`.
 
 **Baseline to beat.** Not "nothing" — **CO-RIP (κ 0.80)** and the published tamarisk RF/S2 result
 (**87.8% OA**). If we cannot beat those, we have not contributed.
