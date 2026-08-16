@@ -177,12 +177,11 @@ function withTimeout(ms: number) {
   return { signal: ctrl.signal, clear: () => clearTimeout(id) };
 }
 
-// Meta-questions about the project/site itself ("what is this?", "how was this
-// developed?") aren't in the watershed-literature corpus, so retrieval grabs a
-// tangential "…Project is…" match. Answer those from the project's own description.
-const META_RE = /(this (project|site|app|web ?app|page|watch)|what am i looking at|how (was|is) (this|it)\b[^?]*\b(develop|built|made|creat)|who (made|built|develop|creat)\b|^\s*what('?s| is) this\b[^a-z]*$)/i;
-const META_ANSWER =
-  "**San Juan Riparian Watch** is an independent proof-of-concept that maps riparian vegetation and its invasive share along the San Juan River from decades of satellite imagery, and field-tests a Random Forest against **Ai2's OlmoEarth** foundation model. They tie on the river corridors (~0.80–0.88 AUC); the foundation model pulls ahead on a lone arroyo (0.557 → 0.889). It runs on Ai2's open stack — OlmoEarth delineates the vegetation, and the agent is built to answer with Ai2's **OLMo** (there's no live OLMo endpoint yet, so I currently answer through another open model, switching to OLMo the moment one is served) — grounded in the document corpus with citations. It's experimental and not independently validated. Ask me about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision and I'll answer from the sources.";
+// (Removed the "what is this?" meta-intercept: it hardcoded an answer for any query
+// containing "this project", which hijacked substantive questions like "the biggest
+// threats to this project's claim". The corpus now has an about-doc and the retrieval
+// layer anchors self-referential queries to the project, so the grounded, cited RAG
+// answers these itself — which is the whole point.)
 
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
@@ -314,10 +313,6 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (busy) return;
     setBusy(true);
     setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '', streaming: true }]);
-    if (META_RE.test(text)) {   // answer "what is this?" from the project's own description
-      setTimeout(() => { finalize(META_ANSWER, [], []); setBusy(false); }, 150);
-      return;
-    }
     if (!live) {
       setTimeout(() => { finalize(fallbackAnswer(text), [], []); setBusy(false); }, 200);
       return;
