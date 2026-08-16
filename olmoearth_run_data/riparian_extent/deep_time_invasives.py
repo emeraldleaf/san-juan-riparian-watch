@@ -88,12 +88,12 @@ def _search_window(cat: pystac_client.Client, bbox: BBox, years: range) -> list:
     failed = []
     for year in yrs:
         got = _search_year(cat, bbox, year)
-        if got is None:
-            failed.append(year)
+        if not got:   # None (search failed) OR [] (no scenes under the cloud gate) — both contribute nothing,
+            failed.append(year)   # and both must count as PARTIAL so an under-sampled window is never silent
             continue
         pooled += _least_cloudy(got, per_year)          # each year contributes its best few
     if failed:
-        logger.warning("  window %d–%d: %d year(s) had no usable search %s — composite is PARTIAL",
+        logger.warning("  window %d–%d: %d year(s) had no usable scenes %s — composite is PARTIAL",
                        yrs[0], yrs[-1], len(failed), failed)
     return _least_cloudy(pooled, WINDOW_MAX)
 

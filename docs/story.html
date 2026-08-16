@@ -845,7 +845,9 @@
 
   // KPI count-up: animate every numeric token in each hero stat, preserving separators (→, %, .)
   function countUp(el,dur){
-    var final=el.textContent, tokens=final.match(/[0-9]*\.?[0-9]+|[^0-9]+/g)||[final], start=null;
+    var final=el.textContent;
+    if(final.indexOf(',')>=0) return;   // grouping commas mangle the token animation; leave static
+    var tokens=final.match(/[0-9]*\.?[0-9]+|[^0-9]+/g)||[final], start=null;
     function fr(ts){ if(start===null)start=ts; var p=Math.min(1,(ts-start)/dur), e=1-Math.pow(1-p,3);
       el.textContent=tokens.map(function(t){ if(/^[0-9]*\.?[0-9]+$/.test(t)){ var d=(t.split('.')[1]||'').length; return (parseFloat(t)*e).toFixed(d); } return t; }).join('');
       if(p<1) requestAnimationFrame(fr); else el.textContent=final; }
@@ -1137,27 +1139,35 @@
   // Streaming variant for the full app: tokens render as they arrive (low perceived latency).
   async function askLiveStream(q,onToken){
     var url=AGENT_URL.replace(/\/query\/?$/,'/query/stream');
-    var r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({query:q, session_id:(SESSION||undefined), use_cache:true, model_tier:TIER})});
-    if(!r.ok||!r.body) throw new Error('agent '+r.status);
-    var reader=r.body.getReader(), dec=new TextDecoder(), buf='', full='', ctx=[];
-    for(;;){ var out=await reader.read(); if(out.done) break;
-      buf+=dec.decode(out.value,{stream:true}); var blocks=buf.split('\n\n'); buf=blocks.pop();
-      for(var i=0;i<blocks.length;i++){ var ev='message', data='';
-        blocks[i].split('\n').forEach(function(ln){
-          if(ln.indexOf('event:')===0) ev=ln.slice(6).trim();
-          else if(ln.indexOf('data:')===0) data+=ln.slice(5).trim(); });
-        if(!data) continue; var d; try{ d=JSON.parse(data); }catch(_){ continue; }
-        if(ev==='token'&&d.token){ full+=d.token; onToken(full); }
-        else if(ev==='context'){ if(Array.isArray(d)) ctx=d; else if(d&&d.contexts) ctx=d.contexts; else if(d) ctx.push(d); }
-        else if(ev==='done'){ if(d.session_id) SESSION=d.session_id; }
-        else if(ev==='error'||ev==='security'){ throw new Error(d.error||'blocked'); }
+    // Abort a stream that goes silent (no data for 30s) so the chat can't hang
+    // busy forever; the timer resets on every chunk, so a long answer is fine.
+    var ctrl=new AbortController(), idle;
+    function bump(){ clearTimeout(idle); idle=setTimeout(function(){ctrl.abort();},30000); }
+    bump();
+    try{
+      var r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},signal:ctrl.signal,
+        body:JSON.stringify({query:q, session_id:(SESSION||undefined), use_cache:true, model_tier:TIER})});
+      if(!r.ok||!r.body) throw new Error('agent '+r.status);
+      var reader=r.body.getReader(), dec=new TextDecoder(), buf='', full='', ctx=[];
+      for(;;){ var out=await reader.read(); if(out.done) break;
+        bump();
+        buf+=dec.decode(out.value,{stream:true}); var blocks=buf.split('\n\n'); buf=blocks.pop();
+        for(var i=0;i<blocks.length;i++){ var ev='message', data='';
+          blocks[i].split('\n').forEach(function(ln){
+            if(ln.indexOf('event:')===0) ev=ln.slice(6).trim();
+            else if(ln.indexOf('data:')===0) data+=ln.slice(5).trim(); });
+          if(!data) continue; var d; try{ d=JSON.parse(data); }catch(_){ continue; }
+          if(ev==='token'&&d.token){ full+=d.token; onToken(full); }
+          else if(ev==='context'){ if(Array.isArray(d)) d.forEach(function(x){ctx.push(x);}); else if(d&&d.contexts) d.contexts.forEach(function(x){ctx.push(x);}); else if(d) ctx.push(d); }
+          else if(ev==='done'){ if(d.session_id) SESSION=d.session_id; }
+          else if(ev==='error'||ev==='security'){ throw new Error(d.error||'blocked'); }
+        }
       }
-    }
-    var seen={}, cites=[];
-    ctx.forEach(function(c){ var s=((c&&c.metadata)||{}).source_file||(c&&c.source_file);
-      if(s&&!seen[s]){seen[s]=1; cites.push({source_file:s, source_url:citeUrlFor(s)});} });
-    return {answer:full, citations:cites, resolved_geometries:[]};
+      var seen={}, cites=[];
+      ctx.forEach(function(c){ var s=((c&&c.metadata)||{}).source_file||(c&&c.source_file);
+        if(s&&!seen[s]){seen[s]=1; cites.push({source_file:s, source_url:citeUrlFor(s)});} });
+      return {answer:full, citations:cites, resolved_geometries:[]};
+    } finally { clearTimeout(idle); }
   }
   function answer(text){
     if(busy)return; busy=true; setBusy(true);

@@ -172,20 +172,22 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
 
   const finalize = useCallback((text: string, citations: Cite[], geoms: Geom[]) => {
     const clean = stripSources(text);
+    // Dedup/filter once here (citations already deduped upstream) so the render
+    // doesn't repeat O(n²) passes on every re-render of the log.
+    const shownGeoms = (geoms || []).filter((g) => g?.geom);
     setMessages((m) => {
       const copy = m.slice();
-      copy[copy.length - 1] = { role: 'assistant', text: clean, html: mdToHtml(clean || ''), citations, geoms };
+      copy[copy.length - 1] = { role: 'assistant', text: clean, html: mdToHtml(clean || ''), citations, geoms: shownGeoms };
       return copy;
     });
     // A resolved geometry highlights the corridor map. Only fall back to
     // keyword-routing (which flies to a *different* map with no highlight layer)
     // when there is no resolved geometry to show.
-    let shownGeom = false;
-    if (geoms && geoms.length) {
-      const feats = geoms.filter((g) => g?.geom).map((g) => ({ type: 'Feature', geometry: g.geom, properties: {} }));
-      if (feats.length) { emitGeom(feats); shownGeom = true; }
+    if (shownGeoms.length) {
+      emitGeom(shownGeoms.map((g) => ({ type: 'Feature', geometry: g.geom, properties: {} })));
+    } else {
+      emitAnswerToMap(clean);
     }
-    if (!shownGeom) emitAnswerToMap(clean);
   }, []);
 
   const askLiveStream = useCallback(async (q: string, onToken: (partial: string) => void) => {
@@ -273,18 +275,18 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
             {m.role === 'assistant' && !m.streaming && m.html ? (
               <>
                 <div className="md" dangerouslySetInnerHTML={{ __html: m.html }} />
-                {m.citations && m.citations.filter((c, j, a) => a.findIndex((x) => x.source_file === c.source_file) === j).length > 0 && (
+                {m.citations && m.citations.length > 0 && (
                   <div className="cites">
                     <span className="citehead">Sources</span>
-                    {m.citations.filter((c, j, a) => a.findIndex((x) => x.source_file === c.source_file) === j).map((c, k) => {
+                    {m.citations.map((c, k) => {
                       const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^findings-/, '').replace(/\.(md|pdf|html?)$/, '');
                       return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
                     })}
                   </div>
                 )}
-                {m.geoms && m.geoms.filter((g) => g.geom).length > 0 && (
+                {m.geoms && m.geoms.length > 0 && (
                   <div className="cites">
-                    {m.geoms.filter((g) => g.geom).map((g, k) => (
+                    {m.geoms.map((g, k) => (
                       <span key={k} className="geo" onClick={() => emitGeom([{ type: 'Feature', geometry: g.geom, properties: {} }])}>📍 {g.mention_text || g.ref || 'location'}</span>
                     ))}
                   </div>

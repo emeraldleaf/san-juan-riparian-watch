@@ -19,6 +19,9 @@ addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
 function countUp(el: HTMLElement, dur: number) {
   const final = el.textContent || '';
+  // Grouping commas would be split into separate numeric runs and animate to
+  // nonsense (1,700 → "0,315"); leave any such value static.
+  if (final.indexOf(',') >= 0) return;
   const tokens = final.match(/[0-9]*\.?[0-9]+|[^0-9]+/g) || [final];
   let start: number | null = null;
   const fr = (ts: number) => {
