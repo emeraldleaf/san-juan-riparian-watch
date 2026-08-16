@@ -3,7 +3,7 @@
 **Date:** 2026-08-04 · **Status:** result (negative) · runs the CPU/RF arm of the
 [Stage-2 invasives/beetle gate](specs/2026-08-01-stage2-invasives-beetle-gate.md) on the real CSU
 field points. Reproducible via
-[`phase3c_invasives_beetle.py`](../olmoearth_run_data/riparian_extent/phase3c_invasives_beetle.py).
+[`phase3c_invasives_beetle.py`](../experiments/riparian_extent/phase3c_invasives_beetle.py).
 
 ## The one-sentence answer
 
@@ -87,7 +87,7 @@ the Plateau pool) sidesteps the sensor confound entirely and is the better next 
 ## Reproduce
 
 ```bash
-cd olmoearth_run_data/riparian_extent
+cd experiments/riparian_extent
 export PYTHONPATH=../../python-etl
 # needs TabletData_2017.csv (CSU, CC BY-SA, ~326 KB from mountainscholar)
 python phase3c_invasives_beetle.py --csv TabletData_2017.csv

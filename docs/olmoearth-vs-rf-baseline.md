@@ -127,7 +127,7 @@ So the honest statement is narrower than either the old page or #9 claimed:
 > **still an open question** — it has not been run.
 
 That run needs a GPU and is what [#9](https://github.com/emeraldleaf/san-juan-riparian-watch/issues/9)
-now tracks. The scaffold is committed at `olmoearth_run_data/riparian_extent/`.
+now tracks. The scaffold is committed at `experiments/riparian_extent/`.
 
 ## A methodological note worth keeping
 

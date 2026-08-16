@@ -210,16 +210,20 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (!AGENT_URL) return;
     const healthUrl = AGENT_URL.replace(/\/(docs\/ask|query)\/?$/, '/health');
     let cancelled = false;
+    // Re-fetch on every healthy probe so tier availability stays live — e.g. OLMo
+    // flips to enabled the moment a provider serves it, which is what the UI copy
+    // promises. Only the FIRST load sets the default tier; later refreshes update
+    // availability without clobbering the visitor's current selection.
     const loadModels = () => {
-      if (modelsLoadedRef.current || !isQuery) return;
-      modelsLoadedRef.current = true;
+      if (!isQuery) return;
       const url = AGENT_URL.replace(/\/query\/?$/, '/agent/models');
       const mt = withTimeout(8000);
       fetch(url, { signal: mt.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
         if (cancelled) return;
-        if (d?.default) { setTier(d.default); tierRef.current = d.default; }
+        if (!modelsLoadedRef.current && d?.default) { setTier(d.default); tierRef.current = d.default; }
+        modelsLoadedRef.current = true;
         setTiers(d?.tiers || null);
-      }).catch(() => { modelsLoadedRef.current = false; }).finally(() => mt.clear());
+      }).catch(() => {}).finally(() => mt.clear());
     };
     const probe = () => {
       const ht = withTimeout(8000);

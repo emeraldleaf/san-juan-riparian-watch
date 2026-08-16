@@ -14,7 +14,7 @@ This renders, per selected window, three side-by-side panels:
 If panel 2's cyan line sits ON the green riparian vegetation and panel 3 (the shifted one) sits OFF
 it → labels are aligned, accept. If panel 3 fits BETTER → a real offset; shift labels before Phase 1.
 
-    PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/naip_overlay.py [n_windows]
+    PYTHONPATH=python-etl python experiments/riparian_extent/naip_overlay.py [n_windows]
 """
 
 from __future__ import annotations

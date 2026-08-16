@@ -1,6 +1,6 @@
 # San Juan Riparian Watch
 
-### 🌐 [**Live site → riparian.emeraldleaf.dev**](https://riparian.emeraldleaf.dev)
+## 🌐 [**Live site → riparian.emeraldleaf.dev**](https://riparian.emeraldleaf.dev)
 
 An interactive story map of the corridor, the **Random Forest vs. Ai2's OlmoEarth** field test, and a **grounded RAG agent** you can ask anything — answers stream in and cite their sources.
 
@@ -316,7 +316,7 @@ san-juan-riparian-watch/
 │   ├── requirements.txt               #   full runtime deps
 │   └── requirements-test.txt          #   curated CI subset (no torch/geopandas)
 │
-├── olmoearth_run_data/                # ── OlmoEarth FM track — research/experiment scripts ──
+├── experiments/                # ── OlmoEarth FM track — research/experiment scripts ──
 │   └── riparian_extent/               #   materialize_reach.py (phenology cubes) · run_loro.py +
 │                                      #   build_loro_dataset.py (leave-one-reach-out fine-tune) ·
 │                                      #   deep_time_invasives.py · phase3a/b/c · deploy_extent_map.py.
@@ -362,7 +362,7 @@ san-juan-riparian-watch/
 > **What's deliberate vs. what's legacy** (so the breadth reads as choices, not accretion):
 > - **Two front-ends on purpose** — `frontend/` is the full React data-explorer; `web/` is the Astro
 >   story site that embeds the live agent (canonical). `docs/*.html` is the GitHub Pages mirror.
-> - **Two ML homes on purpose** — `python-etl/riparian/` is the productized package; `olmoearth_run_data/`
+> - **Two ML homes on purpose** — `python-etl/riparian/` is the productized package; `experiments/`
 >   is the flat experiment bench for the GPU foundation-model runs (research scripts, not a library).
 > - **A/B legacy is kept, not hidden** — `python-etl/etl_pipeline.py` + the flat `*_processor.py` are the
 >   pre-delineation buffer-era pipeline, retained as the measured baseline the new package is compared against.

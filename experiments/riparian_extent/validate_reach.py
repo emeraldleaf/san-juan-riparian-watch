@@ -11,7 +11,7 @@ It fetches its own S2 (not a materialised cube), so it works for any reach given
   3. Rasterise labels onto the NDVI grid; separability (riparian vs corridor-neg 3/4) + a global,
      pooled shift test — the same contract as `validate_materialized.py`.
 
-    PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/validate_reach.py \
+    PYTHONPATH=python-etl python experiments/riparian_extent/validate_reach.py \
         [minx miny maxx maxy]     # defaults to the Malpais Arroyo–San Juan HUC12
 """
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-20 · **Status:** the honest baseline for the FM-vs-RF deploy decision (spec
 `specs/2026-07-19-fm-vs-rf-deploy-decision.md`, PR #70) · reproducible via
-[`deploy_extent_map.py`](../olmoearth_run_data/riparian_extent/deploy_extent_map.py)
+[`deploy_extent_map.py`](../experiments/riparian_extent/deploy_extent_map.py)
 
 ## Why this exists
 
@@ -69,7 +69,7 @@ foundation model, if anywhere, earns its keep.
 ## Reproduce
 
 ```bash
-PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/deploy_extent_map.py \
+PYTHONPATH=python-etl python experiments/riparian_extent/deploy_extent_map.py \
     --gdb <path>/GRSJ_Version2_0Plus_North.gdb
 ```
 

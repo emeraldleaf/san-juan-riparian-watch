@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-05 · **Status:** result (a *negative* on the deep-time trajectory, a *positive* on the
 present-day map) · reproducible via
-[`deep_time_invasives.py`](../olmoearth_run_data/riparian_extent/deep_time_invasives.py).
+[`deep_time_invasives.py`](../experiments/riparian_extent/deep_time_invasives.py).
 **Reliable product:** [the present-day corridor-vs-invasive map](extent-vs-invasive.html).
 
 ## The one-sentence answer
@@ -80,7 +80,7 @@ sensor that resolves the phenology (which the incumbent literature also flags as
 ## Reproduce
 
 ```bash
-cd olmoearth_run_data/riparian_extent
+cd experiments/riparian_extent
 export PYTHONPATH=../../python-etl
 # present-day corridor + invasive predictions → .tmp/present/{extent,invasive}_2020.geojson
 python deep_time_invasives.py --target extent   --epochs 2020 --out .tmp/present

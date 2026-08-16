@@ -1,7 +1,7 @@
 # ADR: Fine-tune OlmoEarth on invasives, with extent as a calibration control
 
 **Date:** 2026-07-12 · **Status:** Accepted (planning) · **Supersedes:** nothing
-**Tracks:** issue #9 · **Scaffold:** `olmoearth_run_data/riparian_extent/`
+**Tracks:** issue #9 · **Scaffold:** `experiments/riparian_extent/`
 
 > **Revised 2026-07-12 (same day), after review.** The first draft of this ADR framed extent as
 > "already solved, therefore not a contribution" and treated the control as a throwaway benchmark.

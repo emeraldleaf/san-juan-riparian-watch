@@ -112,7 +112,7 @@ Not one of them could catch errors 5, 8, or 9 — because those are **semantic d
 asserting something that is *no longer true*. Structural gates are blind to it, and it is the exact
 failure mode of fast, fluent, AI-assisted work.
 
-So the loop was extended with three **semantic** gates, all mechanical, all in CI, all **required** on
+So the loop was extended with four **semantic** gates, all mechanical, all in CI, all **required** on
 `main`:
 
 ### 1. Retraction registry — `docs/RETRACTIONS.md`
@@ -140,6 +140,18 @@ Every spec, ADR and audit must be linked from the published hub.
 
 > **Why it exists:** the **plan of record** — the fine-tune ADR — was live on the site and reachable
 > only by guessing its URL.
+
+### 4. Canonical results — `docs/canonical-results.md`
+The **inverse** of the retraction gate. That one fails a document for *stating a withdrawn claim*; this
+one fails a document for *missing a current one*. Each row registers a headline value (e.g. the arroyo
+`0.557 → 0.889`) and the public documents that **must** carry it; CI fails the build, naming the doc, if
+one has gone stale.
+
+> **Why it exists:** 15 days after the FM-vs-RF result shipped to the live site's front page, the
+> **flagship engineering-review page** still said the fair test *"doesn't exist yet."* The retraction
+> gate — born from *this same page* — sailed straight past it: nothing was *contradicted*, a current
+> result was simply *absent*. Every existing gate enforced that a doc says nothing *wrong*; none
+> enforced that it says the *current* thing.
 
 ---
 

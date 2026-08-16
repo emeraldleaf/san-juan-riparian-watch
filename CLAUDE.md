@@ -40,7 +40,7 @@ so the ledger below stays honest.
 |---|---|
 | PostToolUse/PreToolUse hooks (`check-claude-md-refs`, `check-file-moves`, `block-sync-over-async`) | **Automatic**, on every edit |
 | Drift gates — `./dev.sh --check-encoding` | **Automatic in CI** (`drift-gates` job) |
-| Ruff (lint) — `python-etl` **and** `olmoearth_run_data` (the ungated zone, now gated) | **Automatic in CI** (`ci-python`), version **pinned** so a release can't retro-fail a branch |
+| Ruff (lint) — `python-etl` **and** `experiments` (the ungated zone, now gated) | **Automatic in CI** (`ci-python`), version **pinned** so a release can't retro-fail a branch |
 | CodeRabbit | **Automatic** on every PR — and it must be **green before merge** (below) |
 | `architecture-reviewer` agent | **Automatic in CI** (`architecture-review.yml`, self-owned, fails on must-fix) **once `ANTHROPIC_API_KEY` is set** — soft-passes until then; also on demand via `/check-rules` |
 

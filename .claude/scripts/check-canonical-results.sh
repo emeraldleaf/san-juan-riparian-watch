@@ -24,7 +24,9 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 2
 
 REG="docs/canonical-results.md"
-[[ -f "$REG" ]] || { echo "no $REG — nothing to enforce"; exit 0; }
+# A missing registry is a setup error, NOT "nothing to enforce" — otherwise the gate
+# can be silently disabled by deleting the file it reads. Fail loudly (exit 2).
+[[ -f "$REG" ]] || { echo "MISSING $REG — the registry this gate enforces is gone"; exit 2; }
 
 if [[ -t 1 ]]; then RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; NC=$'\033[0m'
 else RED=""; GREEN=""; NC=""; fi

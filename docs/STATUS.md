@@ -59,7 +59,7 @@ in-domain at CV 0.90+, but boundaries don't transfer across morphology). **Diver
 closed river-corridor transfer to ~0.88 — but the lone arroyo stays 0.557**, because it is the only
 example of its type. That gap **is** the FM's one predicted opening (under-represented-morphology
 transfer). Result in `docs/2026-07-20-diverse-reach-transfer.md`; the DB-free inference tool is
-`olmoearth_run_data/riparian_extent/deploy_extent_map.py` (median-mosaic → GeoTIFF + extent GeoJSON).
+`experiments/riparian_extent/deploy_extent_map.py` (median-mosaic → GeoTIFF + extent GeoJSON).
 
 **The gate is now reproducible (#70), not qualitative.** Two CodeRabbit rounds (ASSERTIVE) turned it
 from "materially cleaner / no worse" into a contract a third party could run: **extent task only**
@@ -97,7 +97,7 @@ edge — multi-sensor pretraining — a plain per-pixel RF crosses sensors cheap
 not decisive on the sensor axis** and RF stays the pragmatic pick for the archive roll-out. It
 isolates the sensor axis only; **3B (temporal) and 3C (beetle) are separate, unsolved, and
 model-agnostic.** Result + caveats in `docs/2026-07-18-phase3a-cross-sensor-result.md`, reproducible
-end-to-end via `olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py` — both land with **PR #66**.
+end-to-end via `experiments/riparian_extent/phase3a_cross_sensor.py` — both land with **PR #66**.
 
 **The merge gate itself was broken — found and fixed.** `check-coderabbit.sh` passed jq's `--arg` to
 `gh api --jq`, which silently ignores it; `REVIEW` came back empty and the gate false-blocked *every*
@@ -479,7 +479,7 @@ later behind the existing provider seam. Landed this session:
    - a real `SegmentationPoolingDecoder`, instead of **mean-pooling tokens over time AND
      band-sets** — which discards the phenology signal that *is* the riparian discriminator.
    Reported mangrove accuracy: 97.6%. **Scaffold committed at
-   `olmoearth_run_data/riparian_extent/`** (`dataset.json` / `model.yaml` / `olmoearth_run.yaml`,
+   `experiments/riparian_extent/`** (`dataset.json` / `model.yaml` / `olmoearth_run.yaml`,
    transcribed from `mangrove`, NMRipMap as label source, spatial split). Needs a GPU +
    `olmoearth_projects` checkout to run. Note **v1.1 cuts compute ~3×** (band-merged tokens)
    and **v1.2 adds RoPE** — re-check whether a smaller variant is viable first.

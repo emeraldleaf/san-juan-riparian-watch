@@ -114,7 +114,7 @@ That is what this project is for — and their recommendation is, in effect, its
   an honest tooling assessment (`odc-stac`/dask as the portable core, rslearn as the ML adapter, GEE
   as the server-side alternative) and the **receipt** — a mis-composited shortcut collapsed a transfer
   to AUC 0.37. Reusable via
-  [`materialize_reach.py`](../olmoearth_run_data/riparian_extent/materialize_reach.py); the flow is
+  [`materialize_reach.py`](../experiments/riparian_extent/materialize_reach.py); the flow is
   drawn in [`malpais-download-pipeline.svg`](malpais-download-pipeline.svg).
 
 - [**Methods & metrics**](2026-07-18-methods-and-metrics.md) — the companion to the results: what the
@@ -174,7 +174,7 @@ That is what this project is for — and their recommendation is, in effect, its
   deep record). Three nested tests (separability gate · species LORO · the **beetle axis isolated**), with
   the headline prediction **pre-registered**: a present-day-trained model **inverts** pre-beetle (AUROC < 0.5)
   because the beetle *flips the sign* of the tamarisk phenology cue — the confound turned into a number.
-  The CPU RF arm ([`phase3c_invasives_beetle.py`](../olmoearth_run_data/riparian_extent/phase3c_invasives_beetle.py))
+  The CPU RF arm ([`phase3c_invasives_beetle.py`](../experiments/riparian_extent/phase3c_invasives_beetle.py))
   is scaffolded and GPU-free — the highest information-per-dollar next move.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
 
@@ -207,20 +207,20 @@ That is what this project is for — and their recommendation is, in effect, its
   cross-reach transfer to **0.85–0.91** on river corridors (RF is genuinely good), but the lone
   **arroyo** stays at **0.557** — the one place a per-pixel RF can't reach, and exactly the
   under-represented-morphology transfer the foundation model is predicted to win. Sharpens FM-vs-RF to a
-  single falsifiable test. Reproducible via [`deploy_extent_map.py`](../olmoearth_run_data/riparian_extent/deploy_extent_map.py).
+  single falsifiable test. Reproducible via [`deploy_extent_map.py`](../experiments/riparian_extent/deploy_extent_map.py).
 - [**Phase 3B — the temporal gate**](2026-07-18-phase3b-temporal-result.md) — going back three years
   is essentially **free**: an RF trained on 2020 and scored at the same 167 CSU points on **Landsat
   2020 vs Landsat 2017** loses only **+0.003 AUC**. With 3A, both model-agnostic deep-time axes are now
   measured and cheap (sensor +0.046, time +0.003); the binding constraint is **spatial coverage of
   training**, not the year or sensor — so it does not reopen RF-vs-FM. Reproducible via
-  [`phase3b_temporal.py`](../olmoearth_run_data/riparian_extent/phase3b_temporal.py).
+  [`phase3b_temporal.py`](../experiments/riparian_extent/phase3b_temporal.py).
 - [**Phase 3A — the cross-sensor gate**](2026-07-18-phase3a-cross-sensor-result.md) — the first
   deep-time measurement: an RF trained on **Sentinel-2 2020** and scored on the **same held-out
   pixels' Landsat 2020** loses only **+0.046 AUC** (0.942 → 0.896). On the one axis where the
   foundation model has a structural edge — multi-sensor pretraining — a plain per-pixel RF crosses
   sensors cheaply, so the FM edge is **not decisive** here. Isolates the sensor axis only; temporal
   drift (3B) and the beetle inversion (3C) are separate, unsolved and **model-agnostic**. Reproducible
-  via [`phase3a_cross_sensor.py`](../olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py).
+  via [`phase3a_cross_sensor.py`](../experiments/riparian_extent/phase3a_cross_sensor.py).
 - [**Phase 0 — the record**](2026-07-14-phase-0-record.md) — what we built (label layer, imagery
   validation, S2 cube, NANO dry-run), the **seven traps** it caught for $0 that would have failed on
   a GPU, the methods that generalised, the trade-offs, and the **open decisions before Phase 1**
