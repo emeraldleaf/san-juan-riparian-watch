@@ -336,6 +336,28 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
         <div><div className="t">Riparian document agent</div><div className="s">Hybrid RAG over the corpus + these findings</div></div>
         <div className={'live' + (live ? ' on' : '')} id="livebadge" title="agent status"><span className="pip"></span><span>{live ? 'live' : 'offline'}</span></div>
       </div>
+      {tiers && (
+        <div className="modelbar">
+          <span className="ml">Model</span>
+          <div className="seg" role="radiogroup" aria-label="Answer model">
+            {tiers.map((t) => (
+              <button key={t.id} role="radio" aria-checked={t.id === tier} disabled={!t.available}
+                className={t.id === tier ? 'on' : ''}
+                title={!t.available ? 'OLMo isn’t being served right now — this switch goes live the moment a host (Ai2 / OpenRouter) serves it.' : undefined}
+                onClick={() => { if (t.available && !busy) setTier(t.id); }}>
+                {t.id === 'olmo' && <span className={'sd ' + (t.available ? 'up' : 'down')}></span>}
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+          <span className="mnote">{activeNote}</span>
+        </div>
+      )}
+      {olmo && !olmo.available && (
+        <div className="moffline">
+          <b>OLMo is disabled</b> — no live OpenRouter endpoint yet (0 providers serve it); runs on another open model meanwhile and enables automatically when one goes live.
+        </div>
+      )}
       <div className="chat" ref={chatRef} role="log" aria-live="polite" aria-atomic="false">
         {messages.map((m, i) => (
           <div key={i} className={'msg ' + (m.role === 'user' ? 'u' : 'a') + (m.streaming && !m.text ? ' think' : '') + (m.streaming && m.text ? ' streaming' : '')}>
@@ -378,28 +400,6 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
           </div>
         )}
       </div>
-      {tiers && (
-        <div className="modelbar">
-          <span className="ml">Model</span>
-          <div className="seg" role="radiogroup" aria-label="Answer model">
-            {tiers.map((t) => (
-              <button key={t.id} role="radio" aria-checked={t.id === tier} disabled={!t.available}
-                className={t.id === tier ? 'on' : ''}
-                title={!t.available ? 'OLMo isn’t being served right now — this switch goes live the moment a host (Ai2 / OpenRouter) serves it.' : undefined}
-                onClick={() => { if (t.available && !busy) setTier(t.id); }}>
-                {t.id === 'olmo' && <span className={'sd ' + (t.available ? 'up' : 'down')}></span>}
-                <span>{t.label}</span>
-              </button>
-            ))}
-          </div>
-          <span className="mnote">{activeNote}</span>
-        </div>
-      )}
-      {olmo && !olmo.available && (
-        <div className="moffline">
-          <b>OLMo is disabled</b> because Ai2’s OLMo has no live inference endpoint on OpenRouter yet (0 providers currently serve it), so it can’t answer. The demo runs on another open model meanwhile; this button enables itself automatically the moment an OLMo endpoint goes live.
-        </div>
-      )}
       <div className="askrow">
         <input value={input} disabled={busy} onChange={(e) => setInput((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => { if (e.key === 'Enter') go(); }}
