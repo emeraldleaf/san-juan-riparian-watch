@@ -6,7 +6,7 @@ on:
   pull_request:
     paths:
       - 'python-etl/**'
-      - 'olmoearth_run_data/**'
+      - 'experiments/**'
       - '.github/workflows/ci-python.yml'
 
 permissions:
@@ -50,12 +50,12 @@ jobs:
         run: ruff check riparian tests
 
       - name: Ruff (lint) — ungated zone gate
-        # Closes the ungated zone: experiment scripts under olmoearth_run_data (materialize, LORO
+        # Closes the ungated zone: experiment scripts under experiments (materialize, LORO
         # drivers, the phase3c invasives arm) were linted by nothing. Runs from the repo ROOT — its
         # own import tree (sibling `phase3a_cross_sensor` etc.), so isort first-party detection must
         # anchor there, not at python-etl, or the sort grouping flips. Same pinned ruff, no config.
         working-directory: ${{ github.workspace }}
-        run: ruff check olmoearth_run_data
+        run: ruff check experiments
 
       - name: Mypy (type-check) — advisory
         continue-on-error: true

@@ -1,7 +1,7 @@
 # Phase 3B — the temporal gate: going back three years is essentially free (+0.003 AUC)
 
 **Date:** 2026-07-18 · **Status:** second deep-time data point · reproducible via
-[`phase3b_temporal.py`](../olmoearth_run_data/riparian_extent/phase3b_temporal.py) ·
+[`phase3b_temporal.py`](../experiments/riparian_extent/phase3b_temporal.py) ·
 spec: [Phase 3 — deep-time change](specs/2026-07-18-phase3-deeptime-change.md) ·
 companion: [3A — the cross-sensor gate](2026-07-18-phase3a-cross-sensor-result.md)
 
@@ -82,10 +82,10 @@ does **not**, on this evidence, reopen the RF-vs-FM decision.
 
 ```
 # 1) build the 2020 S2 training cube (3A):
-PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/phase3a_cross_sensor.py \
+PYTHONPATH=python-etl python experiments/riparian_extent/phase3a_cross_sensor.py \
     --gdb <path>/GRSJ_Version2_0Plus_North.gdb
 # 2) run the temporal gate (downloads the CSU points, samples Landsat 2017 + 2020 at them):
-PYTHONPATH=python-etl python olmoearth_run_data/riparian_extent/phase3b_temporal.py \
+PYTHONPATH=python-etl python experiments/riparian_extent/phase3b_temporal.py \
     --gdb <path>/GRSJ_Version2_0Plus_North.gdb
 ```
 

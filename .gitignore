@@ -35,13 +35,13 @@ __pycache__/
 # macOS
 .DS_Store
 .venv-olmoearth/
-olmoearth_run_data/riparian_extent/dataset/
-olmoearth_run_data/riparian_extent/dataset_*/
+experiments/riparian_extent/dataset/
+experiments/riparian_extent/dataset_*/
 .tmp/
 docs/audits/corpus_pdfs/
 docs/audits/fetch_failures.csv
 docs/audits/closed_access.csv
 docs/audits/fetch.log
-olmoearth_run_data/riparian_extent/naip_chips/
+experiments/riparian_extent/naip_chips/
 .codacy/
-olmoearth_run_data/riparian_extent/dryrun_*.yaml
+experiments/riparian_extent/dryrun_*.yaml

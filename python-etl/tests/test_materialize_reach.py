@@ -1,6 +1,6 @@
 """Unit tests for the reusable reach-cube materializer (``materialize_reach.py``).
 
-The module lives in ``olmoearth_run_data/riparian_extent/`` (an ops script tree, not
+The module lives in ``experiments/riparian_extent/`` (an ops script tree, not
 the ``riparian`` package), so these tests import it by prepending that directory to
 ``sys.path``. Its heavy top-level dependency — ``validate_reach``, which imports the
 geo stack (planetary_computer/pystac/rasterio/pyproj) — is stubbed, and the pipeline
@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-REACH_DIR = Path(__file__).resolve().parents[2] / "olmoearth_run_data" / "riparian_extent"
+REACH_DIR = Path(__file__).resolve().parents[2] / "experiments" / "riparian_extent"
 MALPAIS_BBOX = (-108.8217, 36.8096, -108.6729, 36.9508)
 FARMINGTON_BBOX = (-108.40, 36.66, -108.10, 36.80)
 

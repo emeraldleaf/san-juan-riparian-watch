@@ -38,8 +38,8 @@ Planetary Computer download is money set on fire. If the tile store was disturbe
 
 # (a) The materialised cube is intact and honestly separable (water-excluded contract):
 PYTHONPATH=python-etl \
-  .venv-olmoearth/bin/python olmoearth_run_data/riparian_extent/validate_materialized.py \
-  olmoearth_run_data/riparian_extent/dataset
+  .venv-olmoearth/bin/python experiments/riparian_extent/validate_materialized.py \
+  experiments/riparian_extent/dataset
 #   Expect AUC ≈ 0.75 (peak-season, corridor-negative). If it errors or reads BROKEN, the tile
 #   store is damaged — re-materialise (§2) before spending a cent.
 
@@ -71,7 +71,7 @@ Budget **~15 GB** for the tile store (ours came to 11 GB). Materialised windows 
 - RunPod L4 ≈ $0.43/hr · A10G ≈ $0.34/hr.
 - **Hard cost cap: $100.** At $0.43/hr that is 230 GPU-hours; the plan needs **< 15**.
 - Python 3.12 + `uv sync` against an [`olmoearth_projects`](https://github.com/allenai/olmoearth_projects)
-  checkout (these configs drop into `olmoearth_run_data/riparian_extent/`). The PyPI package is
+  checkout (these configs drop into `experiments/riparian_extent/`). The PyPI package is
   **`olmoearth-runner`**; the import name is `olmoearth_run`.
 
 Copy the materialised `dataset/` to the GPU box (or re-materialise there — but that burns GPU time
@@ -80,7 +80,7 @@ on a CPU/network task; prefer copying).
 ## 4. Env vars the configs reference
 
 ```bash
-export DATASET_PATH=/path/to/olmoearth_run_data/riparian_extent/dataset
+export DATASET_PATH=/path/to/experiments/riparian_extent/dataset
 export NUM_WORKERS=8
 export CHECKPOINT_PATH=/path/to/checkpoints/riparian_extent
 export WANDB_PROJECT=san-juan-riparian   WANDB_NAME=extent-control-v1base   WANDB_ENTITY=<you>
@@ -90,7 +90,7 @@ export PREDICTION_OUTPUT_LAYER=output     # only needed for the predict step (§
 ## 5. Train
 
 ```bash
-rslearn model fit --config olmoearth_run_data/riparian_extent/model.yaml
+rslearn model fit --config experiments/riparian_extent/model.yaml
 ```
 - `rslearn model fit` is the **verified** entry point (Phase-0 dry-run ran exactly this, NANO/CPU).
 - ~60 epochs, batch 32 + AMP → **~2–7 GPU-hours** (V1_BASE's 3× attention cost widens this).

@@ -9,8 +9,8 @@ will train on — using the corridor-negative contract (agriculture + other, not
 ``riparian.labels.validate_layer``. Run it after `dataset materialize`:
 
     PYTHONPATH=python-etl \
-    .venv-olmoearth/bin/python olmoearth_run_data/riparian_extent/validate_materialized.py \
-        olmoearth_run_data/riparian_extent/dataset
+    .venv-olmoearth/bin/python experiments/riparian_extent/validate_materialized.py \
+        experiments/riparian_extent/dataset
 
 NDVI = (B08 − B04) / (B08 + B04), taken as the per-pixel **median across the 12 monthly mosaics**
 (peak season is already June–August). The geotiff band order is
@@ -129,7 +129,7 @@ def main() -> int:
     Returns a process exit code: 0 if separability is not BROKEN and the global shift test finds no
     above-tolerance offset, else 1.
     """
-    dataset = Path(sys.argv[1] if len(sys.argv) > 1 else "olmoearth_run_data/riparian_extent/dataset")
+    dataset = Path(sys.argv[1] if len(sys.argv) > 1 else "experiments/riparian_extent/dataset")
     windows = sorted((dataset / "windows").glob("*/*/"))
     logger.info("validating %d windows in %s", len(windows), dataset)
 

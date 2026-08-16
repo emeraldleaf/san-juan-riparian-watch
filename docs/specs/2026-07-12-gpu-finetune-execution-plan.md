@@ -249,7 +249,7 @@ cannot pull away from it, we have merely learned to imitate the incumbent's limi
    > rasters are on disk. A green exit that means "nothing happened" is the most expensive kind of
    > green — on a GPU you would train on an empty cube and the loss would fall anyway.
 4. **Dry-run on `OLMOEARTH_V1_NANO`, MPS/CPU, 1 epoch, a handful of windows.** ✅ **DONE 2026-07-14.**
-   Reproduce with `olmoearth_run_data/riparian_extent/make_dryrun_config.py` (derives the dry-run
+   Reproduce with `experiments/riparian_extent/make_dryrun_config.py` (derives the dry-run
    from the canonical `model.yaml`, so it exercises the real wiring, not a lookalike). The run shook
    out **four more config bugs the GPU would have hit on step one**, each fixed:
    - **`OLMOEARTH_V1_1_BASE` does not resolve** — only `V1_{NANO,TINY,BASE,LARGE}` exist in this

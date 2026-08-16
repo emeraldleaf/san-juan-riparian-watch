@@ -80,7 +80,7 @@ def _redirect_temp(dest: Path) -> None:
     The scratch dir must also be a **short path**: rslearn's ``--workers`` pool
     opens an ``AF_UNIX`` multiprocessing socket *under* ``TMPDIR``, and macOS caps
     that path at 104 chars. A ``.tmp`` beside a deeply-nested dataset (e.g.
-    ``…/olmoearth_run_data/riparian_extent/.tmp``) overflows it and ``prepare``
+    ``…/experiments/riparian_extent/.tmp``) overflows it and ``prepare``
     dies with ``AF_UNIX path too long``. So on a ``/Volumes/<name>`` mount we place
     the scratch at the volume root (short, same filesystem); otherwise beside the
     dataset as before.
