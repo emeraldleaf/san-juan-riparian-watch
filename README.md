@@ -312,7 +312,23 @@ san-juan-riparian-watch/
 │   ├── requirements.txt               #   full runtime deps
 │   └── requirements-test.txt          #   curated CI subset (no torch/geopandas)
 │
-├── frontend/                          # React 18 + TypeScript + MapLibre GL + Tailwind (Vite)
+├── olmoearth_run_data/                # ── OlmoEarth FM track — research/experiment scripts ──
+│   └── riparian_extent/               #   materialize_reach.py (phenology cubes) · run_loro.py +
+│                                      #   build_loro_dataset.py (leave-one-reach-out fine-tune) ·
+│                                      #   deep_time_invasives.py · phase3a/b/c · deploy_extent_map.py.
+│                                      #   Deliberately FLAT: single-run GPU/CPU scripts, not a
+│                                      #   productized package. The clean home for delineation/health
+│                                      #   logic is python-etl/riparian/; this is the experiment bench.
+│
+├── frontend/                          # React 18 + TypeScript + MapLibre GL + Tailwind (Vite) — the
+│                                      #   full data-explorer app (all layers, timelapse, MVT tiles)
+├── web/                               # Astro 5 + React-islands STORY site (the live deliverable at
+│   ├── src/pages/                     #   riparian.emeraldleaf.dev) — index.astro (scrollytelling) +
+│   ├── src/components/Chat.tsx        #   method/architecture/agent/privacy. Chat.tsx = the grounded
+│   └── src/scripts/story-client.ts    #   RAG agent as a React island; story-client.ts = the maps.
+├── docintel/                          # The agent's public CONTRACT (API_CONTRACT.md) + geo-mention
+│                                      #   resolver. The RAG engine itself (Quartzose) is a SEPARATE,
+│                                      #   PRIVATE repo — this repo only speaks to it over /query.
 │
 ├── sql/                               # Additive migrations (create_schemas.sql = source of truth)
 │   ├── create_schemas.sql             #   base bronze/silver/gold schema
@@ -320,10 +336,12 @@ san-juan-riparian-watch/
 │   ├── reach_migration.sql            #   bronze.nhd_flowlines + gold.reach_riparian
 │   └── nwi/raster/ssurgo/lidar/health/incremental_migration.sql
 │
-├── docs/
-│   ├── STATUS.md                      #   cross-session live state
-│   ├── specs/                         #   Stage-1, Stage-3 feature specs
-│   ├── decisions/                     #   ADRs (delineation-over-buffers, NextAurora-rules)
+├── docs/                              # Findings, specs, ADRs + the GitHub Pages static mirror
+│   ├── STATUS.md · method.md          #   cross-session state · the method (a deliverable itself)
+│   ├── findings-*.md · RETRACTIONS.md #   dated results + the retraction registry (a drift gate)
+│   ├── specs/ · decisions/            #   feature specs + ADRs
+│   ├── *.html · maps/*.geojson        #   STATIC story/method pages served by GitHub Pages — a mirror
+│   │                                  #   of web/; the live Astro site (web/) is the canonical one
 │   ├── sonarqube.md                   #   full SonarQube setup guide
 │   └── riparian-pipeline.{excalidraw,svg,png}   # paired architecture diagram
 │
@@ -336,6 +354,15 @@ san-juan-riparian-watch/
 
 > The `.NET`/frontend projects keep their original `RiparianPoc.*` names — only the GitHub
 > repository and product were renamed to *San Juan Riparian Watch*.
+>
+> **What's deliberate vs. what's legacy** (so the breadth reads as choices, not accretion):
+> - **Two front-ends on purpose** — `frontend/` is the full React data-explorer; `web/` is the Astro
+>   story site that embeds the live agent (canonical). `docs/*.html` is the GitHub Pages mirror.
+> - **Two ML homes on purpose** — `python-etl/riparian/` is the productized package; `olmoearth_run_data/`
+>   is the flat experiment bench for the GPU foundation-model runs (research scripts, not a library).
+> - **A/B legacy is kept, not hidden** — `python-etl/etl_pipeline.py` + the flat `*_processor.py` are the
+>   pre-delineation buffer-era pipeline, retained as the measured baseline the new package is compared against.
+> - **The RAG engine is a separate private repo** — this repo holds only the public `/query` contract.
 
 ---
 

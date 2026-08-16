@@ -1,0 +1,117 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/hub.css';
+---
+<Base title='How the agent is built' description="Inside the grounded RAG agent: hybrid retrieval, a prompt-injection and PII guard pipeline, a semantic cache, CRAG self-correcting retrieval, multi-turn memory, and a model-agnostic LLM seam running on Ai2's OLMo.">
+<div class="topbar"><div class="wrap">
+  <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
+  <a class="back" href="/">← back to the story</a>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">// the-agent · Quartzose RAG</div>
+  <h1>A RAG agent that can't make things up</h1>
+  <p class="lede">The chat at the end of the story runs on <strong>Quartzose</strong>, a production
+    retrieval-augmented pipeline. Its whole design goal is a single rule — <strong>no source, no claim</strong> —
+    enforced server-side, so every sentence it returns is pinned to a document you can open.</p>
+</div></header>
+
+<div class="wrap">
+
+<section>
+  <h2>The request path</h2>
+  <p>A question doesn't go straight to a language model. It runs a pipeline where each stage can refuse, correct,
+    or short-circuit:</p>
+  <div class="flow">
+    <div class="node"><div class="k">guard</div><div class="v">QueryShield</div><div class="s">prompt-injection screen</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">cache</div><div class="v">semantic cache</div><div class="s">vector hit → skip the LLM</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">retrieve</div><div class="v">hybrid + rerank</div><div class="s">dense + BM25</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">grade</div><div class="v">CRAG</div><div class="s">relevant? re-retrieve if not</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">generate</div><div class="v">OLMo</div><div class="s">grounded, cited</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">scrub</div><div class="v">AnswerScrubber</div><div class="s">PII out</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Hybrid retrieval</h2>
+  <p>Dense embeddings catch meaning; sparse keyword matching catches exact terms a manager actually types
+    (species names, reach names, metrics). Using both, then reranking, beats either alone.</p>
+  <div class="grid2">
+    <div class="card"><span class="k">// dense</span>
+      <h3>Arctic embeddings</h3>
+      <p>Snowflake <code>arctic-embed</code> (1024-d) served over Ollama, indexed in Qdrant. Query and corpus
+        share the exact embedder, so the index and the query can't silently disagree.</p></div>
+    <div class="card"><span class="k">// sparse</span>
+      <h3>BM25, then rerank</h3>
+      <p>A FastEmbed BM25 sparse vector runs alongside the dense one; a cross-encoder reranker (ONNX, no GPU)
+        orders the pooled candidates before anything reaches the model.</p></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The guard pipeline</h2>
+  <p>A public LLM endpoint is an attack surface. Three guards wrap generation:</p>
+  <table>
+    <thead><tr><th>Guard</th><th>Stops</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">QueryShield</td><td>Direct prompt injection in the user's question ("ignore your instructions…").</td></tr>
+      <tr><td class="mono">PassageShield</td><td><em>Indirect</em> injection — malicious instructions hidden inside a retrieved document, the subtler attack.</td></tr>
+      <tr><td class="mono">AnswerScrubber</td><td>PII leaking into the response — emails, keys, personal identifiers — scrubbed before it's returned.</td></tr>
+    </tbody>
+  </table>
+  <div class="note good"><span class="t">Grounding is server-side</span>
+    The "no source, no claim" contract isn't a polite instruction in the prompt — it's enforced by the pipeline.
+    If retrieval comes back empty or irrelevant, the honest non-answer is what ships.</div>
+</section>
+
+<section>
+  <h2>Correction, memory, and cost</h2>
+  <div class="grid2">
+    <div class="card"><span class="k">// CRAG</span>
+      <h3>Self-correcting retrieval</h3>
+      <p>Retrieved passages are graded for relevance. Weak retrieval triggers decomposed re-retrieval rather than
+        answering from thin context — the model isn't handed junk and asked to sound confident.</p></div>
+    <div class="card"><span class="k">// memory</span>
+      <h3>Multi-turn, per session</h3>
+      <p>A Redis-backed conversation window makes follow-ups work ("and on the river reaches?") without leaking
+        one visitor's thread into another's.</p></div>
+    <div class="card"><span class="k">// cache</span>
+      <h3>Semantic cache</h3>
+      <p>A Redis vector cache returns near-duplicate questions (the suggested chips, FAQs) with <em>no LLM call at
+        all</em> — most real traffic is free, which is what keeps a public demo cheap.</p></div>
+    <div class="card"><span class="k">// seam</span>
+      <h3>Model-agnostic LLM</h3>
+      <p>Generation goes through one OpenAI-compatible seam, so the model swaps by config — Ai2's OLMo when a host
+        serves it, another open model otherwise — with a per-IP rate limit and a hard provider spend cap in front.</p></div>
+  </div>
+  <div class="tags">
+    <span class="tag"><b>FastAPI</b> · Haystack</span>
+    <span class="tag"><b>Qdrant</b> hybrid</span>
+    <span class="tag"><b>Redis</b> cache + sessions</span>
+    <span class="tag"><b>Ollama</b> arctic embeddings</span>
+    <span class="tag">OLMo / OpenAI-compatible</span>
+    <span class="tag">rate limit + daily budget</span>
+  </div>
+</section>
+
+</div>
+
+<footer><div class="wrap">
+  Part of <a href="/">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified outputs. The agent can be wrong or
+    incomplete; its answers are grounded in a provisional research corpus, not validated fact, and may change as the work is refined.</p>
+  <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="/privacy">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
+  <div class="footlinks">
+    <a href="/">← The story</a>
+    <a href="/method">The AI-assisted method →</a>
+    <a href="/architecture">System architecture →</a>
+  </div>
+</div></footer>
+</Base>

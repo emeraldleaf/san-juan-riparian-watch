@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>System architecture</title>
+<meta name="description" content="The full stack behind San Juan Riparian Watch: a STAC Earth-observation pipeline, a PostGIS medallion store, RF + OlmoEarth model tracks, a .NET services layer, and a React map front-end — plus the distributed-systems reference app it shares a discipline with.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0c0e'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%234f46e5'/%3E%3C/svg%3E">
+<link href="fonts.css" rel="stylesheet">
+<link href="hub.css" rel="stylesheet">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
+  <a class="back" href="index.html">← back to the story</a>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">// system-architecture · end to end</div>
+  <h1>From a satellite pixel to a cited answer</h1>
+  <p class="lede">One person built every layer here: the Earth-observation pipeline, the spatial database,
+    two model tracks, a typed services API, the map front-end, and the grounded agent — each behind its own
+    quality gate. Below is how they fit together, and the distributed-systems app they share a discipline with.</p>
+</div></header>
+
+<div class="wrap">
+
+<section>
+  <h2>The riparian pipeline</h2>
+  <p>Data flows one direction — raw imagery in, a cited, mapped answer out — with every stage reproducible
+    and independently checked.</p>
+  <div class="flow">
+    <div class="node"><div class="k">ingest</div><div class="v">STAC ETL</div><div class="s">Sentinel-2 / Landsat via Planetary Computer</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">store</div><div class="v">PostGIS medallion</div><div class="s">bronze → silver → gold</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">model</div><div class="v">RF · OlmoEarth</div><div class="s">per-pixel vs fine-tuned FM</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">serve</div><div class="v">.NET API</div><div class="s">GeoJSON + MVT vector tiles</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">map + ask</div><div class="v">React · RAG</div><div class="s">MapLibre + grounded agent</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><span class="k">// earth observation</span>
+      <h3>STAC ingest → phenology cubes</h3>
+      <p>Python ETL pulls the Landsat and Sentinel-2 archives from Microsoft Planetary Computer, composites each
+        reach into phenology-aligned 12-month median-mosaic cubes (identical compositing is the experiment), and
+        writes to the store. <code>rasterio.mask</code> clips to geometry; everything is <code>EPSG:4269</code>.</p></div>
+    <div class="card"><span class="k">// spatial store</span>
+      <h3>PostGIS, medallion architecture</h3>
+      <p>Bronze (raw ingest) → silver (buffers, intersections, NDVI health, riparian extent) → gold (aggregated
+        analytics). GiST indexes and <code>&&</code> bbox pre-filters on every spatial op; geography casts for
+        real distances. Data never flows back upstream.</p></div>
+    <div class="card"><span class="k">// two model tracks</span>
+      <h3>Random Forest vs OlmoEarth</h3>
+      <p>A 144-D spectro-temporal Random Forest baseline, and Ai2's OlmoEarth foundation model fine-tuned on the
+        pooled reaches — scored head-to-head under a pre-registered leave-one-reach-out contract. The FM earns its
+        keep only on under-represented morphology.</p></div>
+    <div class="card"><span class="k">// services + tiles</span>
+      <h3>.NET services, vector tiles</h3>
+      <p>ASP.NET Core minimal APIs on .NET 10, SOLID service/repository split, Dapper + <code>NpgsqlDataSource</code>
+        over PostGIS, 29 routes returning GeoJSON via NetTopologySuite and <code>.pbf</code> MVT tiles through one
+        canonical, injection-safe tile-SQL builder. Orchestrated by .NET Aspire.</p></div>
+  </div>
+  <div class="tags">
+    <span class="tag"><b>Python</b> ETL · GeoPandas · rasterio</span>
+    <span class="tag"><b>PostgreSQL + PostGIS</b></span>
+    <span class="tag"><b>.NET 10</b> · Aspire · Dapper</span>
+    <span class="tag"><b>React 18</b> · MapLibre GL · MVT</span>
+    <span class="tag">OpenTelemetry tracing</span>
+    <span class="tag">scikit-learn · OlmoEarth (rslearn)</span>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The distributed-systems app it shares a discipline with</h2>
+  <p>The same encoding-loop and the same senior standards run a full microservices reference platform
+    (<span class="mono">NextAurora</span>) — proof the approach isn't specific to one codebase.</p>
+  <div class="flow">
+    <div class="node"><div class="k">edge</div><div class="v">React 19 SPA</div><div class="s">Vite · Tailwind · TanStack</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">services</div><div class="v">Catalog · Order</div><div class="s">Payment · Shipping · Notification</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">data</div><div class="v">EF Core · Postgres</div><div class="s">per-service stores</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">platform</div><div class="v">.NET Aspire</div><div class="s">discovery · OTel · Fly.io</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><span class="k">// backend</span>
+      <h3>Aspire-orchestrated microservices</h3>
+      <p>Independent Catalog, Order, Payment, Shipping and Notification services with their own EF Core stores,
+        wired by .NET Aspire for service discovery, health, and OpenTelemetry context propagation. Deployed to
+        Fly.io. DDD boundaries, security requirements, and performance rules enforced by the canon.</p></div>
+    <div class="card"><span class="k">// front-end</span>
+      <h3>A React SPA built to a canon</h3>
+      <p>React 19 (+ the React Compiler), Vite, Tailwind 4, TanStack Query + Router, Zustand, MSW + Vitest.
+        Feature-folder boundaries are enforced by lint; query keys come from factories; cache invalidation lives
+        in the write path; no request waterfalls; a CI-enforced bundle budget. Auth is PKCE/BFF.</p></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Cross-cutting</h2>
+  <div class="tiles">
+    <div class="tile"><div class="n">OTel</div><div class="l">tracing across every service + span-per-method</div></div>
+    <div class="tile"><div class="n">CI</div><div class="l">lint, tests, drift-gates, AI review — green to merge</div></div>
+    <div class="tile"><div class="n">TLS</div><div class="l">hardened deploy: key-only SSH, CSP, rate limits</div></div>
+    <div class="tile"><div class="n">IaC</div><div class="l">Aspire + azd / Fly.io + docker-compose</div></div>
+  </div>
+  <div class="note"><span class="t">The through-line</span>
+    Right tool for each job — Python for EO, .NET for services, React for interactive UI, static HTML for this
+    narrative — each with observability and a quality gate, none of it copy-pasted from a template.</div>
+</section>
+
+</div>
+
+<footer><div class="wrap">
+  Part of <a href="index.html">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified model outputs. All figures and
+    RF / OlmoEarth results are provisional — in-sample calibration, not validated ground truth — and may change as the work is refined.</p>
+  <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="privacy.html">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
+  <div class="footlinks">
+    <a href="index.html">← The story</a>
+    <a href="method.html">The AI-assisted method →</a>
+    <a href="agent.html">How the agent is built →</a>
+  </div>
+</div></footer>
+</body>
+</html>

@@ -88,12 +88,12 @@ def _search_window(cat: pystac_client.Client, bbox: BBox, years: range) -> list:
     failed = []
     for year in yrs:
         got = _search_year(cat, bbox, year)
-        if got is None:
-            failed.append(year)
+        if not got:   # None (search failed) OR [] (no scenes under the cloud gate) — both contribute nothing,
+            failed.append(year)   # and both must count as PARTIAL so an under-sampled window is never silent
             continue
         pooled += _least_cloudy(got, per_year)          # each year contributes its best few
     if failed:
-        logger.warning("  window %d–%d: %d year(s) had no usable search %s — composite is PARTIAL",
+        logger.warning("  window %d–%d: %d year(s) had no usable scenes %s — composite is PARTIAL",
                        yrs[0], yrs[-1], len(failed), failed)
     return _least_cloudy(pooled, WINDOW_MAX)
 
@@ -222,21 +222,43 @@ def train_rf(comp: np.ndarray, reader, bbox: BBox, affine, h: int, w: int,
     return rf, med, ref
 
 
+Gate = tuple[RandomForestClassifier, np.ndarray, float]  # (extent RF, its impute-median, prob cutoff)
+
+
 def predict_extent(rf: RandomForestClassifier, med: np.ndarray, ref: BandStats, comp: np.ndarray,
-                   affine, h: int, w: int, dest: Path, threshold: float, target: str) -> float:
-    """Predict positive-class probability, vectorise ≥ threshold to WGS84 GeoJSON; return AOI fraction."""
+                   affine, h: int, w: int, dest: Path, threshold: float, target: str,
+                   gate: Gate | None = None) -> float:
+    """Predict positive-class probability, vectorise ≥ threshold to WGS84 GeoJSON; return AOI fraction.
+
+    When ``gate`` is given ``(rf_extent, med_extent, gate_threshold)``, the positive prediction is ANDed
+    with the woody-extent model: a pixel is ``invasive`` only where the extent model *also* calls it
+    riparian-woody. The invasive RF alone is trained native-vs-introduced and never saw a non-vegetation
+    class, so on its own it forces every pixel — water, bare, a metal water tank — onto one side of that
+    boundary. The extent model's negative class *is* WATER/BARE_CHANNEL/DEVELOPED, so gating on it removes
+    those false positives (and corrects the previously-overstated invasive fraction).
+    """
     x = _feature_matrix(comp, ref)
     valid = np.isfinite(x).any(1)
     prob = rf.predict_proba(np.where(np.isfinite(x), x, med))[:, 1]
     prob[~valid] = 0.0
     binary = (prob >= threshold).reshape(h, w).astype("uint8")
+    if gate is not None:
+        grf, gmed, gthr = gate
+        gprob = grf.predict_proba(np.where(np.isfinite(x), x, gmed))[:, 1]
+        gprob[~valid] = 0.0
+        binary &= (gprob >= gthr).reshape(h, w).astype("uint8")  # invasive AND woody-extent
+    # Record the gate cutoff too: different --gate-threshold values yield
+    # different geometries, so the output must be self-describing.
+    gate_thr = float(gate[2]) if gate is not None else None
     feats = [{"type": "Feature", "geometry": transform_geom(UTM, "EPSG:4326", g),
-              "properties": {"class": target, "min_prob": threshold}}
+              "properties": {"class": target, "min_prob": threshold,
+                             "extent_gated": gate is not None, "gate_threshold": gate_thr}}
              for g, v in shapes(binary, mask=binary.astype(bool), transform=affine) if v == 1]
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps({"type": "FeatureCollection", "features": feats}))
     frac = float(binary.sum()) / max(int(valid.sum()), 1)
-    logger.info("  → %s : %d polygons, %.1f%% of valid AOI %s", dest.name, len(feats), 100 * frac, target)
+    logger.info("  → %s : %d polygons, %.1f%% of valid AOI %s%s", dest.name, len(feats), 100 * frac, target,
+                " (extent-gated)" if gate is not None else "")
     return frac
 
 
@@ -257,13 +279,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                     help="'invasive' (IC vs native) or 'extent' (riparian woody vs non-riparian)")
     ap.add_argument("--out", type=Path, default=HERE / ".tmp/deep_invasives", help="GeoJSON output dir")
     ap.add_argument("--threshold", type=float, default=0.5, help="positive-class probability cutoff")
+    ap.add_argument("--no-gate", action="store_true",
+                    help="disable the woody-extent gate on invasive — NOT recommended: lets non-vegetation "
+                         "(water/bare/developed, e.g. a water tank) be classified invasive")
+    ap.add_argument("--gate-threshold", type=float, default=0.5,
+                    help="woody-extent probability cutoff for the invasive gate (higher = stricter)")
     return ap
 
 
 def _map_epochs(cat: pystac_client.Client, a: argparse.Namespace, rf: RandomForestClassifier,
-                med: np.ndarray, ref: BandStats, affine, h: int, w: int, train_comp: np.ndarray) -> None:
+                med: np.ndarray, ref: BandStats, affine, h: int, w: int, train_comp: np.ndarray,
+                gate: Gate | None = None) -> None:
     """Map + report the ``a.target`` fraction for each epoch window, reusing the label-year composite."""
-    logger.info("mapping %s per %d-year window:", a.target, 2 * a.half_width + 1)
+    logger.info("mapping %s per %d-year window%s:", a.target, 2 * a.half_width + 1,
+                " (woody-extent gated)" if gate is not None else "")
     trajectory = {}
     for year in sorted(a.epochs):
         comp = (train_comp if year == a.label_year
@@ -271,7 +300,7 @@ def _map_epochs(cat: pystac_client.Client, a: argparse.Namespace, rf: RandomFore
         if comp is None:
             continue
         trajectory[year] = predict_extent(rf, med, ref, comp, affine, h, w,
-                                          a.out / f"{a.target}_{year}.geojson", a.threshold, a.target)
+                                          a.out / f"{a.target}_{year}.geojson", a.threshold, a.target, gate)
     logger.info("── %s trajectory (fraction of valid AOI) ──", a.target)
     for year in sorted(trajectory):
         logger.info("  %d: %.1f%%", year, 100 * trajectory[year])
@@ -283,6 +312,8 @@ def main() -> int:
     a = ap.parse_args()
     if not 0.0 <= a.threshold <= 1.0:
         ap.error(f"--threshold must be a probability in [0, 1], got {a.threshold}")
+    if not 0.0 <= a.gate_threshold <= 1.0:
+        ap.error(f"--gate-threshold must be a probability in [0, 1], got {a.gate_threshold}")
     affine, h, w = _grid(FARM)
     cat = pystac_client.Client.open(STAC, modifier=pc.sign_inplace)
     logger.info("label year %d — building training composite", a.label_year)
@@ -290,7 +321,12 @@ def main() -> int:
     if train_comp is None:
         raise SystemExit(f"no TM/ETM+ imagery for label year {a.label_year}")
     rf, med, ref = train_rf(train_comp, gdb_reader_factory(str(a.gdb)), FARM, affine, h, w, a.target)
-    _map_epochs(cat, a, rf, med, ref, affine, h, w, train_comp)
+    gate = None
+    if a.target == "invasive" and not a.no_gate:
+        logger.info("training woody-extent gate (negatives include WATER/BARE_CHANNEL/DEVELOPED)…")
+        grf, gmed, _ = train_rf(train_comp, gdb_reader_factory(str(a.gdb)), FARM, affine, h, w, "extent")
+        gate = (grf, gmed, a.gate_threshold)
+    _map_epochs(cat, a, rf, med, ref, affine, h, w, train_comp, gate)
     return 0
 
 
