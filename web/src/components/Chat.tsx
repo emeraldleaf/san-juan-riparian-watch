@@ -153,21 +153,35 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   useEffect(() => { tierRef.current = tier; }, [tier]);
   useEffect(() => { const el = chatRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages]);
 
-  // Probe the agent + load model tiers.
+  // Probe the agent + load model tiers. RE-PROBE periodically so a transient
+  // backend blip (a brief restart or load spike) auto-recovers the "live" state
+  // instead of latching the chat "offline" until a page reload.
+  const modelsLoadedRef = useRef(false);
   useEffect(() => {
     if (!AGENT_URL) return;
     const healthUrl = AGENT_URL.replace(/\/(docs\/ask|query)\/?$/, '/health');
-    const ht = withTimeout(8000);
-    fetch(healthUrl, { signal: ht.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then(() => {
-      setLive(true);
-      if (!isQuery) return;
+    let cancelled = false;
+    const loadModels = () => {
+      if (modelsLoadedRef.current || !isQuery) return;
+      modelsLoadedRef.current = true;
       const url = AGENT_URL.replace(/\/query\/?$/, '/agent/models');
       const mt = withTimeout(8000);
       fetch(url, { signal: mt.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
+        if (cancelled) return;
         if (d?.default) { setTier(d.default); tierRef.current = d.default; }
         setTiers(d?.tiers || null);
-      }).catch(() => {}).finally(() => mt.clear());
-    }).catch(() => setLive(false)).finally(() => ht.clear());
+      }).catch(() => { modelsLoadedRef.current = false; }).finally(() => mt.clear());
+    };
+    const probe = () => {
+      const ht = withTimeout(8000);
+      fetch(healthUrl, { signal: ht.signal }).then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then(() => { if (!cancelled) { setLive(true); loadModels(); } })
+        .catch(() => { if (!cancelled) setLive(false); })
+        .finally(() => ht.clear());
+    };
+    probe();
+    const id = setInterval(probe, 25000);
+    return () => { cancelled = true; clearInterval(id); };
   }, [AGENT_URL, isQuery]);
 
   const finalize = useCallback((text: string, citations: Cite[], geoms: Geom[]) => {

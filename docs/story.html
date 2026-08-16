@@ -1235,9 +1235,17 @@
   if(AGENT_URL){
     disc.textContent='Connecting to the live agent…';
     var healthUrl=AGENT_URL.replace(/\/(docs\/ask|query)\/?$/,'/health');
-    var _ht=withTimeout(8000);
-    fetch(healthUrl,{method:'GET',signal:_ht.signal}).then(function(r){return r.ok?r.json():Promise.reject();})
-      .then(function(){ setLive(true); loadModels(); }).catch(function(){ setLive(false); }).finally(function(){ _ht.clear(); });
+    var _modelsLoaded=false;
+    // Re-probe periodically so a transient backend blip (a brief restart or load
+    // spike) auto-recovers instead of latching "offline" until a page reload.
+    function _probe(){
+      var _ht=withTimeout(8000);
+      fetch(healthUrl,{method:'GET',signal:_ht.signal}).then(function(r){return r.ok?r.json():Promise.reject();})
+        .then(function(){ setLive(true); if(!_modelsLoaded){ _modelsLoaded=true; loadModels(); } })
+        .catch(function(){ setLive(false); }).finally(function(){ _ht.clear(); });
+    }
+    _probe();
+    setInterval(_probe,25000);
   }
 })();
 </script>
