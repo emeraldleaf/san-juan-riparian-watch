@@ -186,7 +186,7 @@ const META_ANSWER =
 
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', text: "I'm the assistant for this project — ask about the riparian science and findings, how the maps were made, the RF-vs-OlmoEarth field test, the engineering method behind it, or how this agent itself was built. Tap a question below or type your own; answers cite their sources, and a reach mention flies the map." },
+    { role: 'assistant', text: "I'm the assistant for this project — ask about the riparian science and findings, how the maps were made, the RF-vs-OlmoEarth field test, the engineering method behind it, or how this agent itself was built. Tap a question below or type your own. When I'm live, answers are grounded in the sources with citations, and a reach mention flies the map; offline, you'll get short pre-written notes." },
   ]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);

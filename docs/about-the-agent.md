@@ -84,3 +84,6 @@ guardrails is described in **the engineering method** ([OKL & the encoding loop]
 The agent is grounded, but grounding is not infallibility: retrieval can miss, the model can
 misread a passage, and the corpus is a snapshot. Citations exist precisely so a reader can verify.
 Nothing here is a substitute for the primary sources it points to.
+
+> This page paraphrases the project's architecture; the canonical conventions and the do-not-modify
+> rules live in the repository's project instructions. See CLAUDE.md.

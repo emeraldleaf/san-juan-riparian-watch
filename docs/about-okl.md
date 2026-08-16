@@ -71,3 +71,6 @@ machine, not a memory, enforce it.
 
 *The RAG agent that answers your questions here is built on the same discipline — see
 [how this agent works](about-the-agent.md).*
+
+> This page paraphrases the encoding-loop method the project runs on; the canonical rules, gates, and
+> receipts table live in the repository's project instructions. See CLAUDE.md.
