@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The AI-assisted engineering method</title>
+<meta name="description" content="Mechanized honesty: how AI-assisted research is kept correct by enforcement, not exhortation — the encoding-loop method, its drift gates, and the real regressions they caught.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0c0e'/%3E%3Cpath d='M16 5C10 12 8 18 16 27 24 18 22 12 16 5Z' fill='%234f46e5'/%3E%3C/svg%3E">
+<link href="fonts.css" rel="stylesheet">
+<link href="hub.css" rel="stylesheet">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+<body>
+<div class="topbar"><div class="wrap">
+  <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
+  <a class="back" href="index.html">← back to the story</a>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">// the-other-method · how the work stays honest</div>
+  <h1>Honesty you can't forget to enforce</h1>
+  <p class="lede">This project was built fast, with heavy AI assistance. That is exactly where research
+    quietly goes wrong, so the interesting engineering isn't only the model — it's the machinery that keeps
+    an AI-accelerated codebase <strong>correct</strong> when nobody is watching every line.</p>
+</div></header>
+
+<div class="wrap">
+
+<section>
+  <h2>The failure mode nobody catches</h2>
+  <p>Hallucinated code is the <em>easy</em> failure: it doesn't compile, and a compiler catches it in
+    seconds. The dangerous failures are <strong>semantic</strong> — they compile, they pass the tests, and
+    they read beautifully, while being wrong. AI is very good at producing fluent, plausible, finished-looking
+    output, which is precisely what makes a wrong result invisible.</p>
+  <table>
+    <thead><tr><th>Failure mode</th><th>Caught by</th></tr></thead>
+    <tbody>
+      <tr><td>Hallucinated API call</td><td>the compiler</td></tr>
+      <tr><td>Wrong logic</td><td>a unit test</td></tr>
+      <tr class="bad"><td>A retracted result still published as fact</td><td>nothing</td></tr>
+      <tr class="bad"><td>A model scored against 45%-wrong labels</td><td>nothing</td></tr>
+      <tr class="bad"><td>A novelty claim already falsified by a 2018 paper</td><td>nothing</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><span class="t">The thesis</span>
+    Exhortation ("be careful", "remember to update the docs") does not survive contact with a fast,
+    AI-assisted week. The rule that holds is the one a machine enforces. Put plainly: <strong>every rule that
+    was merely documented eventually drifted; every rule that was mechanized held.</strong></div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The encoding loop</h2>
+  <p>Each hard-won lesson is encoded across several <strong>surfaces</strong> (the canon file, agent + command
+    definitions, review-bot rules, docs and diagrams) and backed by <strong>enforcement tiers</strong> — from
+    an editor hint, to a pre-commit hook, to a CI gate that fails the build. A lesson learned once becomes a
+    check that can't be un-learned.</p>
+  <div class="flow">
+    <div class="node"><div class="k">learn</div><div class="v">A regression or bad claim slips through once</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">encode</div><div class="v">Write it into the canon + a machine rule</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">enforce</div><div class="v">Hook / CI gate fails on any recurrence</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="k">compound</div><div class="v">The guarantee holds for every future change</div></div>
+  </div>
+  <p>The critical move is the last one: because the rule is mechanical, it protects work done months later by
+    someone (or some model) who never read the original lesson.</p>
+</section>
+
+<section>
+  <h2>Drift gates — the checks a compiler can't do</h2>
+  <p>Ordinary CI checks file <em>shape</em>: does it build, do tests pass, is formatting clean. None of that
+    can see a doc presenting a withdrawn result as current, or a retired threshold living on in a docstring.
+    Those are <strong>semantic drift</strong>, and they get their own gates:</p>
+  <table>
+    <thead><tr><th>Gate</th><th>What it makes impossible</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">tombstones</td><td>Resurrecting a retired identifier or a killed metric threshold in any doc, comment, or config — CI fails.</td></tr>
+      <tr><td class="mono">retractions</td><td>Stating a withdrawn claim <em>unless</em> the same doc also retracts it. A result can't quietly come back.</td></tr>
+      <tr><td class="mono">doc-orphans</td><td>A spec or decision record that nothing links to — unreachable docs rot into lies, so they fail the build.</td></tr>
+      <tr><td class="mono">canon-refs</td><td>A paraphrase of the canon that drifts from its source; stale cross-references after a file move.</td></tr>
+    </tbody>
+  </table>
+  <div class="note warn"><span class="t">Why this is unusual</span>
+    Most teams write these rules in a wiki and hope. Here they run identically on a laptop and in CI, so the
+    completion criterion for a cleanup isn't "the docs someone remembered are updated" — it's
+    <code>the gate passes</code>.</div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The receipts</h2>
+  <p>A method is only as honest as its record of being wrong. Each gate exists because something real slipped
+    through first — and those are kept in the record, not scrubbed:</p>
+  <div class="grid2">
+    <div class="card"><span class="k">// caught late, by reading</span>
+      <h3>Extent was already solved</h3>
+      <p>The novelty claim assumed no one had mapped basin-wide riparian extent. A 2018 paper (CO-RIP, κ 0.80)
+        had. Found by <em>reading the literature</em>, not by a gate — which is exactly why a paper-audit
+        command now exists to try to falsify the claim on demand.</p></div>
+    <div class="card"><span class="k">// green check, no review</span>
+      <h3>The merge gate was theatre</h3>
+      <p>For 25 of the first 29 merged PRs, a skipped AI review still posted a green check — "no findings" was
+        indistinguishable from "no review." Caught only when a reviewer asked a question that couldn't be
+        answered without actually checking. Now the review, not the check, is the gate.</p></div>
+    <div class="card"><span class="k">// $ ≠ end-of-string</span>
+      <h3>A regex that let SQL through</h3>
+      <p>A tile-layer name was validated with <code>^[a-z_]+$</code>. In .NET, <code>$</code> also matches
+        before a trailing newline, so <code>"wetlands\n"</code> reached an interpolated SQL literal. The AI
+        review caught what CI, static analysis, 20 unit tests and a careful human passed. Now <code>\A…\z</code>.</p></div>
+    <div class="card"><span class="k">// retracted, still shown</span>
+      <h3>A withdrawn result, presented as fact</h3>
+      <p>A public review page kept presenting a retracted number as current; a retired NDVI threshold lived on
+        in a component docstring; a decision record had nothing linking to it. All three real. All three now
+        impossible to reintroduce without the build failing.</p></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>At scale, across two codebases</h2>
+  <p>This isn't a toy. The same discipline runs the distributed-systems reference app and this
+    geospatial + RAG project, with a substantial enforcement library behind it:</p>
+  <div class="tiles">
+    <div class="tile"><div class="n">677</div><div class="l">skill definitions in the scaffold</div></div>
+    <div class="tile"><div class="n">27</div><div class="l">audit records (the receipts)</div></div>
+    <div class="tile"><div class="n">5</div><div class="l">surfaces each rule is encoded across</div></div>
+    <div class="tile"><div class="n">3</div><div class="l">enforcement tiers: hint · hook · CI</div></div>
+  </div>
+  <div class="tags">
+    <span class="tag"><b>PreToolUse / PostToolUse</b> hooks</span>
+    <span class="tag"><b>drift-gates</b> in CI</span>
+    <span class="tag"><b>architecture-reviewer</b> agent</span>
+    <span class="tag"><b>AI review</b> must be green to merge</span>
+    <span class="tag"><b>tombstones</b> + <b>retractions</b> registries</span>
+    <span class="tag">paper-audit command</span>
+  </div>
+  <div class="note good"><span class="t">The point</span>
+    The deliverable isn't just a map or an agent — it's a way of doing AI-accelerated engineering where being
+    fast and being honest aren't in tension, because the honesty is enforced by the same machinery that makes
+    you fast.</div>
+</section>
+
+</div>
+
+<footer><div class="wrap">
+  Part of <a href="index.html">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified model outputs. All figures and
+    RF / OlmoEarth results are provisional — in-sample calibration, not validated ground truth — and may change as the work is refined.</p>
+  <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="privacy.html">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
+  <div class="footlinks">
+    <a href="index.html">← The story</a>
+    <a href="architecture.html">System architecture →</a>
+    <a href="agent.html">How the agent is built →</a>
+  </div>
+</div></footer>
+</body>
+</html>

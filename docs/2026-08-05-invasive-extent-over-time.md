@@ -45,8 +45,10 @@ worse, and the checks are the point:
 **The diagnosis is consistent:** 1990 is pure **Landsat-5 TM**, 30 years before the ETM+-anchored training
 year, and it is too spectrally distant to reconcile. The middle of the record (roughly 2000–2015, where
 the L5+L7 mix overlaps the training sensor) reconstructs reasonably; the pure-TM deep past does not. And
-even the stabilised part barely moves — **2000 → 2020 is only ~2.7% → 3.5%**, a rise *scarcely larger than
-the ±0.6 pp method-noise on the anchor itself*. The dramatic "5×" was an artifact of an under-sampled 1990.
+even the stabilised part barely moves — **2000 → 2020 is only ~0.8% → 1.4%** of area (the invasive layer is
+now gated to woody vegetation, which removed non-vegetation false positives — a metal water tank was being
+called tamarisk — and cut the earlier estimate by ~60–70%), a rise *at the level of the ±0.6 pp method-noise
+on the anchor itself*. The dramatic "5×" was an artifact of an under-sampled 1990.
 
 **So: no trajectory claim.** Continuing to tune the recipe past here would be fishing for a prettier line
 — the cherry-picking failure the [method](method.md) exists to prevent.
