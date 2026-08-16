@@ -981,7 +981,7 @@
   }
 
   var params=new URLSearchParams(location.search);
-  function _sameOrigin(u){ if(!u) return false; if(u.charAt(0)==='/') return true; try{ return new URL(u,location.href).origin===location.origin; }catch(_){ return false; } }
+  function _sameOrigin(u){ if(!u) return false; if(u.charAt(0)==='/'&&u.charAt(1)!=='/') return true; /* reject '//host' protocol-relative */ try{ return new URL(u,location.href).origin===location.origin; }catch(_){ return false; } }
   var _apParam=(params.get('agent')||'').trim();
   var _apMeta=((document.querySelector('meta[name="agent-url"]')||{}).content||'').trim();
   // Only honor a URL-supplied agent endpoint if it is same-origin — never post the
