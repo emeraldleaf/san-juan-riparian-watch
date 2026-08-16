@@ -57,12 +57,31 @@ const CITE_PAPERS: Record<string, string> = {
   'olmoearth-mangrove-recipe': 'https://github.com/allenai/olmoearth_projects/blob/main/docs/mangrove.md',
 };
 
+// project-* corpus docs live in the public repo's docs/, except these which are
+// under docs/audits/ — the backend only sends source_file, so the subdir is
+// resolved here. (Keep in sync with deploy/assemble_corpus.sh's audits pull.)
+const AUDIT_STEMS = new Set([
+  '2026-07-11-corip-woodward-2018', '2026-07-11-tamarisk-detection-established',
+  '2026-07-12-evangelista-2018-csu-nrel', '2026-07-12-perkins-2025-canyonlands',
+  '2026-07-14-riparian-methods-prior-art', '2026-07-16-DECISION-MEMO-olmoearth-gpu',
+  '2026-07-16-cross-tile-transfer-results', '2026-07-16-finetune-transfer-results',
+  '2026-07-16-label-budget-sweep-results', '2026-07-16-malpais-reach-generalization-note',
+  '2026-07-16-presto-arm-results', '2026-07-16-presto-species-results',
+  '2026-07-16-riparian-fm-methods-review', '2026-07-16-three-tile-transfer-results',
+  '2026-07-17-cropglobe-tong-2025',
+]);
+const DOCS_BASE = 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/';
+
 function citeUrlFor(src: string): string | null {
   if (!src) return null;
   const stem = src.replace(/\.(md|pdf|html?)$/, '');
   if (CITE_PAPERS[stem]) return CITE_PAPERS[stem];
   if (stem.indexOf('findings-') === 0)
-    return 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/' + stem.replace(/^findings-/, '') + '.md';
+    return DOCS_BASE + stem.replace(/^findings-/, '') + '.md';
+  if (stem.indexOf('project-') === 0) {
+    const name = stem.replace(/^project-/, '');
+    return DOCS_BASE + (AUDIT_STEMS.has(name) ? 'audits/' : '') + name + '.md';
+  }
   return null;
 }
 
@@ -304,7 +323,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
                   <div className="cites">
                     <span className="citehead">Sources</span>
                     {m.citations.map((c, k) => {
-                      const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^findings-/, '').replace(/\.(md|pdf|html?)$/, '');
+                      const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^(findings|project)-/, '').replace(/\.(md|pdf|html?)$/, '');
                       return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
                     })}
                   </div>
