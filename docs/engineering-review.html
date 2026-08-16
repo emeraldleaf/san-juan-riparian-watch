@@ -1179,7 +1179,7 @@ def _nmripmap_label_grid(...):
 
       <!-- ============ 6 FM ============ -->
       <section id="fm">
-        <h2><span class="num">06</span>The foundation model, and a negative result</h2>
+        <h2><span class="num">06</span>The foundation model — a negative result, then the fair test</h2>
         <p class="lede">
           OlmoEarth-v1-Nano encodes the Sentinel-2 datacube into learned embeddings, which then feed
           the same random-forest head through the same spatial-CV harness. Identical labels, identical
@@ -1325,11 +1325,54 @@ emb = tokens.mean(dim=(3, 4)).squeeze(0)   <span class="c"># (P_H, P_W, D)</span
         <p>
           So the honest statement is narrower than either the original claim or its correction. Every
           arm above is a <strong>frozen encoder feeding a scikit-learn RandomForest</strong> — a
-          configuration Ai2 endorses nowhere. What remains genuinely untested is OlmoEarth
+          configuration Ai2 endorses nowhere. What remained genuinely untested was OlmoEarth
           <em>as Ai2 actually uses it</em>: a fine-tuned <code>BASE</code> with a
-          <code>SegmentationPoolingDecoder</code>. That run needs a GPU and is scaffolded at
-          <code>olmoearth_run_data/riparian_extent/</code>. Until it exists, none of this should be
-          cited as evidence about foundation models.
+          <code>SegmentationPoolingDecoder</code>, scaffolded at
+          <code>olmoearth_run_data/riparian_extent/</code>. <strong>That run has since been done</strong>
+          — on a GPU, against the RF on an honest leave-one-reach-out test — and it changes the verdict.
+        </p>
+
+        <div class="callout">
+          <span class="chip">Update · 2026-08-01 · the fair test was run</span>
+          <p>
+            The fine-tuned foundation model (<code>OLMOEARTH_V1_BASE</code>, unfrozen, with a
+            <code>SegmentationPoolingDecoder</code> over 12 monthly Sentinel-2 mosaics) was measured
+            against the RF using <strong>leave-one-reach-out (LORO)</strong> over four
+            morphologically-diverse New Mexico reaches: train on three, predict the held-out fourth, so
+            the score is <em>transfer to unseen ground</em>. The held-out reach is scored <strong>once</strong>;
+            epoch selection uses a <code>val</code> slice of the <em>training</em> reaches only, so neither
+            model peeks at the test. Both models run on <strong>identical 12-month median-mosaic
+            cubes</strong> — the comparison is apples-to-apples.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>held-out reach</th><th>morphology</th><th>OlmoEarth (FM)</th><th>RF bar</th><th>Δ (FM − RF)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Malpais</strong></td><td><strong>arroyo</strong></td><td><strong>0.889</strong></td><td>0.557</td><td><strong>+0.332</strong></td></tr>
+              <tr><td>Farmington</td><td>wide river</td><td>0.892</td><td>0.905</td><td>−0.013</td></tr>
+              <tr><td>Kirtland</td><td>mainstem</td><td>0.812</td><td>0.845</td><td>−0.033</td></tr>
+              <tr><td>Aztec/Animas</td><td>tributary</td><td>0.894</td><td>0.886</td><td>+0.008</td></tr>
+              <tr><td><strong>macro-mean</strong></td><td>&nbsp;</td><td><strong>0.872</strong></td><td>0.798</td><td><strong>+0.074</strong></td></tr>
+            </tbody>
+          </table>
+          <p><em>Held-out riparian ROC-AUC per fold (1.0 perfect, 0.5 chance).</em></p>
+        </div>
+
+        <p>
+          <strong>The verdict is GO</strong> — the foundation model clears the pre-registered
+          <strong>+0.04 macro-mean</strong> bar (by +0.074). But the per-fold column tells the real
+          story: on the <strong>three river reaches the RF already handled</strong> (0.845–0.905) the FM
+          <strong>merely ties</strong> — it even <em>trails</em> on Kirtland — and <strong>every bit</strong>
+          of its advantage comes from <strong>one fold: rescuing the desert arroyo, 0.557 → 0.889.</strong>
+          OlmoEarth is <strong>not a uniformly better model</strong>; it is a <strong>specialist for the
+          hard, under-represented morphology</strong> the context-free per-pixel RF is blind to. So the
+          <strong>RF ships for plain extent</strong> (no GPU), and the <strong>foundation model earns its
+          keep exactly where the training distribution runs out.</strong> Full write-up:
+          <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/2026-08-01-fm-vs-rf-loro-result.md">the LORO result</a>.
         </p>
 
         <div class="callout">
