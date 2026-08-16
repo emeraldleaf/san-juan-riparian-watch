@@ -20,10 +20,10 @@ type Tier = { id: string; label: string; note: string; available: boolean };
 
 const SUGGEST = [
   'How much of the corridor is invasive?',
-  'Does the foundation model beat the RF on the arroyo?',
-  'Did the tamarisk beetle break the classifier?',
-  "Why won't you claim a pre-2000 trajectory?",
-  'Why is NDVI not enough?',
+  'Does OlmoEarth beat the Random Forest on the arroyo?',
+  'How was riparian vegetation derived from satellite imagery?',
+  'How was this agent built?',
+  'What engineering method kept the project honest?',
 ];
 
 const FALLBACK: { k: string[]; a: string }[] = [
@@ -186,7 +186,7 @@ const META_ANSWER =
 
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', text: 'Ask about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision. Tap a question below, or type your own, answers cite their sources, and a reach mention flies the map.' },
+    { role: 'assistant', text: "I'm the assistant for this project — ask about the riparian science and findings, how the maps were made, the RF-vs-OlmoEarth field test, the engineering method behind it, or how this agent itself was built. Tap a question below or type your own. When I'm live, answers are grounded in the sources with citations, and a reach mention flies the map; offline, you'll get short pre-written notes." },
   ]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);

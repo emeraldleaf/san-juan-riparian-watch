@@ -56,8 +56,9 @@
         share the exact embedder, so the index and the query can't silently disagree.</p></div>
     <div class="card"><span class="k">// sparse</span>
       <h3>BM25, then rerank</h3>
-      <p>A FastEmbed BM25 sparse vector runs alongside the dense one; a cross-encoder reranker (ONNX, no GPU)
-        orders the pooled candidates before anything reaches the model.</p></div>
+      <p>A FastEmbed BM25 sparse vector runs alongside the dense one; a cross-encoder reranker
+        (Voyage rerank-2.5-lite, served via OpenRouter) orders the pooled candidates before anything
+        reaches the model.</p></div>
   </div>
 </section>
 
