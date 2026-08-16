@@ -1,5 +1,9 @@
 # San Juan Riparian Watch
 
+## 🌐 [**Live site → riparian.emeraldleaf.dev**](https://riparian.emeraldleaf.dev)
+
+An interactive story map of the corridor, the **Random Forest vs. Ai2's OlmoEarth** field test, and a **grounded RAG agent** you can ask anything — answers stream in and cite their sources.
+
 > 📄 **[Engineering & methodology walkthrough](https://emeraldleaf.github.io/san-juan-riparian-watch/engineering-review.html)** — how the pipeline works end to end, with verbatim code and the weak points to scrutinize.
 
 Basin-scale **riparian vegetation delineation, health scoring, and change monitoring** for

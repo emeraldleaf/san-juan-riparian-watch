@@ -89,6 +89,7 @@ these dates.
 | 23 | `deploy_extent_map.py` ran a COG-heavy 5-reach job **without pinning `CPL_TMPDIR`** | **Filled the boot disk to zero** mid-run — GDAL staged temp there, and receipts #16/#17 had *documented this exact trap*. It blocked every tool that writes a file (even `df`'s output). **Knowing a trap in the receipts table did not prevent repeating it** — the redirect has to live *in the script*, not in memory | pinning `TMPDIR`/`CPL_TMPDIR` to the **data drive at import**, before `rasterio` loads (a module-top block, not a runtime call). The honest lesson: a receipt is a record, not a guard — only code in the path prevents recurrence |
 | 24 | The public model switcher (fast / balanced / OLMo) **returned another model's cached answer** | The semantic cache was keyed on **query text only, not the tier** — so on a cache hit (the suggested chips, the common questions) the switch silently did nothing, and one tier's generation poisoned the cache for the others. It *looked* fine and was broken on exactly the cached questions users click most | **`/code-review`** of the switcher, **before merge** — fixed by keying the cache on the answering model (`cache_tag`); guarded by a `pytest` that a different tier yields a different cache key |
 | 25 | The agent's Markdown renderer escaped `<`, `>`, `&` — **but not quotes** | A model answer with a crafted link URL could close `href` and **inject an event attribute** before the string reached `innerHTML` — an XSS in the live agent. The escaping had been ported verbatim into the Astro rebuild, so it was live in **two** places at once | **CodeRabbit** on #78 — fixed by escaping `"`/`'` before link-building and excluding quotes/angles from the URL capture (`web/`, `docs/story.html`) |
+| 26 | The public engineering-review page, **again — staleness, not contradiction** | 15 days after the FM-vs-RF LORO result (arroyo **0.557 → 0.889**) shipped to the live site's front page, section 06 still ended with *"the fair OlmoEarth test doesn't exist yet — don't cite this as FM evidence."* The retraction gate — born from **this same page** (#8) — sailed past it, because nothing was *contradicted*: a current result was simply **missing**. The existing gates all enforce that a doc says nothing *wrong*; none enforced that it says the *current thing* | `docs/canonical-results.md` + `check-canonical-results.sh`, wired into `--check-encoding` — the **inverse** of the retraction gate: every listed public doc MUST carry the current headline value or the build fails. Proven to fail on a stale doc, not only to pass |
 
 **Note errors 2, 3, 4 and 6.** Each was found *after* work had been built on top of it. Errors 5 and 6
 narrowed the project's central novelty claim. **Error 4 disproved the very hypothesis the fix was
@@ -111,7 +112,7 @@ Not one of them could catch errors 5, 8, or 9 — because those are **semantic d
 asserting something that is *no longer true*. Structural gates are blind to it, and it is the exact
 failure mode of fast, fluent, AI-assisted work.
 
-So the loop was extended with three **semantic** gates, all mechanical, all in CI, all **required** on
+So the loop was extended with four **semantic** gates, all mechanical, all in CI, all **required** on
 `main`:
 
 ### 1. Retraction registry — `docs/RETRACTIONS.md`
@@ -139,6 +140,18 @@ Every spec, ADR and audit must be linked from the published hub.
 
 > **Why it exists:** the **plan of record** — the fine-tune ADR — was live on the site and reachable
 > only by guessing its URL.
+
+### 4. Canonical results — `docs/canonical-results.md`
+The **inverse** of the retraction gate. That one fails a document for *stating a withdrawn claim*; this
+one fails a document for *missing a current one*. Each row registers a headline value (e.g. the arroyo
+`0.557 → 0.889`) and the public documents that **must** carry it; CI fails the build, naming the doc, if
+one has gone stale.
+
+> **Why it exists:** 15 days after the FM-vs-RF result shipped to the live site's front page, the
+> **flagship engineering-review page** still said the fair test *"doesn't exist yet."* The retraction
+> gate — born from *this same page* — sailed straight past it: nothing was *contradicted*, a current
+> result was simply *absent*. Every existing gate enforced that a doc says nothing *wrong*; none
+> enforced that it says the *current* thing.
 
 ---
 

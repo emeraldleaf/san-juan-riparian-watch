@@ -57,12 +57,54 @@ const CITE_PAPERS: Record<string, string> = {
   'olmoearth-mangrove-recipe': 'https://github.com/allenai/olmoearth_projects/blob/main/docs/mangrove.md',
 };
 
+// project-* corpus docs live in the public repo's docs/. Those in a subdir
+// (specs / decisions / audits) are mapped here, since the backend sends only
+// source_file, not the path — anything not listed is a docs/ top-level file.
+// (Keep in sync with the repo's docs/ layout; a wrong/missing entry 404s.)
+const DOC_SUBDIR: Record<string, string> = {
+  '2026-07-03-stage1-riparian-delineation': 'specs/',
+  '2026-07-04-document-intelligence-rag': 'specs/',
+  '2026-07-04-stage3-annual-change': 'specs/',
+  '2026-07-11-stage2-invasives-tamarix': 'specs/',
+  '2026-07-12-gpu-finetune-execution-plan': 'specs/',
+  '2026-07-18-phase3-deeptime-change': 'specs/',
+  '2026-07-19-fm-vs-rf-deploy-decision': 'specs/',
+  '2026-08-01-stage2-invasives-beetle-gate': 'specs/',
+  '2026-07-03-delineation-over-hydrology-buffers': 'decisions/',
+  '2026-07-04-document-intelligence-subsystem': 'decisions/',
+  '2026-07-04-nextaurora-rules-applicability': 'decisions/',
+  '2026-07-11-confidence-weighted-label-crosswalk': 'decisions/',
+  '2026-07-11-model-and-inference-hosting': 'decisions/',
+  '2026-07-12-beetle-training-pool-ecoregion-matched': 'decisions/',
+  '2026-07-12-olmoearth-finetune-invasives-with-extent-control': 'decisions/',
+  '2026-07-11-corip-woodward-2018': 'audits/',
+  '2026-07-11-tamarisk-detection-established': 'audits/',
+  '2026-07-12-evangelista-2018-csu-nrel': 'audits/',
+  '2026-07-12-perkins-2025-canyonlands': 'audits/',
+  '2026-07-14-riparian-methods-prior-art': 'audits/',
+  '2026-07-16-DECISION-MEMO-olmoearth-gpu': 'audits/',
+  '2026-07-16-cross-tile-transfer-results': 'audits/',
+  '2026-07-16-finetune-transfer-results': 'audits/',
+  '2026-07-16-label-budget-sweep-results': 'audits/',
+  '2026-07-16-malpais-reach-generalization-note': 'audits/',
+  '2026-07-16-presto-arm-results': 'audits/',
+  '2026-07-16-presto-species-results': 'audits/',
+  '2026-07-16-riparian-fm-methods-review': 'audits/',
+  '2026-07-16-three-tile-transfer-results': 'audits/',
+  '2026-07-17-cropglobe-tong-2025': 'audits/',
+};
+const DOCS_BASE = 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/';
+
 function citeUrlFor(src: string): string | null {
   if (!src) return null;
   const stem = src.replace(/\.(md|pdf|html?)$/, '');
   if (CITE_PAPERS[stem]) return CITE_PAPERS[stem];
   if (stem.indexOf('findings-') === 0)
-    return 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/' + stem.replace(/^findings-/, '') + '.md';
+    return DOCS_BASE + stem.replace(/^findings-/, '') + '.md';
+  if (stem.indexOf('project-') === 0) {
+    const name = stem.replace(/^project-/, '');
+    return DOCS_BASE + (DOC_SUBDIR[name] || '') + name + '.md';
+  }
   return null;
 }
 
@@ -135,6 +177,13 @@ function withTimeout(ms: number) {
   return { signal: ctrl.signal, clear: () => clearTimeout(id) };
 }
 
+// Meta-questions about the project/site itself ("what is this?", "how was this
+// developed?") aren't in the watershed-literature corpus, so retrieval grabs a
+// tangential "…Project is…" match. Answer those from the project's own description.
+const META_RE = /(this (project|site|app|web ?app|page|watch)|what am i looking at|how (was|is) (this|it)\b[^?]*\b(develop|built|made|creat)|who (made|built|develop|creat)\b|^\s*what('?s| is) this\b[^a-z]*$)/i;
+const META_ANSWER =
+  "**San Juan Riparian Watch** is an independent proof-of-concept that maps riparian vegetation and its invasive share along the San Juan River from decades of satellite imagery, and field-tests a Random Forest against **Ai2's OlmoEarth** foundation model. They tie on the river corridors (~0.80–0.88 AUC); the foundation model pulls ahead on a lone arroyo (0.557 → 0.889). It runs end to end on Ai2's open stack — OlmoEarth delineates the vegetation, and **OLMo** (me) answers from the document corpus with citations. It's experimental and not independently validated. Ask me about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision and I'll answer from the sources.";
+
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: 'Ask about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision. Tap a question below, or type your own, answers cite their sources, and a reach mention flies the map.' },
@@ -153,21 +202,39 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   useEffect(() => { tierRef.current = tier; }, [tier]);
   useEffect(() => { const el = chatRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages]);
 
-  // Probe the agent + load model tiers.
+  // Probe the agent + load model tiers. RE-PROBE periodically so a transient
+  // backend blip (a brief restart or load spike) auto-recovers the "live" state
+  // instead of latching the chat "offline" until a page reload.
+  const modelsLoadedRef = useRef(false);
   useEffect(() => {
     if (!AGENT_URL) return;
     const healthUrl = AGENT_URL.replace(/\/(docs\/ask|query)\/?$/, '/health');
-    const ht = withTimeout(8000);
-    fetch(healthUrl, { signal: ht.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then(() => {
-      setLive(true);
+    let cancelled = false;
+    // Re-fetch on every healthy probe so tier availability stays live — e.g. OLMo
+    // flips to enabled the moment a provider serves it, which is what the UI copy
+    // promises. Only the FIRST load sets the default tier; later refreshes update
+    // availability without clobbering the visitor's current selection.
+    const loadModels = () => {
       if (!isQuery) return;
       const url = AGENT_URL.replace(/\/query\/?$/, '/agent/models');
       const mt = withTimeout(8000);
       fetch(url, { signal: mt.signal }).then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => {
-        if (d?.default) { setTier(d.default); tierRef.current = d.default; }
+        if (cancelled) return;
+        if (!modelsLoadedRef.current && d?.default) { setTier(d.default); tierRef.current = d.default; }
+        modelsLoadedRef.current = true;
         setTiers(d?.tiers || null);
       }).catch(() => {}).finally(() => mt.clear());
-    }).catch(() => setLive(false)).finally(() => ht.clear());
+    };
+    const probe = () => {
+      const ht = withTimeout(8000);
+      fetch(healthUrl, { signal: ht.signal }).then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then(() => { if (!cancelled) { setLive(true); loadModels(); } })
+        .catch(() => { if (!cancelled) setLive(false); })
+        .finally(() => ht.clear());
+    };
+    probe();
+    const id = setInterval(probe, 25000);
+    return () => { cancelled = true; clearInterval(id); };
   }, [AGENT_URL, isQuery]);
 
   const finalize = useCallback((text: string, citations: Cite[], geoms: Geom[]) => {
@@ -247,6 +314,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (busy) return;
     setBusy(true);
     setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '', streaming: true }]);
+    if (META_RE.test(text)) {   // answer "what is this?" from the project's own description
+      setTimeout(() => { finalize(META_ANSWER, [], []); setBusy(false); }, 150);
+      return;
+    }
     if (!live) {
       setTimeout(() => { finalize(fallbackAnswer(text), [], []); setBusy(false); }, 200);
       return;
@@ -269,38 +340,6 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
         <div><div className="t">Riparian document agent</div><div className="s">Hybrid RAG over the corpus + these findings</div></div>
         <div className={'live' + (live ? ' on' : '')} id="livebadge" title="agent status"><span className="pip"></span><span>{live ? 'live' : 'offline'}</span></div>
       </div>
-      <div className="chat" ref={chatRef} role="log" aria-live="polite" aria-atomic="false">
-        {messages.map((m, i) => (
-          <div key={i} className={'msg ' + (m.role === 'user' ? 'u' : 'a') + (m.streaming && !m.text ? ' think' : '')}>
-            {m.role === 'assistant' && !m.streaming && m.html ? (
-              <>
-                <div className="md" dangerouslySetInnerHTML={{ __html: m.html }} />
-                {m.citations && m.citations.length > 0 && (
-                  <div className="cites">
-                    <span className="citehead">Sources</span>
-                    {m.citations.map((c, k) => {
-                      const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^findings-/, '').replace(/\.(md|pdf|html?)$/, '');
-                      return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
-                    })}
-                  </div>
-                )}
-                {m.geoms && m.geoms.length > 0 && (
-                  <div className="cites">
-                    {m.geoms.map((g, k) => (
-                      <span key={k} className="geo" onClick={() => emitGeom([{ type: 'Feature', geometry: g.geom, properties: {} }])}>📍 {g.mention_text || g.ref || 'location'}</span>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              m.streaming && !m.text ? '…thinking' : m.text
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="qs">
-        {SUGGEST.map((q) => (<button key={q} onClick={() => { if (!busy) answer(q); }}>{q}</button>))}
-      </div>
       {tiers && (
         <div className="modelbar">
           <span className="ml">Model</span>
@@ -320,9 +359,51 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
       )}
       {olmo && !olmo.available && (
         <div className="moffline">
-          <b>OLMo is disabled</b> because Ai2’s OLMo has no live inference endpoint on OpenRouter yet (0 providers currently serve it), so it can’t answer. The demo runs on another open model meanwhile; this button enables itself automatically the moment an OLMo endpoint goes live.
+          <b>OLMo is disabled</b> — no live OpenRouter endpoint yet (0 providers serve it); runs on another open model meanwhile and enables automatically when one goes live.
         </div>
       )}
+      <div className="chat" ref={chatRef} role="log" aria-live="polite" aria-atomic="false">
+        {messages.map((m, i) => (
+          <div key={i} className={'msg ' + (m.role === 'user' ? 'u' : 'a') + (m.streaming && !m.text ? ' think' : '') + (m.streaming && m.text ? ' streaming' : '')}>
+            {m.role === 'assistant' ? (
+              (m.streaming && !m.text) ? '…thinking' : (
+                <>
+                  {/* Render markdown LIVE while streaming: m.html is set only at
+                      finalize, so until then parse the partial each tick so bold,
+                      lists, tables and links appear as they arrive, not all at once. */}
+                  <div className="md" dangerouslySetInnerHTML={{ __html: m.html || mdToHtml(m.text) }} />
+                  {!m.streaming && m.citations && m.citations.length > 0 && (
+                    <div className="cites">
+                      <span className="citehead">Sources</span>
+                      {m.citations.map((c, k) => {
+                        const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^(findings|project)-/, '').replace(/\.(md|pdf|html?)$/, '');
+                        return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
+                      })}
+                    </div>
+                  )}
+                  {!m.streaming && m.geoms && m.geoms.length > 0 && (
+                    <div className="cites">
+                      {m.geoms.map((g, k) => (
+                        <span key={k} className="geo" onClick={() => emitGeom([{ type: 'Feature', geometry: g.geom, properties: {} }])}>📍 {g.mention_text || g.ref || 'location'}</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            ) : (
+              m.text
+            )}
+          </div>
+        ))}
+        {/* Suggestions live in the empty/starter state, inside the log, so they're
+            not sandwiched between the output and the input once a chat is going. */}
+        {messages.length <= 1 && !busy && (
+          <div className="qs qs-starter">
+            <span className="qs-label">Try asking</span>
+            {SUGGEST.map((q) => (<button key={q} onClick={() => { if (!busy) answer(q); }}>{q}</button>))}
+          </div>
+        )}
+      </div>
       <div className="askrow">
         <input value={input} disabled={busy} onChange={(e) => setInput((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => { if (e.key === 'Enter') go(); }}

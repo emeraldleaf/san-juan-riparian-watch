@@ -743,6 +743,7 @@ case "${1:-}" in
         rc=0
         .claude/scripts/check-tombstones.sh       || rc=1
         .claude/scripts/check-retracted-claims.sh || rc=1
+        .claude/scripts/check-canonical-results.sh || rc=1
         .claude/scripts/check-doc-orphans.sh      || rc=1
         .claude/scripts/check-scaffold-classpaths.sh || rc=1
         exit $rc
@@ -757,7 +758,7 @@ case "${1:-}" in
         echo "  --reconnect        Recover after external drive disconnect/reconnect"
         echo "  --update [type]    Run ETL update (full|incremental|ndvi|all) [--force]"
         echo "  --review-status N  Merge gate: is CodeRabbit GREEN on PR N's current head?"
-        echo "  --check-encoding   Drift gates: tombstones + retracted claims + doc orphans"
+        echo "  --check-encoding   Drift gates: tombstones + retracted claims + canonical results + doc orphans"
         echo ""
         echo "  Database:"
         echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"

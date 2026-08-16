@@ -225,6 +225,14 @@
   .qs{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px;}
   .qs button{border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s;}
   .qs button:hover{border-color:var(--accent);background:var(--accent-tint);color:var(--accent-2);}
+  /* Starter suggestions live inside the chat log (not sandwiched above the input),
+     so drop .qs's own horizontal padding and align to the chat's 16px gutter. */
+  .qs-starter{padding:2px 0 2px;align-self:stretch;}
+  .qs-label{width:100%;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 1px;}
+  /* Blinking cursor at the tail of the answer while tokens stream in. */
+  .msg.streaming .md>:last-child::after{content:'▍';color:var(--accent);margin-left:1px;animation:blink 1s steps(2) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  @media (prefers-reduced-motion:reduce){.msg.streaming .md>:last-child::after{animation:none;}}
   .modelbar{display:flex;align-items:center;gap:10px;padding:0 16px 12px;flex-wrap:wrap;}
   .modelbar .ml{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle);}
   .seg{display:inline-flex;gap:3px;background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:3px;}

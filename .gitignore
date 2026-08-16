@@ -44,4 +44,7 @@ docs/audits/closed_access.csv
 docs/audits/fetch.log
 experiments/riparian_extent/naip_chips/
 .codacy/
-experiments/riparian_extent/dryrun_*.yaml
+# Derived FM experiment data — rslearn datasets + materialized reach cubes
+# (69GB, 156k files, regenerable via materialize_reach.py). Never commit.
+# (Blanket ignore — subsumes the specific experiments/riparian_extent/* rules above.)
+experiments/
