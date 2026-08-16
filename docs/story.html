@@ -1169,9 +1169,14 @@
       return {answer:full, citations:cites, resolved_geometries:[]};
     } finally { clearTimeout(idle); }
   }
+  // Meta-questions about the project/site aren't in the watershed-literature corpus;
+  // answer them from the project's own description instead of a tangential retrieval.
+  var META_RE=/(this (project|site|app|web ?app|page|watch)|what am i looking at|how (was|is) (this|it)\b[^?]*\b(develop|built|made|creat)|who (made|built|develop|creat)\b|^\s*what('?s| is) this\b[^a-z]*$)/i;
+  var META_ANSWER="**San Juan Riparian Watch** is an independent proof-of-concept that maps riparian vegetation and its invasive share along the San Juan River from decades of satellite imagery, and field-tests a Random Forest against **Ai2's OlmoEarth** foundation model. They tie on the river corridors (~0.80–0.88 AUC); the foundation model pulls ahead on a lone arroyo (0.557 → 0.889). It runs end to end on Ai2's open stack — OlmoEarth delineates the vegetation, and **OLMo** (me) answers from the document corpus with citations. It's experimental and not independently validated. Ask me about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision and I'll answer from the sources.";
   function answer(text){
     if(busy)return; busy=true; setBusy(true);
     bubbleUser(text); var node=bubbleThinking();
+    if(META_RE.test(text)){ setTimeout(function(){ fillAnswer(node, META_ANSWER); busy=false; setBusy(false); },150); return; }
     if(!LIVE){ setTimeout(function(){ fillAnswer(node, fallbackAnswer(text)); busy=false; setBusy(false); },200); return; }
     var isQuery=/\/query\/?$/.test(AGENT_URL);
     var done=function(res){ fillAnswer(node, res.answer||'(no answer returned)', res.citations, res.resolved_geometries); };

@@ -135,6 +135,13 @@ function withTimeout(ms: number) {
   return { signal: ctrl.signal, clear: () => clearTimeout(id) };
 }
 
+// Meta-questions about the project/site itself ("what is this?", "how was this
+// developed?") aren't in the watershed-literature corpus, so retrieval grabs a
+// tangential "…Project is…" match. Answer those from the project's own description.
+const META_RE = /(this (project|site|app|web ?app|page|watch)|what am i looking at|how (was|is) (this|it)\b[^?]*\b(develop|built|made|creat)|who (made|built|develop|creat)\b|^\s*what('?s| is) this\b[^a-z]*$)/i;
+const META_ANSWER =
+  "**San Juan Riparian Watch** is an independent proof-of-concept that maps riparian vegetation and its invasive share along the San Juan River from decades of satellite imagery, and field-tests a Random Forest against **Ai2's OlmoEarth** foundation model. They tie on the river corridors (~0.80–0.88 AUC); the foundation model pulls ahead on a lone arroyo (0.557 → 0.889). It runs end to end on Ai2's open stack — OlmoEarth delineates the vegetation, and **OLMo** (me) answers from the document corpus with citations. It's experimental and not independently validated. Ask me about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision and I'll answer from the sources.";
+
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: 'Ask about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision. Tap a question below, or type your own, answers cite their sources, and a reach mention flies the map.' },
@@ -261,6 +268,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (busy) return;
     setBusy(true);
     setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '', streaming: true }]);
+    if (META_RE.test(text)) {   // answer "what is this?" from the project's own description
+      setTimeout(() => { finalize(META_ANSWER, [], []); setBusy(false); }, 150);
+      return;
+    }
     if (!live) {
       setTimeout(() => { finalize(fallbackAnswer(text), [], []); setBusy(false); }, 200);
       return;
