@@ -332,14 +332,15 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const answerRef = useRef(answer);
   useEffect(() => { answerRef.current = answer; }, [answer]);
   useEffect(() => {
+    let askTimer: ReturnType<typeof setTimeout>;
     const onAsk = (e: Event) => {
       const q = (e as CustomEvent)?.detail?.q;
       if (typeof q !== 'string' || !q) return;
       try { document.getElementById('agent')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
-      setTimeout(() => answerRef.current(q), 450);
+      askTimer = setTimeout(() => answerRef.current(q), 450);
     };
     window.addEventListener('story:ask', onAsk as EventListener);
-    return () => window.removeEventListener('story:ask', onAsk as EventListener);
+    return () => { clearTimeout(askTimer); window.removeEventListener('story:ask', onAsk as EventListener); };
   }, []);
 
   const olmo = tiers?.find((t) => t.id === 'olmo');
