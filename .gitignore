@@ -45,3 +45,7 @@ docs/audits/fetch.log
 olmoearth_run_data/riparian_extent/naip_chips/
 .codacy/
 olmoearth_run_data/riparian_extent/dryrun_*.yaml
+
+# Derived FM experiment data — rslearn datasets + materialized reach cubes
+# (69GB, 156k files, regenerable via materialize_reach.py). Never commit.
+experiments/
