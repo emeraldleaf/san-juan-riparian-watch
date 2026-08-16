@@ -57,19 +57,42 @@ const CITE_PAPERS: Record<string, string> = {
   'olmoearth-mangrove-recipe': 'https://github.com/allenai/olmoearth_projects/blob/main/docs/mangrove.md',
 };
 
-// project-* corpus docs live in the public repo's docs/, except these which are
-// under docs/audits/ — the backend only sends source_file, so the subdir is
-// resolved here. (Keep in sync with deploy/assemble_corpus.sh's audits pull.)
-const AUDIT_STEMS = new Set([
-  '2026-07-11-corip-woodward-2018', '2026-07-11-tamarisk-detection-established',
-  '2026-07-12-evangelista-2018-csu-nrel', '2026-07-12-perkins-2025-canyonlands',
-  '2026-07-14-riparian-methods-prior-art', '2026-07-16-DECISION-MEMO-olmoearth-gpu',
-  '2026-07-16-cross-tile-transfer-results', '2026-07-16-finetune-transfer-results',
-  '2026-07-16-label-budget-sweep-results', '2026-07-16-malpais-reach-generalization-note',
-  '2026-07-16-presto-arm-results', '2026-07-16-presto-species-results',
-  '2026-07-16-riparian-fm-methods-review', '2026-07-16-three-tile-transfer-results',
-  '2026-07-17-cropglobe-tong-2025',
-]);
+// project-* corpus docs live in the public repo's docs/. Those in a subdir
+// (specs / decisions / audits) are mapped here, since the backend sends only
+// source_file, not the path — anything not listed is a docs/ top-level file.
+// (Keep in sync with the repo's docs/ layout; a wrong/missing entry 404s.)
+const DOC_SUBDIR: Record<string, string> = {
+  '2026-07-03-stage1-riparian-delineation': 'specs/',
+  '2026-07-04-document-intelligence-rag': 'specs/',
+  '2026-07-04-stage3-annual-change': 'specs/',
+  '2026-07-11-stage2-invasives-tamarix': 'specs/',
+  '2026-07-12-gpu-finetune-execution-plan': 'specs/',
+  '2026-07-18-phase3-deeptime-change': 'specs/',
+  '2026-07-19-fm-vs-rf-deploy-decision': 'specs/',
+  '2026-08-01-stage2-invasives-beetle-gate': 'specs/',
+  '2026-07-03-delineation-over-hydrology-buffers': 'decisions/',
+  '2026-07-04-document-intelligence-subsystem': 'decisions/',
+  '2026-07-04-nextaurora-rules-applicability': 'decisions/',
+  '2026-07-11-confidence-weighted-label-crosswalk': 'decisions/',
+  '2026-07-11-model-and-inference-hosting': 'decisions/',
+  '2026-07-12-beetle-training-pool-ecoregion-matched': 'decisions/',
+  '2026-07-12-olmoearth-finetune-invasives-with-extent-control': 'decisions/',
+  '2026-07-11-corip-woodward-2018': 'audits/',
+  '2026-07-11-tamarisk-detection-established': 'audits/',
+  '2026-07-12-evangelista-2018-csu-nrel': 'audits/',
+  '2026-07-12-perkins-2025-canyonlands': 'audits/',
+  '2026-07-14-riparian-methods-prior-art': 'audits/',
+  '2026-07-16-DECISION-MEMO-olmoearth-gpu': 'audits/',
+  '2026-07-16-cross-tile-transfer-results': 'audits/',
+  '2026-07-16-finetune-transfer-results': 'audits/',
+  '2026-07-16-label-budget-sweep-results': 'audits/',
+  '2026-07-16-malpais-reach-generalization-note': 'audits/',
+  '2026-07-16-presto-arm-results': 'audits/',
+  '2026-07-16-presto-species-results': 'audits/',
+  '2026-07-16-riparian-fm-methods-review': 'audits/',
+  '2026-07-16-three-tile-transfer-results': 'audits/',
+  '2026-07-17-cropglobe-tong-2025': 'audits/',
+};
 const DOCS_BASE = 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/';
 
 function citeUrlFor(src: string): string | null {
@@ -80,7 +103,7 @@ function citeUrlFor(src: string): string | null {
     return DOCS_BASE + stem.replace(/^findings-/, '') + '.md';
   if (stem.indexOf('project-') === 0) {
     const name = stem.replace(/^project-/, '');
-    return DOCS_BASE + (AUDIT_STEMS.has(name) ? 'audits/' : '') + name + '.md';
+    return DOCS_BASE + (DOC_SUBDIR[name] || '') + name + '.md';
   }
   return null;
 }
@@ -315,35 +338,45 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
       </div>
       <div className="chat" ref={chatRef} role="log" aria-live="polite" aria-atomic="false">
         {messages.map((m, i) => (
-          <div key={i} className={'msg ' + (m.role === 'user' ? 'u' : 'a') + (m.streaming && !m.text ? ' think' : '')}>
-            {m.role === 'assistant' && !m.streaming && m.html ? (
-              <>
-                <div className="md" dangerouslySetInnerHTML={{ __html: m.html }} />
-                {m.citations && m.citations.length > 0 && (
-                  <div className="cites">
-                    <span className="citehead">Sources</span>
-                    {m.citations.map((c, k) => {
-                      const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^(findings|project)-/, '').replace(/\.(md|pdf|html?)$/, '');
-                      return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
-                    })}
-                  </div>
-                )}
-                {m.geoms && m.geoms.length > 0 && (
-                  <div className="cites">
-                    {m.geoms.map((g, k) => (
-                      <span key={k} className="geo" onClick={() => emitGeom([{ type: 'Feature', geometry: g.geom, properties: {} }])}>📍 {g.mention_text || g.ref || 'location'}</span>
-                    ))}
-                  </div>
-                )}
-              </>
+          <div key={i} className={'msg ' + (m.role === 'user' ? 'u' : 'a') + (m.streaming && !m.text ? ' think' : '') + (m.streaming && m.text ? ' streaming' : '')}>
+            {m.role === 'assistant' ? (
+              (m.streaming && !m.text) ? '…thinking' : (
+                <>
+                  {/* Render markdown LIVE while streaming: m.html is set only at
+                      finalize, so until then parse the partial each tick so bold,
+                      lists, tables and links appear as they arrive, not all at once. */}
+                  <div className="md" dangerouslySetInnerHTML={{ __html: m.html || mdToHtml(m.text) }} />
+                  {!m.streaming && m.citations && m.citations.length > 0 && (
+                    <div className="cites">
+                      <span className="citehead">Sources</span>
+                      {m.citations.map((c, k) => {
+                        const label = '[' + (k + 1) + '] ' + c.source_file.replace(/^(findings|project)-/, '').replace(/\.(md|pdf|html?)$/, '');
+                        return c.source_url ? <a key={k} className="cite" href={c.source_url} target="_blank" rel="noopener noreferrer">{label}</a> : <span key={k} className="cite">{label}</span>;
+                      })}
+                    </div>
+                  )}
+                  {!m.streaming && m.geoms && m.geoms.length > 0 && (
+                    <div className="cites">
+                      {m.geoms.map((g, k) => (
+                        <span key={k} className="geo" onClick={() => emitGeom([{ type: 'Feature', geometry: g.geom, properties: {} }])}>📍 {g.mention_text || g.ref || 'location'}</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
             ) : (
-              m.streaming && !m.text ? '…thinking' : m.text
+              m.text
             )}
           </div>
         ))}
-      </div>
-      <div className="qs">
-        {SUGGEST.map((q) => (<button key={q} onClick={() => { if (!busy) answer(q); }}>{q}</button>))}
+        {/* Suggestions live in the empty/starter state, inside the log, so they're
+            not sandwiched between the output and the input once a chat is going. */}
+        {messages.length <= 1 && !busy && (
+          <div className="qs qs-starter">
+            <span className="qs-label">Try asking</span>
+            {SUGGEST.map((q) => (<button key={q} onClick={() => { if (!busy) answer(q); }}>{q}</button>))}
+          </div>
+        )}
       </div>
       {tiers && (
         <div className="modelbar">
