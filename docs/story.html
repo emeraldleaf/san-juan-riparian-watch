@@ -352,8 +352,9 @@
     model in a real field test, on ground neither model has seen, to find where the foundation model
     genuinely earns its keep and where the two simply tie. It's just as candid about what didn't hold up:
     two tempting results that came apart under scrutiny, kept in rather than quietly dropped. And the agent
-    that answers your own questions at the end runs on <strong>Ai2's OLMo</strong>. OlmoEarth sees; OLMo
-    speaks.</p>
+    that answers your own questions is designed to run on <strong>Ai2's OLMo</strong> — there's no live
+    OLMo endpoint served yet, so for now it speaks through another open model, and OLMo becomes selectable
+    the moment a provider serves it. The intent: OlmoEarth sees; OLMo speaks.</p>
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
@@ -722,7 +723,7 @@
     <div class="aa">→</div>
     <div class="an"><div class="ak">Serve</div><div class="av">.NET API · MVT vector tiles</div></div>
     <div class="aa">→</div>
-    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid RAG on OLMo</div></div>
+    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid RAG · OLMo-ready</div></div>
   </div>
   <p style="margin-top:18px">The agent below is part of the same discipline: <strong>no source, no
     claim.</strong> Grounding is enforced backend-side, so every sentence it returns is pinned to a
@@ -755,7 +756,7 @@
       <div class="disc-ico">🤖</div>
       <div class="disc-role">AI developer</div>
       <p>Ran a rigorous field evaluation of Ai2's OlmoEarth foundation model against a Random Forest, then
-        built the grounded agent below on Ai2's OLMo: hybrid retrieval, prompt-injection and PII guards,
+        built the grounded agent below for Ai2's OLMo: hybrid retrieval, prompt-injection and PII guards,
         semantic caching, and self-correcting retrieval.</p>
     </div>
     <div class="disc-card">
@@ -778,10 +779,11 @@
   <div class="kicker">Interrogate it</div>
   <h2>Ask the agent, it answers from the documents, and cites them</h2>
   <p>Everything above, the findings, the methods, and the watershed literature behind them, is indexed
-    in a hybrid-retrieval system (dense embeddings + BM25). Ask it anything. The answer is written by
-    <strong>OLMo, Ai2's open language model</strong>, <strong>grounded in the retrieved sources with
-    clickable citations</strong>, and if you mention a reach the map flies to it. No source, no claim, so
-    the same Ai2 stack that <em>maps</em> the vegetation also <em>explains</em> it.</p>
+    in a hybrid-retrieval system (dense embeddings + BM25). Ask it anything. The answer is written by an
+    open LLM — <strong>Ai2's OLMo</strong> the moment a provider serves it, another open model until then
+    — <strong>grounded in the retrieved sources with clickable citations</strong>, and if you mention a
+    reach the map flies to it. No source, no claim; the same Ai2 open stack that <em>maps</em> the
+    vegetation is built to <em>explain</em> it.</p>
   <div class="qa">
     <div class="qa-head"><div class="av">◑</div>
       <div><div class="t">Riparian document agent</div><div class="s">Hybrid RAG over the corpus + these findings</div></div>
@@ -1171,12 +1173,9 @@
   }
   // Meta-questions about the project/site aren't in the watershed-literature corpus;
   // answer them from the project's own description instead of a tangential retrieval.
-  var META_RE=/(this (project|site|app|web ?app|page|watch)|what am i looking at|how (was|is) (this|it)\b[^?]*\b(develop|built|made|creat)|who (made|built|develop|creat)\b|^\s*what('?s| is) this\b[^a-z]*$)/i;
-  var META_ANSWER="**San Juan Riparian Watch** is an independent proof-of-concept that maps riparian vegetation and its invasive share along the San Juan River from decades of satellite imagery, and field-tests a Random Forest against **Ai2's OlmoEarth** foundation model. They tie on the river corridors (~0.80–0.88 AUC); the foundation model pulls ahead on a lone arroyo (0.557 → 0.889). It runs end to end on Ai2's open stack — OlmoEarth delineates the vegetation, and **OLMo** (me) answers from the document corpus with citations. It's experimental and not independently validated. Ask me about the corridor, the invasives, the beetle test, or the RF-vs-foundation-model decision and I'll answer from the sources.";
   function answer(text){
     if(busy)return; busy=true; setBusy(true);
     bubbleUser(text); var node=bubbleThinking();
-    if(META_RE.test(text)){ setTimeout(function(){ fillAnswer(node, META_ANSWER); busy=false; setBusy(false); },150); return; }
     if(!LIVE){ setTimeout(function(){ fillAnswer(node, fallbackAnswer(text)); busy=false; setBusy(false); },200); return; }
     var isQuery=/\/query\/?$/.test(AGENT_URL);
     var done=function(res){ fillAnswer(node, res.answer||'(no answer returned)', res.citations, res.resolved_geometries); };

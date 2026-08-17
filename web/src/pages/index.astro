@@ -42,8 +42,9 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     model in a real field test, on ground neither model has seen, to find where the foundation model
     genuinely earns its keep and where the two simply tie. It's just as candid about what didn't hold up:
     two tempting results that came apart under scrutiny, kept in rather than quietly dropped. And the agent
-    that answers your own questions at the end runs on <strong>Ai2's OLMo</strong>. OlmoEarth sees; OLMo
-    speaks.</p>
+    that answers your own questions is designed to run on <strong>Ai2's OLMo</strong> — there's no live
+    OLMo endpoint served yet, so for now it speaks through another open model, and OLMo becomes selectable
+    the moment a provider serves it. The intent: OlmoEarth sees; OLMo speaks.</p>
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
@@ -199,6 +200,10 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     The 23% masked prediction <em>reproduces</em> the NMRipMap label proportion (15,656 / 67,625 woody
     pixels invasive = 23%): well-calibrated to the 2020 labels it trained on. A spatially-held-out test
     is the honest next step, and it's named as such rather than dressed up as validation.</div>
+  <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
+    <button class="askchip" data-ask="How much of the corridor is invasive, and how confident are you in that number?">How much is invasive — and how sure? ↗</button>
+    <button class="askchip" data-ask="Why is NDVI not enough to map the invasives?">Why isn't NDVI enough? ↗</button>
+  </div>
 </div></section>
 
 <!-- ── FINDING 2: RF vs FM ────────────────────────────────────────── -->
@@ -265,6 +270,10 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     (ranking quality, prevalence-invariant), reported alongside F1 at the deployment threshold, never
     accuracy. For plain <em>extent</em>, RF is as good and needs no GPU; the foundation model earns its
     keep only on the under-represented morphology.</div>
+  <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
+    <button class="askchip" data-ask="Does OlmoEarth beat the Random Forest on the arroyo, and why?">Does OlmoEarth beat the RF on the arroyo — and why? ↗</button>
+    <button class="askchip" data-ask="Why does the foundation model ship for invasives but not for plain extent?">Why ship the FM for invasives but not extent? ↗</button>
+  </div>
 </div></section>
 
 <!-- ── FINDING 3: BEETLE NULL ─────────────────────────────────────── -->
@@ -368,6 +377,10 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     You'll notice "in-sample calibration," "documented negative," "cannot resolve", not "validated,"
     "proven," "breakthrough." The claims are sized to the evidence. That restraint <em>is</em> the
     credibility.</div>
+  <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
+    <button class="askchip" data-ask="What are the biggest threats to this project's central claim, and how does it defend against them?">Biggest threats to the claim — and the defense? ↗</button>
+    <button class="askchip" data-ask="What did this project get wrong, and how did it catch it?">What did it get wrong — and how was it caught? ↗</button>
+  </div>
 </div></section>
 
 <!-- ── AI-ASSISTED METHOD ──────────────────────────────────────────── -->
@@ -412,11 +425,15 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     <div class="aa">→</div>
     <div class="an"><div class="ak">Serve</div><div class="av">.NET API · MVT vector tiles</div></div>
     <div class="aa">→</div>
-    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid RAG on OLMo</div></div>
+    <div class="an"><div class="ak">Map + Ask</div><div class="av">MapLibre · hybrid RAG · OLMo-ready</div></div>
   </div>
   <p style="margin-top:18px">The agent below is part of the same discipline: <strong>no source, no
     claim.</strong> Grounding is enforced backend-side, so every sentence it returns is pinned to a
     retrieved document you can open.</p>
+  <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
+    <button class="askchip" data-ask="What engineering method kept the project honest?">What method kept the work honest? ↗</button>
+    <button class="askchip" data-ask="How was this agent built?">How was this agent built? ↗</button>
+  </div>
 </div></section>
 
 <!-- ── FOUR DISCIPLINES / WHAT THIS DEMONSTRATES ───────────────────── -->
@@ -445,7 +462,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <div class="disc-ico">🤖</div>
       <div class="disc-role">AI developer</div>
       <p>Ran a rigorous field evaluation of Ai2's OlmoEarth foundation model against a Random Forest, then
-        built the grounded agent below on Ai2's OLMo: hybrid retrieval, prompt-injection and PII guards,
+        built the grounded agent below for Ai2's OLMo: hybrid retrieval, prompt-injection and PII guards,
         semantic caching, and self-correcting retrieval.</p>
     </div>
     <div class="disc-card">
@@ -468,11 +485,12 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <div class="kicker">Interrogate it</div>
   <h2>Ask the agent, it answers from the documents, and cites them</h2>
   <p>Everything above, the findings, the methods, and the watershed literature behind them, is indexed
-    in a hybrid-retrieval system (dense embeddings + BM25). Ask it anything. The answer is written by
-    <strong>OLMo, Ai2's open language model</strong>, <strong>grounded in the retrieved sources with
-    clickable citations</strong>, and if you mention a reach the map flies to it. No source, no claim, so
-    the same Ai2 stack that <em>maps</em> the vegetation also <em>explains</em> it.</p>
-  <Chat client:visible agentUrl="/query" />
+    in a hybrid-retrieval system (dense embeddings + BM25). Ask it anything. The answer is written by an
+    open LLM — <strong>Ai2's OLMo</strong> the moment a provider serves it, another open model until then
+    — <strong>grounded in the retrieved sources with clickable citations</strong>, and if you mention a
+    reach the map flies to it. No source, no claim; the same Ai2 open stack that <em>maps</em> the
+    vegetation is built to <em>explain</em> it.</p>
+  <Chat client:load agentUrl="/query" />
 </div></section>
 
 <footer><div class="wrap">

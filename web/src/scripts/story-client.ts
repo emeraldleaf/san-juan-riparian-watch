@@ -170,3 +170,11 @@ addEventListener('story:answer', (e: any) => {
   else if (/farmington|corridor|invasive|23\s*%/.test(t)) focusMap('corridor');
 });
 addEventListener('story:geom', (e: any) => { const f = e.detail?.features; if (f && f.length) showGeom(f); });
+
+// Contextual "ask the agent" chips ([data-ask="…"]) placed in any section → hand
+// the question to the Chat island, which scrolls itself into view and asks it.
+document.addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement | null)?.closest('[data-ask]');
+  const q = el?.getAttribute('data-ask');
+  if (q) dispatchEvent(new CustomEvent('story:ask', { detail: { q } }));
+});
