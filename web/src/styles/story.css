@@ -185,7 +185,7 @@
   @media (max-width:640px){ .parrow{transform:rotate(90deg);} .pnode{flex-basis:100%;} }
 
   /* live agent */
-  .qa{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);overflow:hidden;margin:22px 0;}
+  .qa{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);overflow:hidden;margin:22px 0;scroll-margin-top:76px;}
   .qa-head{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;
     background:color-mix(in srgb,var(--accent) 4%,var(--panel));}
   .qa-head .av{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));

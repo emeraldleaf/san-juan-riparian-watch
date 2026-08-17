@@ -336,7 +336,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const onAsk = (e: Event) => {
       const q = (e as CustomEvent)?.detail?.q;
       if (typeof q !== 'string' || !q) return;
-      try { document.getElementById('agent')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+      try { (document.querySelector('.qa') || document.getElementById('agent'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
       askTimer = setTimeout(() => answerRef.current(q), 450);
     };
     window.addEventListener('story:ask', onAsk as EventListener);
