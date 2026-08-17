@@ -1,15 +1,20 @@
 # Project Status
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-16
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-07-25): 4-reach FM dataset **built + materialized** — the GPU run is a rental away
+## ⏩⏩ Latest (2026-08-01): the FM raced the bar — **GO, it ships** (arroyo 0.557 → 0.889)
 
-The rigorous deploy test (spec #70) needs the FM scored **leave-one-reach-out over the same 4 reaches**
-the RF bar was measured on. All four are now built as rslearn datasets (12-month median mosaics,
-identical compositing), materialized and verified on disk:
+The FM-vs-RF deploy decision is **settled**. Fine-tuned OlmoEarth, scored **leave-one-reach-out over the
+same 4 reaches** the RF bar used, **ties the RF on the river reaches it already handled and rescues the
+one morphology the RF was blind to** — the Malpais desert arroyo, **AUROC 0.557 → 0.889**. Macro-mean
+transfer **0.798 → 0.872** (+0.074), clearing the pre-registered **+0.04** bar → **GO, the FM ships**
+where it wins (the arroyo / harder invasive task; the RF stays cheaper and GPU-free for river-reach
+extent). Full result: [`docs/2026-08-01-fm-vs-rf-loro-result.md`](2026-08-01-fm-vs-rf-loro-result.md).
+The datasets that made the run possible (built as rslearn datasets — 12-month median mosaics, identical
+compositing — materialized and verified on disk):
 
 | reach | windows | rasters |
 |---|---|---|
@@ -34,17 +39,15 @@ weakness visible: model predicts 8.0% riparian vs NMRipMap's 5.7% truth, over-fi
 because **80% of the AOI is unlabeled** so the RF was never taught to reject upland/ag — the per-pixel,
 no-corridor-constraint failure the FM's spatial context is meant to fix.
 
-### ➡️ Next — the FM finally races the bar (GPU only)
+### ✅ Resolved — the decision is made
 
-**The LORO wiring is done and CPU-validated** (this PR): `build_loro_dataset.py` combines the 4 reaches
-into one dataset (hardlinked, 1404 windows, labels rasterized), `run_loro.py` sets each fold, and a
-NANO/CPU dry-run ran a clean epoch. It is **unbiased by construction** — the held-out reach is the
-`test` set scored once; epoch selection uses a `val` slice of the *three training reaches* (not the
-held-out one), so the FM number is comparable to the single-shot RF bar. Runbook: `LAUNCH-LORO.md`.
-
-The **only** remaining step is the GPU: rent a CUDA box (~$3–15), get the datasets there (rebuild via
-`materialize_reach.py`), then per fold `run_loro.py --hold-out <reach> --fit` → read the **test riparian
-AUC** and lay it beside the RF bar (arroyo **0.557** is the sharp test), plus coherence at matched recall.
+The LORO run executed on a GPU exactly as the CPU-validated wiring specified (`build_loro_dataset.py`
+combines the 4 reaches into one dataset — hardlinked, 1404 windows, labels rasterized; `run_loro.py`
+sets each fold). It is **unbiased by construction** — the held-out reach is the `test` set scored once;
+epoch selection uses a `val` slice of the *three training reaches* (not the held-out one), so the FM
+number is comparable to the single-shot RF bar. The gate (spec #70) returned **GO**. Forward work now
+sits downstream in the product: applying the shipped model to invasive scoring (Stage 2) and annual
+change (Stage 3), and the grounded RAG agent that answers over the whole record (Quartzose platform).
 
 ## Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
 
