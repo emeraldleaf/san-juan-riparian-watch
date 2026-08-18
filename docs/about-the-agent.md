@@ -79,6 +79,31 @@ That episode is the method in miniature: *profile before hypothesizing; "small m
 the best fix can be to run it elsewhere.* The discipline that turns lessons like this into permanent
 guardrails is described in **the engineering method** ([OKL & the encoding loop](about-okl.md)).
 
+## A worked engineering lesson: the answers that wouldn't come
+
+Under two people asking questions at once, the agent stopped answering — requests hung, then timed out.
+The health check stayed green and the box was not out of memory, which ruled out the obvious. Working
+without the server logs at first, the temptation was to *theorize*, and the first three theories were
+all wrong: too many grading calls, then a re-retrieval cascade, then a saturated local embedder. Each
+was plausible; none survived contact with the evidence.
+
+The logs, once reachable, said it in one line: **`Generation complete (137.11s)`**. Retrieval had
+finished in three seconds and the graded pipeline was fine; **generation** was the entire cost. The
+answer model — a 72-billion-parameter Qwen — was producing about **8 tokens per second**, and under two
+concurrent users the provider throttled it to ~6. A full answer at that rate takes over two minutes.
+
+The root cause was not the model but *where it was served*. On OpenRouter a model is routed to one of
+several backend providers, and that 72B model had only **two** — both ordinary GPUs whose speed swings
+with load, fast one day and crawling the next. The fix had two parts: **backpressure** (a concurrency
+limit, so a burst of requests queues gracefully instead of collapsing the box) and **a model with a
+fast home** — one served on Groq's inference silicon at ~250 tokens/second, pinned via OpenRouter's
+throughput routing. The same answer that took 137 seconds now streams in about four, and the speed no
+longer rides on a daily provider lottery.
+
+The lesson in miniature: *a green health check is not a working system; get the real logs before you
+theorize; and for a hosted model, throughput is a property of the **provider**, not the model — so pick
+a model that has a fast one.*
+
 ## Honest limits
 
 The agent is grounded, but grounding is not infallibility: retrieval can miss, the model can
