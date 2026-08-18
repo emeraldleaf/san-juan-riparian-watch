@@ -199,7 +199,21 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const isQuery = /\/query\/?$/.test(AGENT_URL);
 
   useEffect(() => { tierRef.current = tier; }, [tier]);
-  useEffect(() => { const el = chatRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages]);
+  const prevLenRef = useRef(messages.length);
+  // On a NEW exchange, bring the just-asked question to the top of the panel so the
+  // answer reads from its beginning as it streams — instead of pinning to the bottom
+  // (which forced the reader to scroll up to the start of every answer). During
+  // streaming (token updates keep the message count the same) we leave scroll put.
+  useEffect(() => {
+    const el = chatRef.current;
+    if (!el) return;
+    if (messages.length > prevLenRef.current) {
+      const qs = el.querySelectorAll('.msg.u');
+      const lastQ = qs[qs.length - 1] as HTMLElement | undefined;
+      if (lastQ) el.scrollTop += lastQ.getBoundingClientRect().top - el.getBoundingClientRect().top - 8;
+    }
+    prevLenRef.current = messages.length;
+  }, [messages]);
 
   // Probe the agent + load model tiers. RE-PROBE periodically so a transient
   // backend blip (a brief restart or load spike) auto-recovers the "live" state
