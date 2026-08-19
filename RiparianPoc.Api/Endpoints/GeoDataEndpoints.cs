@@ -586,8 +586,14 @@ public sealed class AreaMetric
     /// <summary>The delineation method used, or <c>n/a</c> when not applicable.</summary>
     public required string Method { get; init; }
 
-    /// <summary>The metric value, or null when nothing intersected the area.</summary>
+    /// <summary>The metric value, or null when the area is uncovered or empty.</summary>
     public double? Value { get; init; }
+
+    /// <summary>
+    /// False when the product does not cover this area (the metric refuses rather
+    /// than reporting a confident 0). Callers should surface the refusal, not a number.
+    /// </summary>
+    public bool Covered { get; init; }
 
     /// <summary>The unit of <see cref="Value"/> (e.g. <c>percent riparian</c>).</summary>
     public required string Unit { get; init; }

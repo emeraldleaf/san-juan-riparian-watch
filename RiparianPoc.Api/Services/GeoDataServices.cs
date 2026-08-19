@@ -476,6 +476,12 @@ public sealed class SpatialQueryService : ISpatialQueryService
 public sealed class AgentQueryService : IAgentQueryService
 {
     private const double SquareMetersPerAcre = 4046.86;
+    // A river/reach line is buffered this far each side to form the corridor a
+    // percent-riparian answer is computed over.
+    private const double CorridorMeters = 100.0;
+    // If the nearest extent cell is farther than this, the area is outside the
+    // modeled region — the metric refuses rather than reporting a confident 0%.
+    private const double CoverageRadiusMeters = 1500.0;
     private static readonly ActivitySource Source = new("RiparianPoc.Api.AgentQuery");
     private static readonly HashSet<string> Methods =
         new(StringComparer.Ordinal) { "rf", "olmoearth" };
@@ -523,15 +529,34 @@ public sealed class AgentQueryService : IAgentQueryService
                 $"Method must be one of rf, olmoearth; got '{method}'", nameof(method));
         }
 
+        // A river/reach resolves to a LINE; percent-riparian needs an AREA, so a line
+        // or point is buffered into a corridor (polygons — HUCs — pass through). The
+        // nearest-cell distance is the coverage signal: the extent product covers the
+        // San Juan mainstem and select arroyos, not the whole basin, so an area with no
+        // cell nearby is outside the modeled region — and must say so, not assert 0%.
         const string sql = """
-            WITH aoi AS (
-                SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4269) AS g
+            WITH input AS (
+                SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4269) AS g0
+            ),
+            aoi AS (
+                SELECT CASE
+                    WHEN GeometryType(g0) IN
+                        ('LINESTRING', 'MULTILINESTRING', 'POINT', 'MULTIPOINT')
+                    THEN ST_Buffer(g0::geography, @corridorMeters)::geometry
+                    ELSE g0
+                END AS g
+                FROM input
             )
             SELECT
                 ST_Area(aoi.g::geography) AS area_sq_m,
                 COALESCE(SUM(
                     ST_Area(ST_Intersection(e.geom, aoi.g)::geography)
-                ), 0) AS riparian_sq_m
+                ), 0) AS riparian_sq_m,
+                (SELECT ST_Distance(aoi.g::geography, n.geom::geography)
+                 FROM silver.riparian_extent n
+                 WHERE n.method = @method AND n.is_riparian
+                 ORDER BY aoi.g <-> n.geom
+                 LIMIT 1) AS nearest_cell_m
             FROM aoi
             LEFT JOIN silver.riparian_extent e
                 ON e.method = @method
@@ -541,8 +566,31 @@ public sealed class AgentQueryService : IAgentQueryService
             GROUP BY aoi.g
             """;
 
-        var rows = await _repository.QueryAsync<AreaRow>(sql, new { geoJson, method }, ct);
+        var rows = await _repository.QueryAsync<AreaRow>(
+            sql, new { geoJson, method, corridorMeters = CorridorMeters }, ct);
         var row = rows.Count > 0 ? rows[0] : new AreaRow();
+        var provenance = $"silver.riparian_extent (method={method})";
+
+        // Coverage guard: refuse a confident number where the product does not reach.
+        if (row.NearestCellM is null || row.NearestCellM > CoverageRadiusMeters)
+        {
+            var detail = row.NearestCellM is null
+                ? $"no '{method}' riparian extent exists yet"
+                : $"outside the modeled region — nearest extent is "
+                  + $"{Math.Round(row.NearestCellM.Value)} m away (> {CoverageRadiusMeters:0} m); "
+                  + "the product does not cover this area";
+            return new AreaMetric
+            {
+                Metric = "extent",
+                Method = method,
+                Value = null,
+                Unit = "percent riparian",
+                Covered = false,
+                Provenance = provenance,
+                Detail = detail,
+            };
+        }
+
         var areaAcres = (row.AreaSqM ?? 0) / SquareMetersPerAcre;
         var riparianAcres = (row.RiparianSqM ?? 0) / SquareMetersPerAcre;
         var sharePct = areaAcres > 0 ? Math.Round(riparianAcres / areaAcres * 100, 1) : 0;
@@ -553,7 +601,8 @@ public sealed class AgentQueryService : IAgentQueryService
             Method = method,
             Value = sharePct,
             Unit = "percent riparian",
-            Provenance = $"silver.riparian_extent (method={method})",
+            Covered = true,
+            Provenance = provenance,
             Detail =
                 $"{Math.Round(riparianAcres, 1)} riparian acres of {Math.Round(areaAcres, 1)} acres",
         };
@@ -590,6 +639,7 @@ public sealed class AgentQueryService : IAgentQueryService
             Method = "n/a",
             Value = mean,
             Unit = "composite score (0-100)",
+            Covered = row.ScoredBuffers > 0,
             Provenance = "gold.buffer_health_score",
             Detail = $"across {row.ScoredBuffers} scored buffer(s)",
         };
@@ -601,6 +651,7 @@ public sealed class AreaRow
 {
     public double? AreaSqM { get; init; }
     public double? RiparianSqM { get; init; }
+    public double? NearestCellM { get; init; }
     public double? MeanComposite { get; init; }
     public long ScoredBuffers { get; init; }
 }
