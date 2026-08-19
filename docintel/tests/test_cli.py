@@ -8,9 +8,13 @@ inputs. ``resolve`` is exercised against a fake ``SpatialBackend`` (no DB); the
 
 from __future__ import annotations
 
+import json
+import urllib.request
+from typing import Self
+
 import pytest
 
-from docintel.cli import CliError, build_map_action, resolve_place
+from docintel.cli import CliError, build_map_action, query_area, resolve_place
 from docintel.geo.models import GeoCandidate, MentionType, ResolvedKind
 from docintel.geo.resolver import GeoResolver
 
@@ -138,3 +142,54 @@ def test_map_layer_toggle() -> None:
 def test_map_rejects_malformed_calls(call) -> None:
     with pytest.raises(CliError):
         call()
+
+
+# --- area -----------------------------------------------------------------
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_area_posts_typed_request_and_returns_provenance(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_urlopen(request, timeout=0):
+        captured["url"] = request.full_url
+        captured["method"] = request.get_method()
+        captured["body"] = json.loads(request.data)
+        return _FakeResponse(
+            b'{"metric":"extent","value":12.3,"unit":"percent riparian",'
+            b'"provenance":"silver.riparian_extent (method=rf)"}'
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    geom = {"type": "Point", "coordinates": [-108.2, 36.73]}
+
+    out = query_area("extent", geom, api_url="http://api:8000/", method="rf")
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "http://api:8000/api/agent/area"
+    assert captured["body"] == {"metric": "extent", "method": "rf", "geometry": geom}
+    assert out["value"] == pytest.approx(12.3)
+    assert "riparian_extent" in out["provenance"]
+
+
+def test_area_rejects_unknown_metric_before_any_request(monkeypatch) -> None:
+    def explode(*_args, **_kwargs):  # pragma: no cover - must never be called
+        raise AssertionError("no HTTP request should be made for a bad metric")
+
+    monkeypatch.setattr(urllib.request, "urlopen", explode)
+
+    with pytest.raises(CliError):
+        query_area("invasive-share", {"type": "Point", "coordinates": [0, 0]}, api_url="http://x")

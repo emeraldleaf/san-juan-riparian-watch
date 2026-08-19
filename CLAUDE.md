@@ -223,7 +223,7 @@ Data flows one direction: bronze → silver → gold. **Never write back upstrea
 ### Services and How They Connect
 - **Aspire AppHost** orchestrates all services with automatic service discovery
 - **PostgreSQL + PostGIS** is the shared data store (connection strings injected by Aspire)
-- **C# API** reads from all three schemas, returns GeoJSON via NetTopologySuite + MVT tiles (29 routes)
+- **C# API** reads from all three schemas, returns GeoJSON via NetTopologySuite + MVT tiles (30 routes)
 - **Python ETL** writes to bronze, silver, and gold (concurrent bronze + silver processing)
 - **React frontend** calls the C# API, renders on a MapLibre GL map (MVT vector tiles) with timelapse slider
 - External data (Python ETL, all free / no API key): **Microsoft Planetary Computer** (Sentinel-2,
@@ -231,11 +231,12 @@ Data flows one direction: bronze → silver → gold. **Never write back upstrea
   Access** (SSURGO soils + hydric ratings), **LANDFIRE LF250 ImageServer** (EVT/EVH), **MRLC
   NLCD ImageServer** (land cover).
 
-### API Endpoints (29 routes)
+### API Endpoints (30 routes)
 **GeoJSON** routes below, plus **9 MVT tile routes** — `/api/tiles/{z}/{x}/{y}.pbf` (buffers) and
 `/api/tiles/{streams|parcels|wetlands|soils|vegetation|centroids|buffers-ndvi[/{date}]}/{z}/{x}/{y}.pbf`.
 Every tile route goes through `MvtTileSql.Build` — one canonical shape, so the index-backed bbox
-pre-filter cannot drift per-layer. Also `GET /api/riparian/extent`.
+pre-filter cannot drift per-layer. Also `GET /api/riparian/extent` and
+`POST /api/agent/area` (the map agent's aggregate metric for a resolved geometry, `IAgentQueryService`).
 - `GET /api/streams` — stream centerlines from bronze (GeoJSON)
 - `GET /api/buffers` — riparian buffer polygons from silver (GeoJSON)
 - `GET /api/buffers/health` — buffers with latest NDVI health (LEFT JOIN LATERAL to vegetation_health)

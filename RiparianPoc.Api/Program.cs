@@ -18,13 +18,15 @@ builder.AddNpgsqlDataSource("ripariandb");
 builder.Services.AddScoped<IPostGisRepository, PostGisRepository>();
 builder.Services.AddScoped<ISpatialQueryService, SpatialQueryService>();
 builder.Services.AddScoped<IComplianceDataService, ComplianceDataService>();
+builder.Services.AddScoped<IAgentQueryService, AgentQueryService>();
 
 // Register custom ActivitySources for OpenTelemetry tracing
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing
         .AddSource("RiparianPoc.Api.Repository")
         .AddSource("RiparianPoc.Api.SpatialQuery")
-        .AddSource("RiparianPoc.Api.ComplianceData"));
+        .AddSource("RiparianPoc.Api.ComplianceData")
+        .AddSource("RiparianPoc.Api.AgentQuery"));
 
 // Configure GeoJSON serialization via NetTopologySuite
 builder.Services.ConfigureHttpJsonOptions(options =>

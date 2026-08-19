@@ -7,10 +7,11 @@ and is unit-testable with the agent absent.
 
 Phase 1 commands:
   resolve <place>   free-form place -> typed geometry (resolve, don't guess)
+  area --metric ... an aggregate metric for a geometry, with provenance
   map <action>      one deterministic frontend map action (a story:map event)
 
-`area` / `find` — metric queries against the C# spatial API — land in the next
-increment, once the aggregate endpoint exists (see the spec's Phasing section).
+`find` — feature filters against the C# spatial API — is the next increment (see
+the spec's Phasing section).
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ import json
 import logging
 import os
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 
 from docintel.geo.models import GeoCandidate, GeoMention, MentionType
@@ -28,6 +31,9 @@ from docintel.geo.resolver import GeoResolver
 logger = logging.getLogger("riparian_cli")
 
 _MAP_ACTIONS = ("fly-to", "highlight", "layer")
+_AREA_METRICS = ("extent", "health-grade")
+_METHODS = ("rf", "olmoearth")
+_DEFAULT_API_URL = "http://localhost:8000"
 
 
 class CliError(Exception):
@@ -84,6 +90,45 @@ def resolve_place(
         "chosen": _candidate_dict(result.chosen, geometry=True) if result.chosen else None,
         "candidates": [_candidate_dict(c, geometry=False) for c in result.candidates],
     }
+
+
+# --- area -----------------------------------------------------------------
+
+
+def query_area(
+    metric: str,
+    geometry: dict[str, Any],
+    *,
+    api_url: str,
+    method: str = "rf",
+) -> dict[str, Any]:
+    """Query an aggregate metric for a geometry from the C# spatial API.
+
+    The geometry is one the agent resolved via ``resolve``; the API returns the
+    value with its provenance (the schema it came from) so the answer can cite it.
+
+    Raises:
+        CliError: on an unknown metric, or when the API is unreachable / errors.
+    """
+    if metric not in _AREA_METRICS:
+        raise CliError(f"unknown --metric {metric!r}; choose {_AREA_METRICS}")
+    endpoint = f"{api_url.rstrip('/')}/api/agent/area"
+    payload = json.dumps(
+        {"metric": metric, "method": method, "geometry": geometry}
+    ).encode()
+    request = urllib.request.Request(
+        endpoint,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        raise CliError(f"spatial API returned {exc.code} at {endpoint}") from exc
+    except urllib.error.URLError as exc:
+        raise CliError(f"spatial API unreachable at {endpoint}: {exc.reason}") from exc
 
 
 # --- map ------------------------------------------------------------------
@@ -158,6 +203,15 @@ def _run_resolve(args: argparse.Namespace) -> dict[str, Any]:
     return resolve_place(build_resolver(), args.place, MentionType(args.type))
 
 
+def _run_area(args: argparse.Namespace) -> dict[str, Any]:
+    return query_area(
+        args.metric,
+        _load_geojson(args.geojson),
+        api_url=args.api_url,
+        method=args.method,
+    )
+
+
 def _run_map(args: argparse.Namespace) -> dict[str, Any]:
     return build_map_action(
         args.action,
@@ -182,6 +236,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="the extractor's coarse type guess for the mention",
     )
     p_resolve.set_defaults(func=_run_resolve)
+
+    p_area = sub.add_parser("area", help="an aggregate metric for a geometry")
+    p_area.add_argument("--metric", required=True, choices=_AREA_METRICS)
+    p_area.add_argument(
+        "--geojson", required=True, help="geometry file path, or - for stdin"
+    )
+    p_area.add_argument("--method", default="rf", choices=_METHODS)
+    p_area.add_argument(
+        "--api-url",
+        default=os.environ.get("RIPARIAN_API_URL", _DEFAULT_API_URL),
+        help="C# spatial API base URL",
+    )
+    p_area.set_defaults(func=_run_area)
 
     p_map = sub.add_parser("map", help="emit one story:map frontend action")
     p_map.add_argument("action", choices=_MAP_ACTIONS)

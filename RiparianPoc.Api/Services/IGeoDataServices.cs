@@ -80,6 +80,25 @@ public interface ISpatialQueryService
 }
 
 /// <summary>
+/// Aggregate spatial metrics for an arbitrary area — the map agent's read side.
+/// The area arrives as a GeoJSON geometry (EPSG:4269) already resolved upstream by
+/// the deterministic geo-resolver; this service never accepts free-form place text.
+/// </summary>
+public interface IAgentQueryService
+{
+    /// <summary>
+    /// Computes an aggregate <paramref name="metric"/> for a GeoJSON geometry.
+    /// </summary>
+    /// <param name="metric"><c>extent</c> (percent riparian) or <c>health-grade</c>
+    /// (mean composite score of intersecting buffers).</param>
+    /// <param name="geometryGeoJson">A GeoJSON geometry string in EPSG:4269.</param>
+    /// <param name="method">Delineation method for <c>extent</c>: <c>rf</c> or <c>olmoearth</c>.</param>
+    /// <returns>The metric value with its unit and the schema it came from (provenance).</returns>
+    Task<AreaMetric> GetAreaMetricAsync(
+        string metric, string geometryGeoJson, string method, CancellationToken ct);
+}
+
+/// <summary>
 /// Provides non-spatial compliance and vegetation data queries.
 /// </summary>
 public interface IComplianceDataService
