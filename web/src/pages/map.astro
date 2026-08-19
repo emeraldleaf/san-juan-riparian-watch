@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+import MapAgent from '../components/MapAgent.tsx';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import '../styles/hub.css';
+import '../styles/map-agent.css';
+---
+<Base
+  title="Ask the map"
+  description="A conversational map agent for the San Juan basin: ask about riparian extent in plain language, get cited answers while the map moves — and honest refusals where the data doesn't reach."
+>
+  <div class="topbar"><div class="wrap">
+    <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
+    <a class="back" href="/">← back to the story</a>
+  </div></div>
+
+  <div class="ma-layout">
+    <div id="map-agent-map" class="ma-map"></div>
+    <aside class="ma-panel">
+      <div class="ma-head">
+        <div class="eyebrow">// ask-the-map · Quartzose map agent</div>
+        <h1>Ask the map</h1>
+        <p class="ma-lede">A second agent on the platform — it resolves a place to real geometry,
+          queries the basin's own data, and refuses where the product doesn't reach. It never
+          guesses a location or a number.</p>
+      </div>
+      <MapAgent client:load />
+    </aside>
+  </div>
+
+  <script>import '../scripts/map-agent-client.ts';</script>
+</Base>
