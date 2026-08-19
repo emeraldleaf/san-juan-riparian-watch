@@ -72,6 +72,11 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Decision records
 
+- [The conversational map agent — one loop core, two policies](decisions/2026-08-18-map-agent-runtime.md)
+  — a **second agent** on the platform without forking the runtime: factor the tool loop into a generic
+  **core** and a per-agent **policy** (soul, registry, seed, empty-fallback, citation). The document
+  path stays byte-identical (defaults); its tests are the gate. Read-only tools and "resolve, don't
+  guess" hold across both. Includes the [runtime diagram](map-agent-runtime.svg).
 - [Train the beetle model on the ecoregion-matched Colorado Plateau](decisions/2026-07-12-beetle-training-pool-ecoregion-matched.md)
   — **zero defoliated points fall inside the San Juan.** The beetle's 2017 impact was ecoregionally
   split (Escalante 21.6% live tamarisk; Arizona **87%** live), so training defoliation on the lower
