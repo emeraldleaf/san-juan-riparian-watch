@@ -12,6 +12,7 @@ type Msg = {
   text: string;
   streaming?: boolean;
   html?: string; // final rendered markdown
+  standalone?: string; // for a follow-up: the query the agent resolved it to, using prior turns
   citations?: Cite[];
   geoms?: Geom[];
   offline?: boolean;
@@ -210,7 +211,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (messages.length > prevLenRef.current) {
       const qs = el.querySelectorAll('.msg.u');
       const lastQ = qs[qs.length - 1] as HTMLElement | undefined;
-      if (lastQ) el.scrollTop += lastQ.getBoundingClientRect().top - el.getBoundingClientRect().top - 8;
+      if (lastQ) el.scrollTo({ top: el.scrollTop + lastQ.getBoundingClientRect().top - el.getBoundingClientRect().top - 8, behavior: 'smooth' });
     }
     prevLenRef.current = messages.length;
   }, [messages]);
@@ -257,7 +258,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const shownGeoms = (geoms || []).filter((g) => g?.geom);
     setMessages((m) => {
       const copy = m.slice();
-      copy[copy.length - 1] = { role: 'assistant', text: clean, html: mdToHtml(clean || ''), citations, geoms: shownGeoms };
+      copy[copy.length - 1] = { ...copy[copy.length - 1], role: 'assistant', text: clean, html: mdToHtml(clean || ''), citations, geoms: shownGeoms, streaming: false };
       return copy;
     });
     // A resolved geometry highlights the corridor map. Only fall back to
@@ -270,7 +271,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     }
   }, []);
 
-  const askLiveStream = useCallback(async (q: string, onToken: (partial: string) => void) => {
+  const askLiveStream = useCallback(async (q: string, onToken: (partial: string) => void, onRewrite?: (s: string) => void) => {
     const url = AGENT_URL.replace(/\/query\/?$/, '/query/stream');
     // Abort a stream that goes silent (no data for 30s) so the UI can't hang;
     // the timer resets on every chunk, so a long-but-active answer is fine.
@@ -291,6 +292,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
           block.split('\n').forEach((ln) => { if (ln.indexOf('event:') === 0) ev = ln.slice(6).trim(); else if (ln.indexOf('data:') === 0) data += ln.slice(5).trim(); });
           if (!data) continue; let d: any; try { d = JSON.parse(data); } catch { continue; }
           if (ev === 'token' && d.token) { full += d.token; onToken(full); }
+          else if (ev === 'rewrite' && d.standalone && onRewrite) { onRewrite(d.standalone); }
           else if (ev === 'context') { if (Array.isArray(d)) ctx.push(...d); else if (d?.contexts) ctx.push(...d.contexts); else if (d) ctx.push(d); }
           else if (ev === 'done') { if (d.session_id) sessionRef.current = d.session_id; }
           else if (ev === 'error' || ev === 'security') throw new Error(d.error || 'blocked');
@@ -331,8 +333,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
       setTimeout(() => { finalize(fallbackAnswer(text), [], []); setBusy(false); }, 200);
       return;
     }
-    const onToken = (partial: string) => setMessages((m) => { const c = m.slice(); c[c.length - 1] = { role: 'assistant', text: stripSources(partial), streaming: true }; return c; });
-    const run = isQuery ? askLiveStream(text, onToken) : askLive(text).then((res: any) => ({ answer: res.answer, citations: res.citations, geoms: res.resolved_geometries }));
+    let standalone: string | undefined;
+    const onToken = (partial: string) => setMessages((m) => { const c = m.slice(); c[c.length - 1] = { role: 'assistant', text: stripSources(partial), streaming: true, standalone }; return c; });
+    const onRewrite = (s: string) => { standalone = s; setMessages((m) => { const c = m.slice(); c[c.length - 1] = { ...c[c.length - 1], standalone: s }; return c; }); };
+    const run = isQuery ? askLiveStream(text, onToken, onRewrite) : askLive(text).then((res: any) => ({ answer: res.answer, citations: res.citations, geoms: res.resolved_geometries }));
     run.then((res: any) => finalize(res.answer || '(no answer returned)', res.citations || [], res.geoms || []))
       .catch(() => { finalize(fallbackAnswer(text) + '\n\n(the live agent was unreachable just now, that was a pre-written answer.)', [], []); setLive(false); })
       .finally(() => setBusy(false));
@@ -395,6 +399,9 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
             {m.role === 'assistant' ? (
               (m.streaming && !m.text) ? '…thinking' : (
                 <>
+                  {m.standalone && (
+                    <div className="rewrite" title="A follow-up — resolved using the conversation so far">↳ {m.standalone}</div>
+                  )}
                   {/* Render markdown LIVE while streaming: m.html is set only at
                       finalize, so until then parse the partial each tick so bold,
                       lists, tables and links appear as they arrive, not all at once. */}
