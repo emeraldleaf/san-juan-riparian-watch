@@ -209,6 +209,13 @@
   @keyframes glow{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 0%,transparent);}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 14%,transparent);}}
   .msg.think{color:var(--muted);animation:glow 1.8s ease-in-out infinite;}
   @media (prefers-reduced-motion:reduce){.msg.think{animation:none;}}
+  /* streaming cursor — a clear "it's writing" cue without yanking the scroll to the bottom */
+  .msg.a.streaming .md::after{content:"";display:inline-block;width:7px;height:1.05em;margin-left:3px;transform:translateY(2px);
+    background:var(--accent);border-radius:1px;animation:cursorblink 1.05s steps(2,start) infinite;}
+  @keyframes cursorblink{50%{opacity:0;}}
+  @media (prefers-reduced-motion:reduce){.msg.a.streaming .md::after{animation:none;}}
+  /* a follow-up, resolved to a standalone query using the conversation so far */
+  .msg.a .rewrite{font-size:12px;color:var(--muted);margin:0 0 6px;padding-left:2px;font-style:italic;opacity:.85;}
   /* rendered markdown inside an answer bubble */
   .msg .md{white-space:normal;}
   .msg .md>:first-child{margin-top:0;} .msg .md>:last-child{margin-bottom:0;}
