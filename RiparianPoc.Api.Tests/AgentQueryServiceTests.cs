@@ -67,8 +67,11 @@ public sealed class AgentQueryServiceTests
     [Fact]
     public async Task GetAreaMetricAsync_Extent_ComputesSharePercentAndProvenance()
     {
-        IReadOnlyList<AreaRow> rows =
-            new List<AreaRow> { new() { AreaSqM = 404686.0, RiparianSqM = 40468.6 } };
+        // A cell right in the corridor (nearest = 0) → covered, share computed.
+        IReadOnlyList<AreaRow> rows = new List<AreaRow>
+        {
+            new() { AreaSqM = 404686.0, RiparianSqM = 40468.6, NearestCellM = 0.0 },
+        };
         _repo.QueryAsync<AreaRow>(
                 Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
             .Returns(rows);
@@ -77,6 +80,7 @@ public sealed class AgentQueryServiceTests
             "extent", Geom, "rf", CancellationToken.None);
 
         Assert.Equal("extent", result.Metric);
+        Assert.True(result.Covered);
         Assert.Equal(10.0, result.Value!.Value, 3); // 10 riparian acres / 100 acres
         Assert.Equal("percent riparian", result.Unit);
         Assert.Contains("riparian_extent", result.Provenance);
@@ -84,8 +88,30 @@ public sealed class AgentQueryServiceTests
     }
 
     [Fact]
-    public async Task GetAreaMetricAsync_Extent_EmptyResult_IsZeroNotError()
+    public async Task GetAreaMetricAsync_Extent_FarFromAnyCell_RefusesInsteadOfZero()
     {
+        // The Animas case: nearest extent cell ~3 km away → outside the modeled
+        // region → Covered=false, not a confident 0%.
+        IReadOnlyList<AreaRow> rows = new List<AreaRow>
+        {
+            new() { AreaSqM = 500000.0, RiparianSqM = 0.0, NearestCellM = 2947.0 },
+        };
+        _repo.QueryAsync<AreaRow>(
+                Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
+            .Returns(rows);
+
+        var result = await CreateSut().GetAreaMetricAsync(
+            "extent", Geom, "rf", CancellationToken.None);
+
+        Assert.False(result.Covered);
+        Assert.Null(result.Value);
+        Assert.Contains("does not cover", result.Detail);
+    }
+
+    [Fact]
+    public async Task GetAreaMetricAsync_Extent_NoCellsAtAll_RefusesAsUnmodeled()
+    {
+        // No rows (null nearest) → the method has no extent → refuse, don't zero.
         _repo.QueryAsync<AreaRow>(
                 Arg.Any<string>(), Arg.Any<object?>(), Arg.Any<CancellationToken>())
             .Returns(new List<AreaRow>());
@@ -93,7 +119,8 @@ public sealed class AgentQueryServiceTests
         var result = await CreateSut().GetAreaMetricAsync(
             "extent", Geom, "olmoearth", CancellationToken.None);
 
-        Assert.Equal(0.0, result.Value!.Value, 3);
+        Assert.False(result.Covered);
+        Assert.Null(result.Value);
         Assert.Equal("olmoearth", result.Method);
     }
 
@@ -110,6 +137,7 @@ public sealed class AgentQueryServiceTests
             "health-grade", Geom, "rf", CancellationToken.None);
 
         Assert.Equal("health-grade", result.Metric);
+        Assert.True(result.Covered); // 5 scored buffers present
         Assert.Equal(72.3, result.Value!.Value, 3); // rounded to 1 dp
         Assert.Contains("buffer_health_score", result.Provenance);
     }
