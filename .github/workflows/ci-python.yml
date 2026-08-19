@@ -7,6 +7,7 @@ on:
     paths:
       - 'python-etl/**'
       - 'experiments/**'
+      - 'docintel/**'
       - '.github/workflows/ci-python.yml'
 
 permissions:
@@ -57,12 +58,24 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: ruff check experiments
 
+      - name: Ruff (lint) — map-agent CLI (docintel)
+        # docintel/ (geo resolver + riparian-cli) is a repo-root package, so it lints
+        # from the workspace root like experiments — same pinned ruff, no config.
+        working-directory: ${{ github.workspace }}
+        run: ruff check docintel
+
       - name: Mypy (type-check) — advisory
         continue-on-error: true
         run: mypy riparian --ignore-missing-imports --no-error-summary
 
       - name: Pytest (unit tests; skip live) — gate
         run: pytest -m "not live"
+
+      - name: Pytest — map-agent CLI (docintel) — gate
+        # Runs from the repo root: docintel is a root-level package the CLI wraps.
+        # The typed tool layer is tested with the agent absent (fake SpatialBackend).
+        working-directory: ${{ github.workspace }}
+        run: pytest docintel
 
   postgis:
     name: Live PostGIS (the SQL actually executes)
