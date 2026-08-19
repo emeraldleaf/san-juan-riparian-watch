@@ -16,6 +16,34 @@ The stack is a STAC Earth-observation ETL, a PostGIS spatial database, a Python 
 (a RandomForest baseline measured head-to-head against the **OlmoEarth** foundation model),
 a .NET Aspire-orchestrated C# REST API, and a React + MapLibre map frontend.
 
+## Three things this is
+
+Four disciplines — environmental science, remote sensing / GIS, ML, and software engineering —
+that reduce to three things a reader can check, each with a link to the detail:
+
+**1 · A document-intelligence platform ([Quartzose](docs/about-the-agent.md)).** Ingest + extract
+(PDF, table-aware) → hybrid retrieval (dense + BM25 + cross-encoder rerank) → corrective grading
+(CRAG) → grounded, **cited** answers → **evaluation** (retrieval hit@k, routing accuracy, an LLM
+judge). Built first for SEC filings and contracts, then **re-domained — config-driven — to
+environmental science**. Same engine, two unrelated corpora: a platform, not an app.
+
+**2 · A live agent, operated in production.** [Ask it anything →](https://riparian.emeraldleaf.dev)
+— answers stream and cite their sources. Running it for real surfaces real incidents: a
+generation-latency outage traced (wrong three times, before the logs came back) to an OpenRouter
+provider "speed lottery," fixed with concurrency backpressure + routing to fast inference —
+**137-second answers down to ~4**. The two [worked engineering lessons](docs/about-the-agent.md) are
+the point: understand the system, keep it healthy, find the problems before users do.
+
+**3 · Honest Earth-observation science.** A Random Forest field-tested against Ai2's **OlmoEarth**
+foundation model, leave-one-reach-out over four morphologically-diverse reaches. They **tie on the
+river reaches**; the FM **rescues the one morphology the RF was blind to** — a desert arroyo
+(**AUROC 0.557 → 0.889**). Reported as a *[provisional GO](docs/STATUS.md)*: the point estimate
+clears the pre-registered bar, the significance test is still to run. Honest negatives stay in —
+enforced by [mechanical drift gates](docs/method.md).
+
+**The through-line:** turn raw data — documents *or* imagery — into grounded, cited, evaluated
+intelligence for people who aren't ML experts, and keep it healthy in production.
+
 > ### How this is built is part of the contribution
 >
 > **[The method](docs/method.md)** — AI-assisted research that catches its own errors. The dangerous
