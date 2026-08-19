@@ -9,7 +9,7 @@ type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; c
 const EXAMPLES = [
   'How much of the San Juan River corridor is riparian?',
   'How much of the Animas River is riparian?',
-  'Show me the riparian extent near Kirtland.',
+  'How much of Malpais Arroyo is riparian?',
 ];
 
 export default function MapAgent() {
