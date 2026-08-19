@@ -177,6 +177,7 @@ That is what this project is for — and their recommendation is, in effect, its
   The CPU RF arm ([`phase3c_invasives_beetle.py`](../experiments/riparian_extent/phase3c_invasives_beetle.py))
   is scaffolded and GPU-free — the highest information-per-dollar next move.
 - [Document intelligence (RAG)](specs/2026-07-04-document-intelligence-rag.md)
+- [**Conversational map agent**](specs/2026-08-18-conversational-map-agent.md) — a Shippy-shaped analysis agent: ask the map in plain language, get cited answers while it moves. *Resolve, don't guess* — a typed CLI, isolated sessions, and whole-agent rubric evals.
 
 ## Results
 
