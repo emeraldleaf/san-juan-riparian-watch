@@ -1,0 +1,65 @@
+/* "Ask the map" — split layout: map on the left, the agent panel on the right. */
+.ma-layout {
+  display: grid;
+  grid-template-columns: 1fr min(440px, 40vw);
+  height: calc(100vh - 52px);
+  min-height: 520px;
+}
+.ma-map { height: 100%; width: 100%; }
+
+.ma-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line, #e5e7eb);
+  background: var(--bg, #fff);
+}
+.ma-head { padding: 20px 22px 12px; border-bottom: 1px solid var(--line, #e5e7eb); }
+.ma-head .eyebrow { font: 600 11px/1.4 ui-monospace, monospace; letter-spacing: 0.04em; color: #2563eb; }
+.ma-head h1 { margin: 6px 0 8px; font-size: 22px; }
+.ma-lede { margin: 0; font-size: 13px; color: var(--muted, #64748b); line-height: 1.5; }
+
+.ma { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ma-log { flex: 1; overflow-y: auto; padding: 14px 22px; }
+
+.ma-intro p { font-size: 13.5px; color: var(--muted, #475569); line-height: 1.55; margin: 4px 0 14px; }
+.ma-examples { display: flex; flex-direction: column; gap: 8px; }
+.ma-chip {
+  text-align: left; padding: 9px 12px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line, #e5e7eb); border-radius: 10px;
+  background: transparent; color: inherit; transition: border-color .15s;
+}
+.ma-chip:hover { border-color: #2563eb; }
+
+.ma-msg { margin: 12px 0; max-width: 100%; }
+.ma-msg.user { text-align: right; }
+.ma-msg.user .ma-text {
+  display: inline-block; background: #2563eb; color: #fff;
+  padding: 8px 13px; border-radius: 13px 13px 3px 13px; font-size: 14px; text-align: left;
+}
+.ma-msg.agent .ma-text {
+  background: var(--card, #f1f5f9); padding: 9px 13px;
+  border-radius: 13px 13px 13px 3px; font-size: 14px; line-height: 1.5;
+}
+.ma-steps { font: 11px/1.4 ui-monospace, monospace; color: #94a3b8; margin-bottom: 4px; }
+.ma-cite { font: 11px/1.4 ui-monospace, monospace; color: #64748b; margin-top: 5px; }
+.ma-busy { color: var(--muted, #64748b); font-style: italic; }
+
+.ma-form { display: flex; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--line, #e5e7eb); }
+.ma-form input {
+  flex: 1; padding: 10px 13px; font-size: 14px;
+  border: 1px solid var(--line, #e5e7eb); border-radius: 10px;
+  background: var(--bg, #fff); color: inherit;
+}
+.ma-form input:focus { outline: none; border-color: #2563eb; }
+.ma-form button {
+  padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  background: #2563eb; color: #fff; border: none; border-radius: 10px;
+}
+.ma-form button:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 820px) {
+  .ma-layout { grid-template-columns: 1fr; grid-template-rows: 44vh auto; height: auto; }
+  .ma-map { min-height: 300px; }
+  .ma-panel { border-left: none; border-top: 1px solid var(--line, #e5e7eb); }
+}
