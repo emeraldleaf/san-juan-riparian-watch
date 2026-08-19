@@ -468,6 +468,143 @@ public sealed class SpatialQueryService : ISpatialQueryService
 /// Provides non-spatial compliance data queries by delegating to <see cref="IPostGisRepository"/>.
 /// Owns all SQL for vegetation health and compliance summary endpoints.
 /// </summary>
+/// <summary>
+/// Computes aggregate area metrics for the map agent by delegating parameterized
+/// spatial SQL to <see cref="IPostGisRepository"/>. The geometry is always a bound
+/// parameter fed to <c>ST_GeomFromGeoJSON</c> — never string-interpolated.
+/// </summary>
+public sealed class AgentQueryService : IAgentQueryService
+{
+    private const double SquareMetersPerAcre = 4046.86;
+    private static readonly ActivitySource Source = new("RiparianPoc.Api.AgentQuery");
+    private static readonly HashSet<string> Methods =
+        new(StringComparer.Ordinal) { "rf", "olmoearth" };
+
+    private readonly IPostGisRepository _repository;
+    private readonly ILogger<AgentQueryService> _logger;
+
+    public AgentQueryService(
+        IPostGisRepository repository, ILogger<AgentQueryService> logger)
+    {
+        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <inheritdoc />
+    public async Task<AreaMetric> GetAreaMetricAsync(
+        string metric, string geometryGeoJson, string method, CancellationToken ct)
+    {
+        using var activity = Source.StartActivity("AgentQuery.GetAreaMetric");
+        activity?.SetTag("metric", metric);
+        activity?.SetTag("method", method);
+
+        if (string.IsNullOrWhiteSpace(geometryGeoJson))
+        {
+            throw new ArgumentException("Geometry is required", nameof(geometryGeoJson));
+        }
+
+        _logger.LogInformation("Computing area metric {Metric} (method {Method})", metric, method);
+
+        return metric switch
+        {
+            "extent" => await ExtentAsync(geometryGeoJson, method, ct),
+            "health-grade" => await HealthGradeAsync(geometryGeoJson, ct),
+            _ => throw new ArgumentException(
+                $"Unknown metric '{metric}'; supported: extent, health-grade", nameof(metric)),
+        };
+    }
+
+    private async Task<AreaMetric> ExtentAsync(
+        string geoJson, string method, CancellationToken ct)
+    {
+        if (!Methods.Contains(method))
+        {
+            throw new ArgumentException(
+                $"Method must be one of rf, olmoearth; got '{method}'", nameof(method));
+        }
+
+        const string sql = """
+            WITH aoi AS (
+                SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4269) AS g
+            )
+            SELECT
+                ST_Area(aoi.g::geography) AS area_sq_m,
+                COALESCE(SUM(
+                    ST_Area(ST_Intersection(e.geom, aoi.g)::geography)
+                ), 0) AS riparian_sq_m
+            FROM aoi
+            LEFT JOIN silver.riparian_extent e
+                ON e.method = @method
+               AND e.is_riparian
+               AND e.geom && aoi.g
+               AND ST_Intersects(e.geom, aoi.g)
+            GROUP BY aoi.g
+            """;
+
+        var rows = await _repository.QueryAsync<AreaRow>(sql, new { geoJson, method }, ct);
+        var row = rows.Count > 0 ? rows[0] : new AreaRow();
+        var areaAcres = (row.AreaSqM ?? 0) / SquareMetersPerAcre;
+        var riparianAcres = (row.RiparianSqM ?? 0) / SquareMetersPerAcre;
+        var sharePct = areaAcres > 0 ? Math.Round(riparianAcres / areaAcres * 100, 1) : 0;
+
+        return new AreaMetric
+        {
+            Metric = "extent",
+            Method = method,
+            Value = sharePct,
+            Unit = "percent riparian",
+            Provenance = $"silver.riparian_extent (method={method})",
+            Detail =
+                $"{Math.Round(riparianAcres, 1)} riparian acres of {Math.Round(areaAcres, 1)} acres",
+        };
+    }
+
+    private async Task<AreaMetric> HealthGradeAsync(string geoJson, CancellationToken ct)
+    {
+        const string sql = """
+            WITH aoi AS (
+                SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4269) AS g
+            )
+            SELECT
+                AVG(s.composite_score)::float8 AS mean_composite,
+                COUNT(s.composite_score) AS scored_buffers
+            FROM aoi
+            JOIN silver.riparian_buffers b
+                ON b.geom && aoi.g AND ST_Intersects(b.geom, aoi.g)
+            LEFT JOIN LATERAL (
+                SELECT composite_score
+                FROM gold.buffer_health_score
+                WHERE buffer_id = b.id
+                ORDER BY scored_at DESC
+                LIMIT 1
+            ) s ON true
+            """;
+
+        var rows = await _repository.QueryAsync<AreaRow>(sql, new { geoJson }, ct);
+        var row = rows.Count > 0 ? rows[0] : new AreaRow();
+        var mean = row.MeanComposite.HasValue ? Math.Round(row.MeanComposite.Value, 1) : (double?)null;
+
+        return new AreaMetric
+        {
+            Metric = "health-grade",
+            Method = "n/a",
+            Value = mean,
+            Unit = "composite score (0-100)",
+            Provenance = "gold.buffer_health_score",
+            Detail = $"across {row.ScoredBuffers} scored buffer(s)",
+        };
+    }
+}
+
+/// <summary>Row shape for the agent's aggregate area queries (Dapper-mapped).</summary>
+public sealed class AreaRow
+{
+    public double? AreaSqM { get; init; }
+    public double? RiparianSqM { get; init; }
+    public double? MeanComposite { get; init; }
+    public long ScoredBuffers { get; init; }
+}
+
 public sealed class ComplianceDataService : IComplianceDataService
 {
     private static readonly ActivitySource Source = new("RiparianPoc.Api.ComplianceData");

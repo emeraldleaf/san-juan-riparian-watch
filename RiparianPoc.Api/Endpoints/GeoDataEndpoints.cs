@@ -1,3 +1,4 @@
+using System.Text.Json;
 using RiparianPoc.Api.Services;
 
 namespace RiparianPoc.Api.Endpoints;
@@ -17,6 +18,7 @@ public static class GeoDataEndpoints
         api.MapGet("/streams", GetStreams).WithName("GetStreams");
         api.MapGet("/buffers", GetBuffers).WithName("GetBuffers");
         api.MapGet("/riparian/extent", GetRiparianExtent).WithName("GetRiparianExtent");
+        api.MapPost("/agent/area", GetAreaMetric).WithName("GetAreaMetric");
         api.MapGet("/buffers/health", GetBuffersWithHealth).WithName("GetBuffersWithHealth");
         api.MapGet("/parcels", GetParcels).WithName("GetParcels");
         api.MapGet("/focus-areas", GetFocusAreas).WithName("GetFocusAreas");
@@ -135,6 +137,24 @@ public static class GeoDataEndpoints
     {
         var readings = await complianceService.GetVegetationByBufferAsync(bufferId, ct);
         return TypedResults.Ok(readings);
+    }
+
+    /// <summary>
+    /// POST /api/agent/area — an aggregate metric (extent | health-grade) for a
+    /// GeoJSON geometry the map agent resolved upstream. The geometry flows to the
+    /// service as a raw JSON string and reaches SQL only as a bound parameter.
+    /// </summary>
+    private static async Task<IResult> GetAreaMetric(
+        AreaMetricRequest request, IAgentQueryService agentService, CancellationToken ct)
+    {
+        if (request.Geometry.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            throw new ArgumentException("Geometry is required", nameof(request));
+        }
+
+        var metric = await agentService.GetAreaMetricAsync(
+            request.Metric, request.Geometry.GetRawText(), request.Method ?? "rf", ct);
+        return TypedResults.Ok(metric);
     }
 
     /// <summary>
@@ -536,4 +556,45 @@ public sealed class BufferCanopy
     public decimal? CanopyCoverPct { get; init; }
     public decimal? HeightStdDev { get; init; }
     public DateTime ProcessedAt { get; init; }
+}
+
+/// <summary>
+/// Request body for POST /api/agent/area. The geometry is a raw GeoJSON object
+/// (EPSG:4269) so it can be forwarded to PostGIS as a bound parameter unchanged.
+/// </summary>
+public sealed class AreaMetricRequest
+{
+    /// <summary>The metric to compute: <c>extent</c> or <c>health-grade</c>.</summary>
+    public string Metric { get; init; } = "";
+
+    /// <summary>A GeoJSON geometry object (EPSG:4269).</summary>
+    public JsonElement Geometry { get; init; }
+
+    /// <summary>Delineation method for <c>extent</c>: <c>rf</c> (default) or <c>olmoearth</c>.</summary>
+    public string? Method { get; init; }
+}
+
+/// <summary>
+/// An aggregate metric computed for an area, carrying its own provenance so the
+/// agent can cite the number to the schema that produced it.
+/// </summary>
+public sealed class AreaMetric
+{
+    /// <summary>The metric name echoed back (<c>extent</c> | <c>health-grade</c>).</summary>
+    public required string Metric { get; init; }
+
+    /// <summary>The delineation method used, or <c>n/a</c> when not applicable.</summary>
+    public required string Method { get; init; }
+
+    /// <summary>The metric value, or null when nothing intersected the area.</summary>
+    public double? Value { get; init; }
+
+    /// <summary>The unit of <see cref="Value"/> (e.g. <c>percent riparian</c>).</summary>
+    public required string Unit { get; init; }
+
+    /// <summary>The schema/table the number came from — the citation.</summary>
+    public required string Provenance { get; init; }
+
+    /// <summary>Human-readable context (acres, buffer counts).</summary>
+    public string? Detail { get; init; }
 }
