@@ -2,20 +2,31 @@
 // renders the cited answer + the tool trace, and hands the resolved geometry to
 // the imperative map (map-agent-client.ts) via a window CustomEvent. Same seam the
 // story maps use: React fetches, the map listens.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[] };
+type Reach = { name: string; reaches: number };
 
-const EXAMPLES = [
-  'How much of the San Juan River corridor is riparian?',
-  'How much of Malpais Arroyo is riparian?',
-  'How much of Yellow Arroyo is riparian?',
+// Fallback if the live /agent/map/coverage list can't be fetched.
+const FALLBACK: Reach[] = [
+  { name: 'San Juan River', reaches: 0 },
+  { name: 'Malpais Arroyo', reaches: 0 },
+  { name: 'Yellow Arroyo', reaches: 0 },
 ];
 
 export default function MapAgent() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const [val, setVal] = useState('');
+  const [reaches, setReaches] = useState<Reach[]>([]);
+
+  // The named reaches the model actually mapped, straight from the data.
+  useEffect(() => {
+    fetch('/agent/map/coverage')
+      .then((r) => (r.ok ? r.json() : { reaches: [] }))
+      .then((d) => setReaches(Array.isArray(d.reaches) ? d.reaches : []))
+      .catch(() => {});
+  }, []);
   const logRef = useRef<HTMLDivElement>(null);
 
   async function ask(q: string) {
@@ -49,14 +60,25 @@ export default function MapAgent() {
         {msgs.length === 0 && (
           <div className="ma-intro">
             <p>
-              This agent has riparian-extent data for the reaches the model mapped — the San Juan
-              mainstem near Farmington and several arroyos. Ask about one and it resolves the place,
-              queries the data, moves the map, and cites the source. Ask about a river it hasn't
-              mapped — like the Animas — and it tells you so, instead of guessing a number.
+              This agent only has riparian-extent data for the reaches the model actually mapped —
+              the ones below. Ask about one and it resolves the place, queries the data, moves the
+              map, and cites the source. Ask about a river it hasn't mapped (like the Animas) and it
+              says so, instead of guessing a number.
             </p>
+            <div className="ma-maplabel">
+              Mapped reaches{reaches.length ? ` (${reaches.length})` : ''} — ask about any:
+            </div>
             <div className="ma-examples">
-              {EXAMPLES.map((e) => (
-                <button key={e} className="ma-chip" onClick={() => ask(e)} type="button">{e}</button>
+              {(reaches.length ? reaches : FALLBACK).map((r) => (
+                <button
+                  key={r.name}
+                  className="ma-chip"
+                  onClick={() => ask(`How much of ${r.name} is riparian?`)}
+                  type="button"
+                >
+                  {r.name}
+                  {r.reaches ? <span className="ma-count"> · {r.reaches} reaches</span> : null}
+                </button>
               ))}
             </div>
           </div>
