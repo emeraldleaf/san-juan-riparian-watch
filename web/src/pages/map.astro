@@ -15,7 +15,15 @@ import '../styles/map-agent.css';
   </div></div>
 
   <div class="ma-layout">
-    <div id="map-agent-map" class="ma-map"></div>
+    <div class="ma-mapwrap">
+      <div id="map-agent-map" class="ma-map"></div>
+      <div class="ma-legend">
+        <div class="ma-legend-title">Model layers</div>
+        <label><input type="checkbox" data-product="rf" /><span class="sw sw-rf"></span> Riparian · RF</label>
+        <label><input type="checkbox" data-product="fm" /><span class="sw sw-fm"></span> Riparian · OlmoEarth</label>
+        <label><input type="checkbox" data-product="invasive" /><span class="sw sw-inv"></span> Invasive</label>
+      </div>
+    </div>
     <aside class="ma-panel">
       <div class="ma-head">
         <div class="eyebrow">// ask-the-map · Quartzose map agent</div>
