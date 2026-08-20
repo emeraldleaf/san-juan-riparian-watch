@@ -8,8 +8,8 @@ type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; c
 
 const EXAMPLES = [
   'How much of the San Juan River corridor is riparian?',
-  'How much of the Animas River is riparian?',
   'How much of Malpais Arroyo is riparian?',
+  'How much of Yellow Arroyo is riparian?',
 ];
 
 export default function MapAgent() {
@@ -49,9 +49,10 @@ export default function MapAgent() {
         {msgs.length === 0 && (
           <div className="ma-intro">
             <p>
-              Ask about riparian extent anywhere in the San Juan basin. The agent resolves the place,
-              queries the data, moves the map, and cites the source — and tells you plainly when the
-              product does not cover an area, rather than guessing a number.
+              This agent has riparian-extent data for the reaches the model mapped — the San Juan
+              mainstem near Farmington and several arroyos. Ask about one and it resolves the place,
+              queries the data, moves the map, and cites the source. Ask about a river it hasn't
+              mapped — like the Animas — and it tells you so, instead of guessing a number.
             </p>
             <div className="ma-examples">
               {EXAMPLES.map((e) => (
