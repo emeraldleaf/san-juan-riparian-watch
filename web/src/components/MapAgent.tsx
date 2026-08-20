@@ -19,6 +19,7 @@ export default function MapAgent() {
   const [busy, setBusy] = useState(false);
   const [val, setVal] = useState('');
   const [reaches, setReaches] = useState<Reach[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(true);
 
   // The named reaches the model actually mapped, straight from the data.
   useEffect(() => {
@@ -66,27 +67,12 @@ export default function MapAgent() {
         {msgs.length === 0 && (
           <div className="ma-intro">
             <p>
-              This agent only has riparian-extent data for the reaches the model actually mapped —
-              the ones below. Ask about one and it resolves the place, queries the data, moves the
-              map, and cites the source. Ask about a river it hasn't mapped (like the Animas) and it
-              says so, instead of guessing a number.
+              This agent has riparian-extent data for the reaches the model mapped — pick one below,
+              or ask in your own words. It resolves the place, queries the data, moves the map, and
+              cites the source. Ask about a river it hasn't mapped (like the Animas) and it says so,
+              instead of guessing. You can also say <em>"show me the invasive vegetation"</em> or
+              <em>"compare RF and OlmoEarth"</em> to toggle the model overlays.
             </p>
-            <div className="ma-maplabel">
-              Mapped reaches{reaches.length ? ` (${reaches.length})` : ''} — ask about any:
-            </div>
-            <div className="ma-examples">
-              {(reaches.length ? reaches : FALLBACK).map((r) => (
-                <button
-                  key={r.name}
-                  className="ma-chip"
-                  onClick={() => ask(`How much of ${r.name} is riparian?`)}
-                  type="button"
-                >
-                  {r.name}
-                  {r.reaches ? <span className="ma-count"> · {r.reaches} reaches</span> : null}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         {msgs.map((m, i) => (
@@ -102,6 +88,28 @@ export default function MapAgent() {
           <div className="ma-msg agent"><div className="ma-text ma-busy">resolving…</div></div>
         )}
       </div>
+      <details
+        className="ma-picker"
+        open={pickerOpen}
+        onToggle={(e) => setPickerOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>
+          Mapped reaches{(reaches.length ? reaches : FALLBACK).length ? ` (${(reaches.length ? reaches : FALLBACK).length})` : ''} — ask about any
+        </summary>
+        <div className="ma-examples">
+          {(reaches.length ? reaches : FALLBACK).map((r) => (
+            <button
+              key={r.name}
+              className="ma-chip"
+              onClick={() => ask(`How much of ${r.name} is riparian?`)}
+              type="button"
+            >
+              {r.name}
+              {r.reaches ? <span className="ma-count"> · {r.reaches} reaches</span> : null}
+            </button>
+          ))}
+        </div>
+      </details>
       <form className="ma-form" onSubmit={(e) => { e.preventDefault(); ask(val); }}>
         <input
           value={val}

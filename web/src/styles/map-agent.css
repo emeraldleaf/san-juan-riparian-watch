@@ -65,6 +65,19 @@
 .ma-cite { font: 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-top: 5px; }
 .ma-busy { color: var(--muted); font-style: italic; }
 
+/* Persistent, collapsible reach picker above the input — accessible after the
+   first prompt, not just on the empty intro. */
+.ma-picker { border-top: 1px solid var(--line); padding: 10px 22px 0; }
+.ma-picker > summary {
+  font: 600 12px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted);
+  cursor: pointer; list-style: none; padding: 2px 0 10px; user-select: none;
+}
+.ma-picker > summary::-webkit-details-marker { display: none; }
+.ma-picker > summary::before { content: '▸ '; color: var(--subtle); }
+.ma-picker[open] > summary::before { content: '▾ '; }
+.ma-picker > summary:hover { color: var(--ink); }
+.ma-picker .ma-examples { padding-bottom: 10px; }
+
 .ma-form { display: flex; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--line); }
 .ma-form input {
   flex: 1; padding: 10px 13px; font-size: 14px;
