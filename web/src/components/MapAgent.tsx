@@ -45,6 +45,12 @@ export default function MapAgent() {
       const highlight = Object.values(d.resolved || {}).filter(Boolean)[0];
       if (context || highlight) dispatchEvent(new CustomEvent('mapagent:geom', { detail: { context, highlight } }));
       else dispatchEvent(new CustomEvent('mapagent:clear'));
+      // The agent can toggle overlays (rf/fm/invasive) via map(action="layer", …).
+      (d.map_actions || []).forEach((a: any) => {
+        if (a && a.action === 'layer' && a.layer) {
+          dispatchEvent(new CustomEvent('mapagent:layer', { detail: { layer: a.layer, visible: a.visible !== false } }));
+        }
+      });
       setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps, cited: d.cited_sources }]);
     } catch {
       setMsgs((m) => [...m, { role: 'agent', text: 'The map agent is unreachable right now.' }]);
