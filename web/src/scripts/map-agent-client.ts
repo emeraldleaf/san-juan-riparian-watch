@@ -46,6 +46,24 @@ if (container) {
   };
   const layerIds: Record<string, string[]> = { rf: [], fm: [], invasive: [] };
 
+  // Fit the map to a product's extent (lazy-fetched, cached) so toggling a layer
+  // ON also zooms you to where it has data.
+  const productBounds: Record<string, maplibregl.LngLatBounds | null> = {};
+  async function fitToProduct(key: string) {
+    if (!(key in productBounds)) {
+      const b = new maplibregl.LngLatBounds();
+      for (const file of PRODUCTS[key]?.files || []) {
+        try {
+          const gj = await (await fetch(file)).json();
+          (gj.features || []).forEach((f: any) => eachCoord(f.geometry, (c) => b.extend(c as any)));
+        } catch { /* skip a missing file */ }
+      }
+      productBounds[key] = b.isEmpty() ? null : b;
+    }
+    const bb = productBounds[key];
+    if (bb) map.fitBounds(bb, { padding: 60, maxZoom: 13, duration: 800 });
+  }
+
   map.on('load', () => {
     // Product fills go on first (under the river lines). Hidden until toggled.
     for (const [key, p] of Object.entries(PRODUCTS)) {
@@ -82,8 +100,10 @@ if (container) {
     // Legend checkboxes (data-product="rf|fm|invasive") toggle each product's layers.
     document.querySelectorAll<HTMLInputElement>('[data-product]').forEach((cb) => {
       cb.addEventListener('change', () => {
-        (layerIds[cb.dataset.product || ''] || []).forEach((id) =>
+        const key = cb.dataset.product || '';
+        (layerIds[key] || []).forEach((id) =>
           map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
+        if (cb.checked) fitToProduct(key);
       });
     });
     ready = true;
@@ -121,5 +141,6 @@ if (container) {
     ids.forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'));
     const cb = document.querySelector<HTMLInputElement>(`[data-product="${key}"]`);
     if (cb) cb.checked = visible;
+    if (visible) fitToProduct(key);
   });
 }
