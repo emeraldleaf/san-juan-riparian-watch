@@ -148,6 +148,9 @@ That is what this project is for — and their recommendation is, in effect, its
   Measured, not assumed.
 - [Data sources](data-sources.md) — every source, its endpoint, and the trap in each.
   **NMRipMap is classified** (filter `L2_Code`, never fetch raw) and its **label vintage is 2020**.
+- [Map layers](map-layers.md) — the materialized product GeoJSONs in `web/public/maps/`
+  (riparian **RF** + **OlmoEarth FM**, **invasive**, deep-time, truth) and what the `/map` legend
+  shows vs. what the agent can still only *display*, not *query*.
 - [Retractions](RETRACTIONS.md) — withdrawn claims. CI fails any doc restating one without retracting it.
 
 ## Specs
