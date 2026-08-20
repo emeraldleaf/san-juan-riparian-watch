@@ -88,7 +88,7 @@ def resolve_place(
         "resolved": result.is_resolved,
         "ambiguous": result.is_ambiguous,
         "chosen": _candidate_dict(result.chosen, geometry=True) if result.chosen else None,
-        "candidates": [_candidate_dict(c, geometry=False) for c in result.candidates],
+        "candidates": [_candidate_dict(c, geometry=True) for c in result.candidates],
     }
 
 

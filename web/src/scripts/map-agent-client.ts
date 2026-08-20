@@ -30,8 +30,17 @@ if (container) {
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
   let ready = false;
 
+  const fc = (g: any) => ({ type: 'FeatureCollection', features: g ? [{ type: 'Feature', geometry: g, properties: {} }] : [] });
+
   map.on('load', () => {
-    map.addSource('resolved', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    // context = the full in-AOI river (faint, underneath); resolved = the analyzed
+    // reach we actually have a metric for (bold, on top).
+    map.addSource('context', { type: 'geojson', data: fc(null) });
+    map.addLayer({
+      id: 'context-line', type: 'line', source: 'context',
+      paint: { 'line-color': '#93c5fd', 'line-width': 2, 'line-opacity': 0.75 },
+    });
+    map.addSource('resolved', { type: 'geojson', data: fc(null) });
     map.addLayer({
       id: 'resolved-fill', type: 'fill', source: 'resolved',
       filter: ['==', '$type', 'Polygon'],
@@ -39,26 +48,30 @@ if (container) {
     });
     map.addLayer({
       id: 'resolved-line', type: 'line', source: 'resolved',
-      paint: { 'line-color': '#2563eb', 'line-width': 3 },
+      paint: { 'line-color': '#2563eb', 'line-width': 4 },
     });
     ready = true;
   });
 
-  // Move + highlight the map to a resolved geometry.
+  // Draw the full river (context) with the analyzed reach highlighted, fit to the
+  // whole river so you see its full in-AOI extent — not just the scored stretch.
   addEventListener('mapagent:geom', (e: any) => {
-    const geom = e.detail?.geometry;
-    if (!geom || !ready) return;
-    const fc = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: geom, properties: {} }] };
-    (map.getSource('resolved') as any)?.setData(fc);
+    if (!ready) return;
+    const context = e.detail?.context;
+    const highlight = e.detail?.highlight;
+    (map.getSource('context') as any)?.setData(fc(context));
+    (map.getSource('resolved') as any)?.setData(fc(highlight));
     try {
       const b = new maplibregl.LngLatBounds();
-      eachCoord(geom, (c) => b.extend(c as any));
-      if (!b.isEmpty()) map.fitBounds(b, { padding: 70, maxZoom: 13, duration: 800 });
+      eachCoord(context || highlight, (c) => b.extend(c as any));
+      if (!b.isEmpty()) map.fitBounds(b, { padding: 70, maxZoom: 12, duration: 800 });
     } catch { /* geometry with no coords — leave the view */ }
   });
 
-  // Clear the highlight when the agent resolved nothing (refusal / out of scope).
+  // Clear both layers when the agent resolved nothing (refusal / out of scope).
   addEventListener('mapagent:clear', () => {
-    if (ready) (map.getSource('resolved') as any)?.setData({ type: 'FeatureCollection', features: [] });
+    if (!ready) return;
+    (map.getSource('context') as any)?.setData(fc(null));
+    (map.getSource('resolved') as any)?.setData(fc(null));
   });
 }
