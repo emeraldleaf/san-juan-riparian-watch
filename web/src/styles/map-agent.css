@@ -25,7 +25,10 @@
 .ma-log { flex: 1; overflow-y: auto; padding: 14px 22px; }
 
 .ma-intro p { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin: 4px 0 14px; }
-.ma-examples { display: flex; flex-direction: column; gap: 8px; }
+.ma-maplabel { font: 600 12px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin: 4px 0 9px; }
+.ma-count { color: var(--subtle); font-size: 12px; }
+.ma-examples { display: flex; flex-wrap: wrap; gap: 7px; }
+.ma-examples .ma-chip { flex: 0 0 auto; }
 .ma-chip {
   text-align: left; padding: 9px 12px; font-size: 13px; cursor: pointer;
   border: 1px solid var(--line); border-radius: var(--radius, 10px);
