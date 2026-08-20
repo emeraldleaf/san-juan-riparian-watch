@@ -6,7 +6,22 @@
   height: calc(100vh - 52px);
   min-height: 520px;
 }
+.ma-mapwrap { position: relative; height: 100%; min-height: 0; }
 .ma-map { height: 100%; width: 100%; }
+
+.ma-legend {
+  position: absolute; left: 12px; top: 12px; z-index: 5;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius, 10px);
+  padding: 10px 12px; font-size: 13px; box-shadow: var(--shadow, 0 2px 10px rgba(0,0,0,.15));
+}
+.ma-legend-title { font: 600 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-bottom: 7px; letter-spacing: .03em; }
+.ma-legend label { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; }
+.ma-legend input { cursor: pointer; }
+.ma-legend .sw { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+.sw-rf { background: #16a34a; }
+.sw-fm { background: #0891b2; }
+.sw-inv { background: #e11d48; }
 
 .ma-panel {
   display: flex;

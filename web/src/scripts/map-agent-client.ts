@@ -37,7 +37,30 @@ if (container) {
 
   const fc = (g: any) => ({ type: 'FeatureCollection', features: g ? [{ type: 'Feature', geometry: g, properties: {} }] : [] });
 
+  // The mapped model products — already materialized as served GeoJSON. Toggled by
+  // the legend checkboxes. Each product is one or more files (different reaches).
+  const PRODUCTS: Record<string, { color: string; opacity: number; files: string[] }> = {
+    rf: { color: '#16a34a', opacity: 0.5, files: ['maps/present-extent-2020.geojson', 'maps/rf_malpais_full.geojson', 'maps/extent-bloomfield-rf.geojson'] },
+    fm: { color: '#0891b2', opacity: 0.5, files: ['maps/fm_bloomfield.geojson', 'maps/fm_malpais.geojson'] },
+    invasive: { color: '#e11d48', opacity: 0.72, files: ['maps/present-invasive-in-corridor.geojson'] },
+  };
+  const layerIds: Record<string, string[]> = { rf: [], fm: [], invasive: [] };
+
   map.on('load', () => {
+    // Product fills go on first (under the river lines). Hidden until toggled.
+    for (const [key, p] of Object.entries(PRODUCTS)) {
+      p.files.forEach((file, i) => {
+        const id = `prod-${key}-${i}`;
+        map.addSource(id, { type: 'geojson', data: file });
+        map.addLayer({
+          id, type: 'fill', source: id,
+          layout: { visibility: 'none' },
+          paint: { 'fill-color': p.color, 'fill-opacity': p.opacity, 'fill-outline-color': p.color },
+        });
+        layerIds[key].push(id);
+      });
+    }
+
     // context = the full in-AOI river (faint, underneath); resolved = the analyzed
     // reach we actually have a metric for (bold, on top).
     map.addSource('context', { type: 'geojson', data: fc(null) });
@@ -54,6 +77,14 @@ if (container) {
     map.addLayer({
       id: 'resolved-line', type: 'line', source: 'resolved',
       paint: { 'line-color': '#2563eb', 'line-width': 4 },
+    });
+
+    // Legend checkboxes (data-product="rf|fm|invasive") toggle each product's layers.
+    document.querySelectorAll<HTMLInputElement>('[data-product]').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        (layerIds[cb.dataset.product || ''] || []).forEach((id) =>
+          map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
+      });
     });
     ready = true;
   });
