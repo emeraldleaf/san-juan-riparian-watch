@@ -40,9 +40,12 @@ if (container) {
   // The mapped model products — already materialized as served GeoJSON. Toggled by
   // the legend checkboxes. Each product is one or more files (different reaches).
   const PRODUCTS: Record<string, { color: string; opacity: number; files: string[] }> = {
-    rf: { color: '#16a34a', opacity: 0.5, files: ['maps/present-extent-2020.geojson', 'maps/rf_malpais_full.geojson', 'maps/extent-bloomfield-rf.geojson'] },
-    fm: { color: '#0891b2', opacity: 0.5, files: ['maps/fm_bloomfield.geojson', 'maps/fm_malpais.geojson'] },
-    invasive: { color: '#e11d48', opacity: 0.72, files: ['maps/present-invasive-in-corridor.geojson'] },
+    // Absolute paths: this page is served at /map/, so a RELATIVE 'maps/x' would
+    // resolve to /map/maps/x and the box returns the SPA-fallback HTML (not the
+    // GeoJSON) — MapLibre renders nothing and fitToProduct's fetch throws.
+    rf: { color: '#16a34a', opacity: 0.5, files: ['/maps/present-extent-2020.geojson', '/maps/rf_malpais_full.geojson', '/maps/extent-bloomfield-rf.geojson'] },
+    fm: { color: '#0891b2', opacity: 0.5, files: ['/maps/fm_bloomfield.geojson', '/maps/fm_malpais.geojson'] },
+    invasive: { color: '#e11d48', opacity: 0.72, files: ['/maps/present-invasive-in-corridor.geojson'] },
   };
   const layerIds: Record<string, string[]> = { rf: [], fm: [], invasive: [] };
 
