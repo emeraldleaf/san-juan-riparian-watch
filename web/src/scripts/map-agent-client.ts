@@ -110,4 +110,16 @@ if (container) {
     (map.getSource('context') as any)?.setData(fc(null));
     (map.getSource('resolved') as any)?.setData(fc(null));
   });
+
+  // The agent drives the overlays too: toggle a product's layers and sync its
+  // legend checkbox, so "show me the invasive extent" flips the same switch.
+  addEventListener('mapagent:layer', (e: any) => {
+    const key = e.detail?.layer;
+    const visible = e.detail?.visible !== false;
+    const ids = layerIds[key];
+    if (!ids || !ready) return;
+    ids.forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'));
+    const cb = document.querySelector<HTMLInputElement>(`[data-product="${key}"]`);
+    if (cb) cb.checked = visible;
+  });
 }
