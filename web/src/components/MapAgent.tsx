@@ -30,8 +30,9 @@ export default function MapAgent() {
         body: JSON.stringify({ question: q }),
       });
       const d = await r.json();
-      const geoms = Object.values(d.resolved || {}).filter(Boolean);
-      if (geoms.length) dispatchEvent(new CustomEvent('mapagent:geom', { detail: { geometry: geoms[0] } }));
+      const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
+      const highlight = Object.values(d.resolved || {}).filter(Boolean)[0];
+      if (context || highlight) dispatchEvent(new CustomEvent('mapagent:geom', { detail: { context, highlight } }));
       else dispatchEvent(new CustomEvent('mapagent:clear'));
       setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps, cited: d.cited_sources }]);
     } catch {
