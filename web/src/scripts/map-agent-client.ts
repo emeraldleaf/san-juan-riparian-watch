@@ -3,17 +3,22 @@
 // this imperative half owns the map (maps are imperative, like the story maps).
 import maplibregl from 'maplibre-gl';
 
+// Satellite imagery + Esri reference overlays (transparent): roads/highways and
+// place names / boundaries, so the map orients you to the region — towns, roads,
+// and labeled rivers — not just bare pixels.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 const SAT: any = {
   version: 8,
   sources: {
-    sat: {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics',
-    },
+    sat: { type: 'raster', tiles: [`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
+    roads: { type: 'raster', tiles: [`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, attribution: '© Esri' },
+    places: { type: 'raster', tiles: [`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, attribution: '© Esri' },
   },
-  layers: [{ id: 'sat', type: 'raster', source: 'sat' }],
+  layers: [
+    { id: 'sat', type: 'raster', source: 'sat' },
+    { id: 'roads', type: 'raster', source: 'roads' },
+    { id: 'places', type: 'raster', source: 'places' },
+  ],
 };
 
 function eachCoord(geom: any, cb: (c: number[]) => void) {
