@@ -72,8 +72,10 @@ if (container) {
   // layers are visible; the agent narrates in the panel. Presentation layers are
   // reach-SPECIFIC files (only the Malpais/corridor stretch), separate from the
   // legend's whole-product toggles.
-  const PRES_LAYERS: Record<string, { file: string; color: string; opacity: number }> = {
-    truth: { file: '/maps/truth_malpais.geojson', color: '#9aa4b2', opacity: 0.32 },
+  const PRES_LAYERS: Record<string, { file: string; color: string; opacity: number; outline?: string }> = {
+    // Truth reads as hand-drawn delineation: a fill PLUS a crisp white outline so it
+    // stands out on the tan desert (light grey alone washed out).
+    truth: { file: '/maps/truth_malpais.geojson', color: '#cbd5e1', opacity: 0.45, outline: '#f8fafc' },
     rf: { file: '/maps/rf_malpais_full.geojson', color: '#16a34a', opacity: 0.55 },
     fm: { file: '/maps/fm_malpais.geojson', color: '#0891b2', opacity: 0.55 },
     invasive: { file: '/maps/present-invasive-in-corridor.geojson', color: '#e11d48', opacity: 0.72 },
@@ -153,8 +155,11 @@ if (container) {
   const SCENE_DWELL = 11000;
 
   function showPresLayers(active: string[]) {
-    Object.keys(PRES_LAYERS).forEach((k) =>
-      map.setLayoutProperty(`pres-lyr-${k}`, 'visibility', active.includes(k) ? 'visible' : 'none'));
+    Object.entries(PRES_LAYERS).forEach(([k, p]) => {
+      const vis = active.includes(k) ? 'visible' : 'none';
+      map.setLayoutProperty(`pres-lyr-${k}`, 'visibility', vis);
+      if (p.outline) map.setLayoutProperty(`pres-out-${k}`, 'visibility', vis);
+    });
   }
   function clearAgentGeom() {
     (map.getSource('context') as any)?.setData(fc(null));
@@ -232,6 +237,13 @@ if (container) {
         layout: { visibility: 'none' },
         paint: { 'fill-color': p.color, 'fill-opacity': p.opacity, 'fill-outline-color': p.color },
       });
+      if (p.outline) {
+        map.addLayer({
+          id: `pres-out-${key}`, type: 'line', source: `pres-src-${key}`,
+          layout: { visibility: 'none' },
+          paint: { 'line-color': p.outline, 'line-width': 1.3, 'line-opacity': 0.9 },
+        });
+      }
     }
 
     // context = the full in-AOI river (faint, underneath); resolved = the analyzed
