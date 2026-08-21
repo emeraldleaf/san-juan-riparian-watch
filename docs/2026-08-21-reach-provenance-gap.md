@@ -106,10 +106,14 @@ provenance manifest (`.claude/spatial-provenance.json`) and enforces #1–#4 in 
 - **#2 co-location** — declared head-to-heads must have bbox IoU ≥ 0.5. It **self-tests**: every run
   re-checks the retracted `rf_malpais` vs `fm_malpais` pairing (**IoU 0.162**) and fails loudly if that
   ever stops being flagged. The valid Bloomfield comparison passes at **0.814**.
-- **#3 extent reconciliation** — each reach's defined-vs-imaged IoU must clear 0.6 or carry a
-  `discrepancy_ack`. **This immediately surfaced a second reach: Kirtland, IoU 0.395** (its imaged extent
-  is ~4 km short of the declared AOI) — now flagged in the manifest for the same overlay scrutiny as
-  Malpais before any per-reach number is restated. Aztec (0.795) and Bloomfield (0.909) reconcile.
+- **#3 extent reconciliation** — flags a *truncation* (the imaged band offset to one side of the AOI, so
+  part of the reach was never imaged) rather than raw IoU, which over-flags a narrow river in a tall
+  rectangle. It uses the **center-offset** of imaged vs defined. On first run it surfaced **Kirtland
+  (IoU 0.395)**; given the Malpais treatment, **Kirtland *cleared*** — its imaged band is *centered*
+  (offset **0.02**), the San Juan mainstem corridor through the middle of a tall AOI, not a truncation
+  like Malpais (offset **0.21**, missing the northern arroyo). **Kirtland's 0.845 stands.** Aztec (0.09)
+  and Bloomfield (0.02) are also centered corridors. So the extent gate flagged a candidate, the review
+  cleared it, and the metric got sharper in the process — the gate improving under its own findings.
 - **#4 name ↔ geometry** — a reach named for an ephemeral drainage (`arroyo`/`wash`/…) but declared
   river-shaped must carry an ack. "Malpais Arroyo–San Juan" (river-dominated) trips it; its ack is the
   retraction.

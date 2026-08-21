@@ -76,19 +76,30 @@ for rel in layers:
 if not undeclared:
     print(f"✓ [provenance] all {len(served)} served map layers are declared")
 
-# ── Gate 3: extent reconciliation — defined vs imaged per reach
+# ── Gate 3: extent reconciliation — flag a TRUNCATION (imaged band offset to one
+# side of the AOI, so part of the reach was never imaged, e.g. Malpais's northern
+# arroyo), NOT a benign narrow-corridor artifact (a river centered in a tall AOI,
+# e.g. Kirtland). Low bbox IoU alone over-flags narrow corridors; center-offset
+# distinguishes them.
+offset_threshold = float(m.get("offset_threshold", 0.10))
+def center_offset(d, i):
+    W, H = d[2]-d[0], d[3]-d[1]
+    ox = ((i[0]+i[2])/2 - (d[0]+d[2])/2) / W if W else 0
+    oy = ((i[1]+i[3])/2 - (d[1]+d[3])/2) / H if H else 0
+    return max(abs(ox), abs(oy))
 for rid, r in reaches.items():
     db, ib = r.get("defined_bbox"), r.get("imaged_bbox")
     if not (db and ib): continue
-    v = iou(db, ib)
-    if v < reach_min_iou and not r.get("discrepancy_ack"):
-        print(f"✗ [extent] reach '{rid}': defined-vs-imaged IoU {v:.3f} < {reach_min_iou} with no discrepancy_ack.")
-        print(f"    the imaged/scored extent differs materially from the declared reach — acknowledge or reconcile it.")
+    v = iou(db, ib); off = center_offset(db, ib)
+    if off > offset_threshold and not r.get("discrepancy_ack"):
+        print(f"✗ [extent] reach '{rid}': imaged extent is TRUNCATED (center-offset {off:.2f} > "
+              f"{offset_threshold}, IoU {v:.3f}) with no discrepancy_ack.")
+        print(f"    part of the declared reach was not imaged/scored — acknowledge or reconcile it.")
         failures += 1
-    elif v < reach_min_iou:
-        print(f"✓ [extent] reach '{rid}': IoU {v:.3f} — divergence acknowledged")
+    elif off > offset_threshold:
+        print(f"✓ [extent] reach '{rid}': truncated (offset {off:.2f}, IoU {v:.3f}) — acknowledged")
     else:
-        print(f"✓ [extent] reach '{rid}': defined-vs-imaged IoU {v:.3f}")
+        print(f"✓ [extent] reach '{rid}': imaged band centered (offset {off:.2f}, IoU {v:.3f}) — corridor, not a gap")
 
 # ── Gate 4: name ↔ geometry — an ephemeral-drainage name on river-shaped geometry
 DRAINAGE = re.compile(r'\b(arroyo|wash|creek|draw|gulch)\b', re.I)

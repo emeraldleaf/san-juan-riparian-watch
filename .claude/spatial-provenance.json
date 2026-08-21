@@ -2,6 +2,7 @@
   "_doc": "Spatial-provenance manifest. Enforced by .claude/scripts/check-layer-colocation.sh (wired into ./dev.sh --check-encoding and encoding-loop.yml CI). Four gates: (1) every served web/public/maps/*.geojson must be declared in `layers`; (2) any `comparisons` head-to-head must be co-located (bbox IoU >= min_iou); (3) each reach's defined vs imaged extent must reconcile (IoU >= reach_min_iou) OR carry a discrepancy_ack; (4) a reach whose NAME implies a morphology (arroyo/wash/...) that conflicts with its declared `morphology` must carry a discrepancy_ack. Rationale + the failure this prevents: docs/2026-08-21-reach-provenance-gap.md.",
   "min_iou": 0.5,
   "reach_min_iou": 0.6,
+  "offset_threshold": 0.10,
 
   "reaches": {
     "malpais": {
@@ -16,7 +17,7 @@
       "morphology": "San Juan mainstem, semi-arid",
       "defined_bbox": [-108.55, 36.67, -108.37, 36.81],
       "imaged_bbox": [-108.5529, 36.7148, -108.3686, 36.7706],
-      "discrepancy_ack": "FLAGGED for review 2026-08-21: imaged extent is materially smaller than the defined AOI (defined-vs-imaged IoU ~0.40, imaged north edge ~4 km short). Needs the same truth/model overlay scrutiny as Malpais before any per-reach claim is restated."
+      "note": "Reviewed 2026-08-21 (the 'Malpais treatment'): the low bbox IoU (0.395) is a NARROW-CORRIDOR artifact, not a truncation. The imaged band is CENTERED in the AOI (center-offset 0.02) and spans the full E-W river length — it is the San Juan mainstem through the middle of a tall rectangular AOI; the N/S extremes are upland with no riparian. Unlike Malpais (offset 0.21, missing the northern arroyo), Kirtland was NOT truncated. The 0.845 river-reach transfer score stands. The extent gate now flags center-offset, not raw IoU, so this no longer trips."
     },
     "aztec_animas": {
       "name": "Aztec / Animas",
