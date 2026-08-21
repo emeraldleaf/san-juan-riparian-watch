@@ -39,7 +39,7 @@
     line-height:1.6;font-size:16px;-webkit-font-smoothing:antialiased;letter-spacing:-.006em;}
   .mono,.eyebrow{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
-  .eyebrow{font-size:12px;letter-spacing:0;text-transform:none;color:var(--accent);font-weight:500;}
+  .eyebrow{font-size:14px;letter-spacing:-.01em;text-transform:none;color:var(--accent);font-weight:550;}
   h1,h2,h3{color:var(--ink-h);}
   h1{font-family:var(--font-display);font-size:clamp(38px,6.2vw,66px);line-height:1.02;margin:.3em 0 .32em;text-wrap:balance;font-weight:600;letter-spacing:-.038em;}
   h2{font-family:var(--font-display);font-size:clamp(25px,3.8vw,37px);line-height:1.08;margin:0 0 .32em;text-wrap:balance;font-weight:600;letter-spacing:-.032em;}
