@@ -134,6 +134,10 @@
   figcaption{font-size:13px;color:var(--muted);padding:11px 16px;border-top:1px solid var(--line);background:var(--panel-2);}
   figcaption b{color:var(--ink);}
   .maplib{height:min(64vh,560px);width:100%;}
+  .map-fallback{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
+    height:100%;width:100%;padding:24px;text-align:center;background:var(--panel-2);color:var(--muted);}
+  .map-fallback strong{color:var(--ink);font-size:15px;}
+  .map-fallback span{max-width:42ch;font-size:13px;line-height:1.5;}
   .maplegend{position:absolute;top:12px;right:12px;background:color-mix(in srgb,var(--panel) 92%,transparent);
     border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:var(--shadow);z-index:2;backdrop-filter:blur(4px);}
   .maplegend .row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;background:none;border:0;

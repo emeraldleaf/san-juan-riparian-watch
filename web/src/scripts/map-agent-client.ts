@@ -2,6 +2,7 @@
 // to /agent/map and hands the resolved geometry back through a window CustomEvent;
 // this imperative half owns the map (maps are imperative, like the story maps).
 import maplibregl from 'maplibre-gl';
+import { webglSupported, mapFallback } from './webgl';
 
 // Satellite imagery + Esri reference overlays (transparent): roads/highways and
 // place names / boundaries, so the map orients you to the region — towns, roads,
@@ -29,7 +30,8 @@ function eachCoord(geom: any, cb: (c: number[]) => void) {
 }
 
 const container = document.getElementById('map-agent-map');
-if (container) {
+if (container && !webglSupported()) mapFallback(container);
+else if (container) {
   const map = new maplibregl.Map({ container, center: [-108.2, 36.85], zoom: 8.2, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));

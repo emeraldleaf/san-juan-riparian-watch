@@ -3,6 +3,7 @@
 // widgets are inherently imperative, so they live here rather than in React.
 // The agent (a React island) talks to the maps through window CustomEvents.
 import maplibregl from 'maplibre-gl';
+import { webglSupported, mapFallback } from './webgl';
 
 const root = document.documentElement;
 root.classList.add('js-reveal');
@@ -48,6 +49,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
   const status = document.getElementById('status-corridor');
   const container = document.getElementById('map-corridor');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.26, 36.745], zoom: 11.4, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
@@ -71,6 +73,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
   const status = document.getElementById('status-arroyo');
   const container = document.getElementById('map-arroyo');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.76, 36.85], zoom: 11.7, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
@@ -106,6 +109,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
     ticks = document.querySelectorAll('.tticks span'), status = document.getElementById('status-time');
   const container = document.getElementById('map-time');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.26, 36.745], zoom: 11.4, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
