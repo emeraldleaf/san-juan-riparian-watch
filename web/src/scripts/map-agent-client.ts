@@ -203,7 +203,10 @@ else if (container) {
   function setPlaying(p: boolean) {
     presPlaying = p;
     if (presTimer) { clearTimeout(presTimer); presTimer = null; }
-    if (p) scheduleAdvance();
+    if (p) {
+      if (PRESENTATION.scenes[presIndex]?.phenology) startPheno();  // resume the phenology loop if we paused it on a scrub
+      scheduleAdvance();
+    }
     dispatchEvent(new CustomEvent('pres:state', { detail: { playing: presPlaying } }));
   }
   function endPres() {

@@ -25,7 +25,6 @@ if not os.path.exists(manifest_path):
     print(f"✗ spatial-provenance manifest missing: {manifest_path}"); sys.exit(1)
 m = json.load(open(manifest_path))
 min_iou = float(m.get("min_iou", 0.5))
-reach_min_iou = float(m.get("reach_min_iou", 0.6))
 reaches = m.get("reaches", {})
 layers = m.get("layers", {})
 failures = 0

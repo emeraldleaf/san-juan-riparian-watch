@@ -56,14 +56,23 @@ The spine of the whole system — one row per unit of work, the resumability con
 
 ## The per-tile loop (streaming inference)
 
-```
-for (tile, year) in manifest.where(status != done):
-    cube   = materialize_cube(tile.bbox, year)     # STAC + COG range-reads → 12 monthly medians
-    extent = olmoearth.predict_extent(cube)         # GPU; prob raster
-    inv    = invasive_model.predict(cube, extent)   # GPU; only within extent  (Stage 2, gated)
-    write_geotiff(extent, inv, tile.outputs)
-    manifest.mark(tile, year, done, gpu_seconds, cost)
-    del cube                                         # discard raw — storage stays GB, not TB
+```text
+# Workers claim tile-years ATOMICALLY (concurrency-safe) and RESUME from the furthest-done stage,
+# so retries never repeat completed GPU work and two workers never grab the same row.
+STAGE = {cube:0, extent:1, invasive:2, written:3}
+while (t := manifest.claim_one(status="pending")):   # atomic UPDATE...RETURNING → status=running, worker=me
+    try:
+        cube = load_or_build_cube(t)                          if t.stage < STAGE.cube    else t.cube   # STAC + COG range-reads
+        extent = olmoearth.predict_extent(cube)               if t.stage < STAGE.extent  else t.extent # GPU
+        inv = None
+        if STAGE2_LORO_GREEN and t.stage < STAGE.invasive:    # invasive ONLY after its LORO gate passes (see below)
+            inv = invasive_model.predict(cube, extent)        # GPU; within extent
+        write_geotiff(extent, inv, t.outputs)                 # invasive_uri omitted while the gate is not green
+        manifest.mark(t, status="done", gpu_seconds=..., cost=...)
+    except Exception:
+        manifest.mark(t, status="failed")                     # re-runs alone; completed stages are skipped on retry
+    finally:
+        del cube                                              # discard raw — storage stays GB, not TB
 # after all tiles for the year:
 mosaic → threshold → polygons + invasive share → PostGIS(silver/gold) → MVT tiles
 change = diff(year, year-1, landsat_baseline)        # Stage 3
@@ -77,17 +86,18 @@ orchestration around them.**
 
 ## Cost model (parametric, to be filled by the HUC10 proof)
 
-Let `A` = buffered-corridor area, `p` = pixels/km² at 10 m (~10⁴×10⁴/km² ... i.e. 10⁴ per km² per
-band-month; the real driver is tiles × months × model FLOPs), `t` = GPU-seconds/tile (measured),
-`g` = $/GPU-hour (spot). Then **basin-year cost ≈ (tiles) × t × g / 3600**, and the **HUC10 proof
-measures `t` directly**. The dominant levers, in order: (1) buffer width (area), (2) spot vs on-demand
+Let `A` = buffered-corridor area (km²), `t` = GPU-seconds per tile (measured), `g` = $/GPU-hour
+(spot). At 10 m, one km² is `100 × 100 = 10⁴` pixels **per band-month** — but the real cost driver is
+**tiles × 12 months × model FLOPs**, not a raw pixel count, so we scale on **`t`**, not pixels. Then
+**basin-year cost ≈ tiles × t × g / 3600**, and the **HUC10 proof measures `t` directly**. The dominant levers, in order: (1) buffer width (area), (2) spot vs on-demand
 GPU, (3) months composited (12 for phenology vs fewer), (4) S2 vs Landsat resolution. Storage is
 minor because raw is streamed, not kept.
 
 ## Validation at scale
 
 You cannot hand-check a basin. The strategy is layered:
-- **Transfer scores as the generalization warrant** — the LORO is *why* we trust the FM on unseen tiles.
+- **Transfer scores as the generalization warrant** — the LORO is our **best measured evidence** (4
+  reaches) that the FM generalizes to unseen ground; a warrant, not a guarantee at basin scale.
 - **Per-tile confidence** in the manifest — low-confidence tiles are flagged **provisional**, not silently shipped.
 - **Spot-checks against reference** where labels exist (NMRipMap in NM, CO-RIP in CO).
 - **The spatial-provenance gate** ([check-layer-colocation](../2026-08-21-reach-provenance-gap.md)) still

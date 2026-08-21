@@ -57,6 +57,8 @@ say so), the **per-reach trade**, and the GPU cost. No "FM is superior" without 
    under-powered and excluded from the macro-mean and the decision** (with its count stated) — it is never
    silently dropped, and never scored as if solid. On the current four reaches, Aztec (~1.7%) is the fold
    most likely to fall under N; if it does, the invasive decision runs on the remaining folds and says so.
+   **Both models are scored on the *same* set of powered folds** — the N-based exclusion is computed once,
+   from the truth labels, and applied identically to the RF bar and the FM, so it can never advantage one.
    **AUC/F1 always, never accuracy** (a "native everywhere" guess scores high where invasive is rare).
 2. **The IC↔IVD confounder.** Tamarisk in the growing season is spectrally close to irrigated agriculture
    (IVD). Since we score within riparian, ag is excluded from the eval — but note it for the deployment
