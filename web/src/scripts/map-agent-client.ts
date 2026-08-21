@@ -72,12 +72,17 @@ if (container) {
   // layers are visible; the agent narrates in the panel. Presentation layers are
   // reach-SPECIFIC files (only the Malpais/corridor stretch), separate from the
   // legend's whole-product toggles.
+  // Two San Juan reaches, kept honestly distinct:
+  //  • reach A (truth) — the phenology reach (truth + imagery co-located here).
+  //  • Bloomfield (b*) — the ONE reach with expert truth + RF + FM genuinely
+  //    co-located, so the RF-vs-FM head-to-head is like-for-like (not a conflation
+  //    of two different reaches, which the old rf_malpais/fm_malpais pairing was).
+  // Truth reads as hand-drawn delineation: fill + a crisp white outline.
   const PRES_LAYERS: Record<string, { file: string; color: string; opacity: number; outline?: string }> = {
-    // Truth reads as hand-drawn delineation: a fill PLUS a crisp white outline so it
-    // stands out on the tan desert (light grey alone washed out).
     truth: { file: '/maps/truth_malpais.geojson', color: '#cbd5e1', opacity: 0.45, outline: '#f8fafc' },
-    rf: { file: '/maps/rf_malpais_full.geojson', color: '#16a34a', opacity: 0.55 },
-    fm: { file: '/maps/fm_malpais.geojson', color: '#0891b2', opacity: 0.55 },
+    btruth: { file: '/maps/nmripmap-bloomfield.geojson', color: '#cbd5e1', opacity: 0.45, outline: '#f8fafc' },
+    brf: { file: '/maps/extent-bloomfield-rf.geojson', color: '#16a34a', opacity: 0.5 },
+    bfm: { file: '/maps/fm_bloomfield.geojson', color: '#0891b2', opacity: 0.5 },
     invasive: { file: '/maps/present-invasive-in-corridor.geojson', color: '#e11d48', opacity: 0.72 },
   };
   const presBounds: Record<string, maplibregl.LngLatBounds | null> = {};
@@ -98,12 +103,12 @@ if (container) {
   const PRESENTATION: { title: string; scenes: Scene[] } = {
     title: 'How we found the riparian',
     scenes: [
-      { narration: "The Malpais arroyo, in New Mexico's high desert — bone-dry most of the year, but a thread of vegetation follows the wash. Our job: map that riparian vegetation from space, and tell native from invasive.", layers: [], fit: 'truth', pitch: 35 },
-      { narration: "First, what “riparian” even means here. Experts hand-drew it in 2020 — this grey layer is our ground truth. But it exists for one year, one place. We want a model that generalizes to any year, any reach.", layers: ['truth'], fit: 'truth' },
-      { narration: "The hard part: from a single summer image, riparian and an irrigated field look identical — both are just green. One snapshot can't separate them.", layers: ['truth'], fit: 'truth' },
-      { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Here's a year over the Malpais reach in color-infrared, where vegetation glows red. Watch the corridor and the fields pulse as the seasons turn — cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is what separates riparian from bare desert. Drag the slider to scrub the months.", layers: [], fit: 'truth', phenology: true },
-      { narration: "A Random Forest learns that fingerprint from the 12-month stack. Here's where it predicts riparian along the arroyo — compare it to the grey truth.", layers: ['truth', 'rf'], fit: 'rf' },
-      { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — does the same with spatial context. On this arroyo, the morphology the Random Forest was blind to, it lifts accuracy from AUC 0.56 to 0.89.", layers: ['fm'], fit: 'fm' },
+      { narration: "A reach on the San Juan River, in New Mexico's high desert. A thin ribbon of riparian vegetation follows the water through otherwise dry country — and our job is to map it from space, then tell native from invasive.", layers: [], fit: 'truth', pitch: 35 },
+      { narration: "The hard part: from a single summer image, riparian and an irrigated field look identical — both are just green. One snapshot can't separate them.", layers: [], fit: 'truth' },
+      { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Here's a year over this reach in color-infrared, where vegetation glows red. Watch the corridor and the fields pulse as the seasons turn; cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is what separates riparian from bare desert. Drag the slider to scrub the months.", layers: [], fit: 'truth', phenology: true },
+      { narration: "To judge a model you need expert ground truth AND the model on the very same reach. Here's a San Juan reach near Bloomfield where we have both — this grey layer is the riparian hand-drawn by experts in 2020.", layers: ['btruth'], fit: 'btruth' },
+      { narration: "The Random Forest learns the seasonal fingerprint and predicts riparian — in green, over the grey truth. It does well on the river corridors it was trained across.", layers: ['btruth', 'brf'], fit: 'brf' },
+      { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — predicts the same reach with spatial context (teal). Across four held-out test reaches it matched the Random Forest on the rivers and rescued the one morphology the RF was blind to: a desert arroyo, where accuracy jumped from AUC 0.56 to 0.89.", layers: ['btruth', 'bfm'], fit: 'bfm' },
       { narration: "And the invasive share — tamarisk and Russian olive — here in the Farmington corridor. One honest caveat: the model over-counts green farmland near the banks, so read these as model estimates, not ground truth.", layers: ['invasive'], fit: 'invasive' },
     ],
   };
