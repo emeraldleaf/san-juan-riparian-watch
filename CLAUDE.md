@@ -141,6 +141,11 @@ and with an approval on an **older commit than the one you are merging** (a revi
 your last push has not reviewed your PR). Verify with `./dev.sh --review-status <PR>`; `main` is a
 protected branch and the server enforces it.
 
+**Issue closure — use `Closes #N`.** There is **no issue automation** here (no project board, no
+auto-close workflow), so the PR that does an issue's work MUST carry `Closes #N` in its body — that
+GitHub-native keyword is the only thing that closes an issue on merge. Otherwise issues are closed by
+hand (`gh issue close`), which drifts. Track in-progress work with the issue body's `- [ ]` checklist.
+
 Not ceremony: CodeRabbit's review on #5 caught a live SQL-injection weakening that CI, SonarQube, 20
 unit tests and a careful human all passed — `MvtTileSql` validated layer names with `^[a-z_]+$`, but
 in **.NET `$` also matches before a trailing newline**, so `"wetlands\n"` reached the interpolated
