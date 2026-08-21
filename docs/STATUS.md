@@ -2,12 +2,33 @@
 
 > **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **attribution to arroyo morphology is unverified**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
 
-**Last updated:** 2026-08-17
+**Last updated:** 2026-08-21
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-08-01): the FM raced the bar — arroyo rescued (0.557 → 0.889), **provisional GO** (significance pending)
+## ⏩⏩ Latest (2026-08-21): the arroyo result is **RETRACTED** — a reach-provenance gap the gates couldn't see
+
+The headline novelty — OlmoEarth *rescuing a desert arroyo* (RF 0.557 → FM 0.889) — is **retracted**.
+Five artifacts labeled "Malpais" (a HUC12 bbox, the rslearn dataset, and the RF/FM/truth display files)
+were assumed co-located; they are not. The reach is the **river-dominated "Malpais Arroyo–San Juan"
+subwatershed**; the LORO scored only the **328 imaged San Juan-valley windows**; the defined reach's
+**arroyo (up the wash) was never imaged or scored.** So 0.557 → 0.889 is a hard-*river*-reach transfer
+number, not an arroyo result — and the "morphology the RF was blind to" premise does not hold.
+
+**It was found by eye, not by a gate** — the author overlaid RF/FM/truth on the map agent and saw the
+models sitting on the San Juan. Every existing check (canon size, diagram pairing, stale refs,
+tombstones, the retraction registry) enforces **textual** consistency; none can see that a result's
+**display extent ≠ its scored extent**, that two "head-to-head" layers cover different ground, or that a
+reach named "arroyo" is geometrically a river. The method mechanized textual honesty and has **no tier
+for spatial / data-provenance honesty.** Full post-mortem + a five-gate prevention plan (provenance
+manifest · co-location gate · extent reconciliation · name↔geometry · "draw your extent"):
+[**2026-08-21-reach-provenance-gap.md**](2026-08-21-reach-provenance-gap.md). Retraction:
+[RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`. The `/map` page now carries
+**NMRipMap-truth** and **experiment-bbox (defined vs imaged)** inspection layers so the gap is visible in
+one click.
+
+## Latest (2026-08-01): the FM raced the bar — arroyo rescued (0.557 → 0.889), **provisional GO** (significance pending)
 
 The FM-vs-RF deploy decision **points GO — provisionally**. Fine-tuned OlmoEarth (`V1_BASE` 207M +
 per-pixel `UNetDecoder`), scored **leave-one-reach-out over the same 4 reaches** the RF bar used,
