@@ -104,9 +104,10 @@ if (container) {
     document.querySelectorAll<HTMLInputElement>('[data-product]').forEach((cb) => {
       cb.addEventListener('change', () => {
         const key = cb.dataset.product || '';
+        // Manual legend toggles only show/hide — they must NOT move the map (you're
+        // comparing layers in place). Only the agent's own layer action flies to it.
         (layerIds[key] || []).forEach((id) =>
           map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
-        if (cb.checked) fitToProduct(key);
       });
     });
     ready = true;
