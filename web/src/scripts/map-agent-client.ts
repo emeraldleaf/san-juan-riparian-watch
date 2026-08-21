@@ -92,19 +92,60 @@ if (container) {
     if (bb) map.fitBounds(bb, { padding: 70, maxZoom: 14, pitch: opts.pitch ?? 0, duration: 1400 });
   }
 
-  type Scene = { narration: string; layers: string[]; fit: string; stub?: boolean; pitch?: number };
+  type Scene = { narration: string; layers: string[]; fit: string; stub?: boolean; pitch?: number; phenology?: boolean };
   const PRESENTATION: { title: string; scenes: Scene[] } = {
     title: 'How we found the riparian',
     scenes: [
       { narration: "The Malpais arroyo, in New Mexico's high desert — bone-dry most of the year, but a thread of vegetation follows the wash. Our job: map that riparian vegetation from space, and tell native from invasive.", layers: [], fit: 'truth', pitch: 35 },
       { narration: "First, what “riparian” even means here. Experts hand-drew it in 2020 — this grey layer is our ground truth. But it exists for one year, one place. We want a model that generalizes to any year, any reach.", layers: ['truth'], fit: 'truth' },
       { narration: "The hard part: from a single summer image, riparian and an irrigated field look identical — both are just green. One snapshot can't separate them.", layers: ['truth'], fit: 'truth' },
-      { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is the signal. (The month-by-month view lands here next.)", layers: ['truth'], fit: 'truth', stub: true },
+      { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Here's a year over the Malpais reach in color-infrared, where vegetation glows red. Watch the corridor and the fields pulse as the seasons turn — cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is what separates riparian from bare desert. Drag the slider to scrub the months.", layers: [], fit: 'truth', phenology: true },
       { narration: "A Random Forest learns that fingerprint from the 12-month stack. Here's where it predicts riparian along the arroyo — compare it to the grey truth.", layers: ['truth', 'rf'], fit: 'rf' },
       { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — does the same with spatial context. On this arroyo, the morphology the Random Forest was blind to, it lifts accuracy from AUC 0.56 to 0.89.", layers: ['fm'], fit: 'fm' },
       { narration: "And the invasive share — tamarisk and Russian olive — here in the Farmington corridor. One honest caveat: the model over-counts green farmland near the banks, so read these as model estimates, not ground truth.", layers: ['invasive'], fit: 'invasive' },
     ],
   };
+
+  // 12-month phenology imagery (color-infrared monthly composites over Malpais),
+  // materialized from the reach cube. The slider scene cross-fades through them.
+  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const PHENO: { bounds: any; months: string[]; loaded: boolean } = { bounds: null, months: [], loaded: false };
+  let phenoMonth = 0;
+  let phenoTimer: ReturnType<typeof setInterval> | null = null;
+  async function loadPhenology() {
+    try {
+      const m = await (await fetch('/maps/phenology/malpais.json')).json();
+      PHENO.bounds = m.bounds; PHENO.months = m.months; PHENO.loaded = true;
+      const { w, s, e, n } = m.bounds;
+      map.addSource('phenology', { type: 'image', url: `/maps/phenology/${m.months[0]}`,
+        coordinates: [[w, n], [e, n], [e, s], [w, s]] });
+      map.addLayer({ id: 'phenology-lyr', type: 'raster', source: 'phenology',
+        layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.95, 'raster-fade-duration': 250 } });
+    } catch { /* imagery not present — the scene falls back to a caption */ }
+  }
+  function setPhenoMonth(i: number) {
+    if (!PHENO.loaded) return;
+    phenoMonth = ((i % 12) + 12) % 12;
+    (map.getSource('phenology') as any)?.updateImage({ url: `/maps/phenology/${PHENO.months[phenoMonth]}` });
+    dispatchEvent(new CustomEvent('pres:month', { detail: { index: phenoMonth, label: MONTH_LABELS[phenoMonth] } }));
+  }
+  function startPheno() {
+    if (!PHENO.loaded) return;
+    map.setLayoutProperty('phenology-lyr', 'visibility', 'visible');
+    const { w, s, e, n } = PHENO.bounds;
+    map.fitBounds([[w, s], [e, n]], { padding: 30, duration: 1200, pitch: 0 });
+    setPhenoMonth(0);
+    if (phenoTimer) clearInterval(phenoTimer);
+    phenoTimer = setInterval(() => setPhenoMonth(phenoMonth + 1), 950);
+  }
+  function stopPheno() {
+    if (phenoTimer) { clearInterval(phenoTimer); phenoTimer = null; }
+    if (PHENO.loaded) map.setLayoutProperty('phenology-lyr', 'visibility', 'none');
+  }
+  addEventListener('pres:setmonth', (e: any) => {
+    if (phenoTimer) { clearInterval(phenoTimer); phenoTimer = null; }  // scrubbing takes over
+    setPhenoMonth(e.detail?.index ?? 0);
+  });
 
   let presIndex = -1;
   let presPlaying = false;
@@ -123,7 +164,7 @@ if (container) {
     const s = PRESENTATION.scenes[presIndex];
     dispatchEvent(new CustomEvent('pres:scene', { detail: {
       index: presIndex, total: PRESENTATION.scenes.length, title: PRESENTATION.title,
-      narration: s.narration, stub: !!s.stub, playing: presPlaying,
+      narration: s.narration, stub: !!s.stub, phenology: !!s.phenology, playing: presPlaying,
     } }));
   }
   function goToScene(i: number) {
@@ -131,8 +172,10 @@ if (container) {
     presIndex = i;
     const s = PRESENTATION.scenes[i];
     clearAgentGeom();
+    stopPheno();
     showPresLayers(s.layers);
-    fitToPres(s.fit, { pitch: s.pitch });
+    if (s.phenology) startPheno();
+    else fitToPres(s.fit, { pitch: s.pitch });
     emitScene();
     if (presPlaying) scheduleAdvance();
   }
@@ -153,6 +196,7 @@ if (container) {
     presPlaying = false;
     if (presTimer) { clearTimeout(presTimer); presTimer = null; }
     presIndex = -1;
+    stopPheno();
     showPresLayers([]);
     map.easeTo({ pitch: 0, duration: 600 });
     dispatchEvent(new CustomEvent('pres:end'));
@@ -218,6 +262,7 @@ if (container) {
           map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
       });
     });
+    loadPhenology();
     ready = true;
   });
 

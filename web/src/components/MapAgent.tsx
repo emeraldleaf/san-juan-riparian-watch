@@ -9,7 +9,7 @@ import { turnstileToken } from '../scripts/turnstile';
 
 type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[]; pres?: boolean };
 type Reach = { name: string; reaches: number };
-type Scene = { index: number; total: number; title: string };
+type Scene = { index: number; total: number; title: string; phenology?: boolean };
 
 const FALLBACK: Reach[] = [
   { name: 'San Juan River', reaches: 0 },
@@ -26,6 +26,7 @@ export default function MapAgent() {
   const [presenting, setPresenting] = useState(false);
   const [presPlaying, setPresPlaying] = useState(false);
   const [scene, setScene] = useState<Scene | null>(null);
+  const [month, setMonth] = useState<{ index: number; label: string }>({ index: 0, label: 'Jan' });
   const [pausedForAsk, setPausedForAsk] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -46,10 +47,11 @@ export default function MapAgent() {
       const d = e.detail || {};
       setPresenting(true);
       setPresPlaying(!!d.playing);
-      setScene({ index: d.index, total: d.total, title: d.title });
+      setScene({ index: d.index, total: d.total, title: d.title, phenology: !!d.phenology });
       setMsgs((m) => [...m, { role: 'agent', text: d.narration, pres: true }]);
       scrollDown();
     };
+    const onMonth = (e: any) => setMonth({ index: e.detail?.index ?? 0, label: e.detail?.label ?? '' });
     const onState = (e: any) => setPresPlaying(!!e.detail?.playing);
     const onEnd = () => {
       setPresenting(false); setPresPlaying(false); setScene(null); setPausedForAsk(false);
@@ -57,10 +59,12 @@ export default function MapAgent() {
       scrollDown();
     };
     addEventListener('pres:scene', onScene);
+    addEventListener('pres:month', onMonth);
     addEventListener('pres:state', onState);
     addEventListener('pres:end', onEnd);
     return () => {
       removeEventListener('pres:scene', onScene);
+      removeEventListener('pres:month', onMonth);
       removeEventListener('pres:state', onState);
       removeEventListener('pres:end', onEnd);
     };
@@ -151,6 +155,17 @@ export default function MapAgent() {
 
       {presenting ? (
         <div className="ma-presbar">
+          {scene?.phenology && (
+            <div className="ma-monthrow">
+              <span className="ma-monthkey">◐ color-infrared · vegetation = red</span>
+              <input
+                type="range" min={0} max={11} value={month.index} className="ma-monthslider"
+                onChange={(e) => dispatchEvent(new CustomEvent('pres:setmonth', { detail: { index: +e.currentTarget.value } }))}
+                aria-label="Scrub month"
+              />
+              <span className="ma-monthlbl">{month.label}</span>
+            </div>
+          )}
           <span className="ma-presttl">{scene?.title}</span>
           <span className="ma-presnum">Scene {(scene?.index ?? 0) + 1} / {scene?.total ?? 0}</span>
           <div className="ma-presctl">
