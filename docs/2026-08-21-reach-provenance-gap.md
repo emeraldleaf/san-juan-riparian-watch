@@ -97,10 +97,14 @@ Five gates, in rough order of leverage. The first three are cheap and catch this
    **renderable on the map** (the inspection layers added to `/map` on 2026-08-21). A reviewer must be
    able to *see* what area a number covers in one click. Un-viewable extent = un-reviewable claim.
 
-Two of these are already partly real: the `/map` page now carries **"NMRipMap truth · Malpais"** and
-**"Experiment bbox (defined vs imaged)"** layers (#5), and the co-location check (#2) exists as a
-one-off script. The next step is to make #1–#3 mechanical, in the drift-gate tradition — *a gate nobody
-runs is documentation, not enforcement.*
+**#2 is now mechanized.** `.claude/scripts/check-layer-colocation.sh` reads a provenance manifest
+(`experiments/riparian_extent/spatial-provenance.json`) and fails the build when any declared
+head-to-head's layers have bbox IoU < 0.5 — the first drift gate that reaches the *pixels*. It is
+wired into `./dev.sh --check-encoding` and the `encoding-loop.yml` CI job, and it **self-tests**: every
+run re-checks the retracted `rf_malpais` vs `fm_malpais` pairing (IoU **0.162**) and fails loudly if
+that ever stops being flagged — because a broken gate is worse than none. The valid Bloomfield
+comparison passes at IoU **0.814**. #5 is also real (the `/map` inspection layers). #1 (provenance
+manifest as a hard requirement) and #3 (extent reconciliation) remain to be mechanized.
 
 ## The broader lesson
 

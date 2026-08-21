@@ -52,6 +52,7 @@ living on in a component docstring. All three actually happened.
 - `.claude/tombstones.txt` — retired identifiers; CI fails any doc/comment/config resurrecting one.
 - `docs/RETRACTIONS.md` — withdrawn *claims*; a doc may state one **only if it also retracts it**.
 - Doc orphans — every spec/ADR must be linked from the Pages hub (`docs/index.md`).
+- Layer co-location (`spatial-provenance.json`) — layers shown head-to-head must be co-located (bbox IoU ≥ 0.5); the first gate that reaches the *pixels*. Caught by nothing on 2026-08-21 when a river reach was compared as an "arroyo" — see `docs/2026-08-21-reach-provenance-gap.md`.
 
 When you retire a value or withdraw a result, **add it to the registry**. The sweep's completion
 criterion is "`./dev.sh --check-encoding` passes", not "the docs someone remembered are updated".

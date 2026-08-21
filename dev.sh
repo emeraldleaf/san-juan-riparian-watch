@@ -746,6 +746,7 @@ case "${1:-}" in
         .claude/scripts/check-canonical-results.sh || rc=1
         .claude/scripts/check-doc-orphans.sh      || rc=1
         .claude/scripts/check-scaffold-classpaths.sh || rc=1
+        .claude/scripts/check-layer-colocation.sh || rc=1
         exit $rc
         ;;
     --help|-h)
@@ -758,7 +759,7 @@ case "${1:-}" in
         echo "  --reconnect        Recover after external drive disconnect/reconnect"
         echo "  --update [type]    Run ETL update (full|incremental|ndvi|all) [--force]"
         echo "  --review-status N  Merge gate: is CodeRabbit GREEN on PR N's current head?"
-        echo "  --check-encoding   Drift gates: tombstones + retracted claims + canonical results + doc orphans"
+        echo "  --check-encoding   Drift gates: tombstones + retracted claims + canonical results + doc orphans + layer co-location"
         echo ""
         echo "  Database:"
         echo "  --backup           Snapshot ripariandb to backups/ (keeps latest 5)"
