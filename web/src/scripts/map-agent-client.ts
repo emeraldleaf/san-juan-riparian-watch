@@ -67,6 +67,104 @@ if (container) {
     if (bb) map.fitBounds(bb, { padding: 60, maxZoom: 13, duration: 800 });
   }
 
+  // ── Agent-narrated map presentation ──────────────────────────────────────
+  // A keynote where the slides ARE the map: each scene sets the camera + which
+  // layers are visible; the agent narrates in the panel. Presentation layers are
+  // reach-SPECIFIC files (only the Malpais/corridor stretch), separate from the
+  // legend's whole-product toggles.
+  const PRES_LAYERS: Record<string, { file: string; color: string; opacity: number }> = {
+    truth: { file: '/maps/truth_malpais.geojson', color: '#9aa4b2', opacity: 0.32 },
+    rf: { file: '/maps/rf_malpais_full.geojson', color: '#16a34a', opacity: 0.55 },
+    fm: { file: '/maps/fm_malpais.geojson', color: '#0891b2', opacity: 0.55 },
+    invasive: { file: '/maps/present-invasive-in-corridor.geojson', color: '#e11d48', opacity: 0.72 },
+  };
+  const presBounds: Record<string, maplibregl.LngLatBounds | null> = {};
+  async function fitToPres(key: string, opts: { pitch?: number } = {}) {
+    if (!(key in presBounds)) {
+      const b = new maplibregl.LngLatBounds();
+      try {
+        const gj = await (await fetch(PRES_LAYERS[key].file)).json();
+        (gj.features || []).forEach((f: any) => eachCoord(f.geometry, (c) => b.extend(c as any)));
+      } catch { /* missing file */ }
+      presBounds[key] = b.isEmpty() ? null : b;
+    }
+    const bb = presBounds[key];
+    if (bb) map.fitBounds(bb, { padding: 70, maxZoom: 14, pitch: opts.pitch ?? 0, duration: 1400 });
+  }
+
+  type Scene = { narration: string; layers: string[]; fit: string; stub?: boolean; pitch?: number };
+  const PRESENTATION: { title: string; scenes: Scene[] } = {
+    title: 'How we found the riparian',
+    scenes: [
+      { narration: "The Malpais arroyo, in New Mexico's high desert — bone-dry most of the year, but a thread of vegetation follows the wash. Our job: map that riparian vegetation from space, and tell native from invasive.", layers: [], fit: 'truth', pitch: 35 },
+      { narration: "First, what “riparian” even means here. Experts hand-drew it in 2020 — this grey layer is our ground truth. But it exists for one year, one place. We want a model that generalizes to any year, any reach.", layers: ['truth'], fit: 'truth' },
+      { narration: "The hard part: from a single summer image, riparian and an irrigated field look identical — both are just green. One snapshot can't separate them.", layers: ['truth'], fit: 'truth' },
+      { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is the signal. (The month-by-month view lands here next.)", layers: ['truth'], fit: 'truth', stub: true },
+      { narration: "A Random Forest learns that fingerprint from the 12-month stack. Here's where it predicts riparian along the arroyo — compare it to the grey truth.", layers: ['truth', 'rf'], fit: 'rf' },
+      { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — does the same with spatial context. On this arroyo, the morphology the Random Forest was blind to, it lifts accuracy from AUC 0.56 to 0.89.", layers: ['fm'], fit: 'fm' },
+      { narration: "And the invasive share — tamarisk and Russian olive — here in the Farmington corridor. One honest caveat: the model over-counts green farmland near the banks, so read these as model estimates, not ground truth.", layers: ['invasive'], fit: 'invasive' },
+    ],
+  };
+
+  let presIndex = -1;
+  let presPlaying = false;
+  let presTimer: ReturnType<typeof setTimeout> | null = null;
+  const SCENE_DWELL = 11000;
+
+  function showPresLayers(active: string[]) {
+    Object.keys(PRES_LAYERS).forEach((k) =>
+      map.setLayoutProperty(`pres-lyr-${k}`, 'visibility', active.includes(k) ? 'visible' : 'none'));
+  }
+  function clearAgentGeom() {
+    (map.getSource('context') as any)?.setData(fc(null));
+    (map.getSource('resolved') as any)?.setData(fc(null));
+  }
+  function emitScene() {
+    const s = PRESENTATION.scenes[presIndex];
+    dispatchEvent(new CustomEvent('pres:scene', { detail: {
+      index: presIndex, total: PRESENTATION.scenes.length, title: PRESENTATION.title,
+      narration: s.narration, stub: !!s.stub, playing: presPlaying,
+    } }));
+  }
+  function goToScene(i: number) {
+    if (!ready || i < 0 || i >= PRESENTATION.scenes.length) return;
+    presIndex = i;
+    const s = PRESENTATION.scenes[i];
+    clearAgentGeom();
+    showPresLayers(s.layers);
+    fitToPres(s.fit, { pitch: s.pitch });
+    emitScene();
+    if (presPlaying) scheduleAdvance();
+  }
+  function scheduleAdvance() {
+    if (presTimer) clearTimeout(presTimer);
+    presTimer = setTimeout(() => {
+      if (presIndex < PRESENTATION.scenes.length - 1) goToScene(presIndex + 1);
+      else endPres();
+    }, SCENE_DWELL);
+  }
+  function setPlaying(p: boolean) {
+    presPlaying = p;
+    if (presTimer) { clearTimeout(presTimer); presTimer = null; }
+    if (p) scheduleAdvance();
+    dispatchEvent(new CustomEvent('pres:state', { detail: { playing: presPlaying } }));
+  }
+  function endPres() {
+    presPlaying = false;
+    if (presTimer) { clearTimeout(presTimer); presTimer = null; }
+    presIndex = -1;
+    showPresLayers([]);
+    map.easeTo({ pitch: 0, duration: 600 });
+    dispatchEvent(new CustomEvent('pres:end'));
+  }
+
+  addEventListener('pres:start', () => { if (ready) { presPlaying = true; goToScene(0); } });
+  addEventListener('pres:play', () => setPlaying(true));
+  addEventListener('pres:pause', () => setPlaying(false));
+  addEventListener('pres:next', () => { if (presIndex < PRESENTATION.scenes.length - 1) goToScene(presIndex + 1); else endPres(); });
+  addEventListener('pres:prev', () => goToScene(presIndex - 1));
+  addEventListener('pres:exit', () => endPres());
+
   map.on('load', () => {
     // Product fills go on first (under the river lines). Hidden until toggled.
     for (const [key, p] of Object.entries(PRODUCTS)) {
@@ -79,6 +177,16 @@ if (container) {
           paint: { 'fill-color': p.color, 'fill-opacity': p.opacity, 'fill-outline-color': p.color },
         });
         layerIds[key].push(id);
+      });
+    }
+
+    // Presentation layers — reach-specific, hidden until a scene shows them.
+    for (const [key, p] of Object.entries(PRES_LAYERS)) {
+      map.addSource(`pres-src-${key}`, { type: 'geojson', data: p.file });
+      map.addLayer({
+        id: `pres-lyr-${key}`, type: 'fill', source: `pres-src-${key}`,
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': p.color, 'fill-opacity': p.opacity, 'fill-outline-color': p.color },
       });
     }
 

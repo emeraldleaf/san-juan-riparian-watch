@@ -97,3 +97,42 @@
   .ma-map { min-height: 300px; }
   .ma-panel { border-left: none; border-top: 1px solid var(--line); }
 }
+
+/* ── Agent-narrated presentation ─────────────────────────────────────────── */
+.ma-present-cta {
+  display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 12px;
+  padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+  background: var(--accent-2, #0e1a45); color: #fff; border: none;
+  border-radius: var(--radius, 10px); transition: background .15s ease;
+}
+.ma-present-cta:hover { background: #1a2557; }
+.ma-intro-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.ma-intro-sub em { color: var(--ink); font-style: normal; }
+
+/* narration beats read as "presenter" messages: a left accent rule */
+.ma-msg.pres .ma-text {
+  border-left: 3px solid var(--accent); background: var(--panel-2);
+  padding-left: 12px; font-size: 14.5px; line-height: 1.55;
+}
+
+.ma-continue {
+  align-self: flex-start; margin: 6px 0 2px; padding: 8px 14px; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--accent-2, #0e1a45);
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px;
+}
+.ma-continue:hover { background: var(--accent-tint, #eceffb); }
+
+.ma-presbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 22px; border-top: 1px solid var(--line); background: var(--panel-2);
+}
+.ma-presttl { font-weight: 600; font-size: 13px; color: var(--ink); }
+.ma-presnum { font: 600 12px/1 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-right: auto; }
+.ma-presctl { display: flex; align-items: center; gap: 4px; }
+.ma-presctl button {
+  border: 1px solid var(--line-2); background: var(--panel); color: var(--ink);
+  border-radius: 7px; padding: 5px 9px; font-size: 13px; cursor: pointer; line-height: 1;
+}
+.ma-presctl button:hover { border-color: var(--accent); }
+.ma-presexit { font-size: 12px !important; color: var(--muted) !important; margin-left: 4px; }
+.ma-chip-present { border-color: var(--accent) !important; color: var(--accent-2) !important; font-weight: 600; }
