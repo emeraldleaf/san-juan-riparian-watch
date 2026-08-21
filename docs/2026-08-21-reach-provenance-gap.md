@@ -97,14 +97,27 @@ Five gates, in rough order of leverage. The first three are cheap and catch this
    **renderable on the map** (the inspection layers added to `/map` on 2026-08-21). A reviewer must be
    able to *see* what area a number covers in one click. Un-viewable extent = un-reviewable claim.
 
-**#2 is now mechanized.** `.claude/scripts/check-layer-colocation.sh` reads a provenance manifest
-(`.claude/spatial-provenance.json`) and fails the build when any declared
-head-to-head's layers have bbox IoU < 0.5 — the first drift gate that reaches the *pixels*. It is
-wired into `./dev.sh --check-encoding` and the `encoding-loop.yml` CI job, and it **self-tests**: every
-run re-checks the retracted `rf_malpais` vs `fm_malpais` pairing (IoU **0.162**) and fails loudly if
-that ever stops being flagged — because a broken gate is worse than none. The valid Bloomfield
-comparison passes at IoU **0.814**. #5 is also real (the `/map` inspection layers). #1 (provenance
-manifest as a hard requirement) and #3 (extent reconciliation) remain to be mechanized.
+**All five are now mechanized** (2026-08-21). `.claude/scripts/check-layer-colocation.sh` reads a
+provenance manifest (`.claude/spatial-provenance.json`) and enforces #1–#4 in one gate, wired into
+`./dev.sh --check-encoding` and the `encoding-loop.yml` CI job — the first drift gate that reaches the
+*pixels*:
+
+- **#1 provenance** — every served `web/public/maps/*.geojson` must be declared (reach + kind). 14/14 declared.
+- **#2 co-location** — declared head-to-heads must have bbox IoU ≥ 0.5. It **self-tests**: every run
+  re-checks the retracted `rf_malpais` vs `fm_malpais` pairing (**IoU 0.162**) and fails loudly if that
+  ever stops being flagged. The valid Bloomfield comparison passes at **0.814**.
+- **#3 extent reconciliation** — each reach's defined-vs-imaged IoU must clear 0.6 or carry a
+  `discrepancy_ack`. **This immediately surfaced a second reach: Kirtland, IoU 0.395** (its imaged extent
+  is ~4 km short of the declared AOI) — now flagged in the manifest for the same overlay scrutiny as
+  Malpais before any per-reach number is restated. Aztec (0.795) and Bloomfield (0.909) reconcile.
+- **#4 name ↔ geometry** — a reach named for an ephemeral drainage (`arroyo`/`wash`/…) but declared
+  river-shaped must carry an ack. "Malpais Arroyo–San Juan" (river-dominated) trips it; its ack is the
+  retraction.
+- **#5 draw-your-extent** — the `/map` page carries the NMRipMap-truth and defined-vs-imaged bbox
+  inspection layers, so any reviewer can *see* a result's extent in one click.
+
+The gate turned a one-off human catch into standing enforcement — and on its first run it already found
+the next candidate (Kirtland) the same way.
 
 ## The broader lesson
 

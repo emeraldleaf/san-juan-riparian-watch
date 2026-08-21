@@ -1,28 +1,34 @@
 #!/usr/bin/env bash
-# ── Spatial-provenance gate: co-location ─────────────────────────────────────
-# Any set of map layers declared a "head-to-head comparison" MUST be co-located —
-# their bounding boxes must overlap >= min_iou. This catches the 2026-08-21
-# reach-provenance gap, where rf_malpais and fm_malpais were compared as one reach
-# but sit ~5 km apart, so the RF-vs-FM "arroyo rescue" was two different places.
+# ── Spatial-provenance gate ──────────────────────────────────────────────────
+# The first drift gate that reaches the PIXELS. Every existing gate enforces
+# textual consistency; none could see that a "head-to-head" compared two different
+# reaches, or that a reach named "arroyo" is geometrically a river, or that the
+# imaged extent excludes the region a claim is about. Those are the 2026-08-21
+# reach-provenance gap. See docs/2026-08-21-reach-provenance-gap.md.
 #
-# Every existing drift gate enforces TEXTUAL consistency; this is the first that
-# reaches the pixels. It also SELF-TESTS: it re-runs the exact retracted Malpais
-# pairing and fails loudly if that ever stops being flagged (a broken gate is
-# worse than none). See docs/2026-08-21-reach-provenance-gap.md.
+# Reads .claude/spatial-provenance.json and enforces four things:
+#   1. provenance   — every served web/public/maps/*.geojson is declared.
+#   2. co-location  — layers shown head-to-head overlap (bbox IoU >= min_iou);
+#                     SELF-TESTS by re-running the retracted Malpais pairing.
+#   3. extent       — each reach's defined vs imaged extent reconciles, or is ack'd.
+#   4. name↔geom    — a reach named for an ephemeral drainage but river-shaped is ack'd.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MANIFEST="$ROOT/.claude/spatial-provenance.json"
 PY="$(command -v python3 || echo python3)"
 
 exec "$PY" - "$MANIFEST" "$ROOT" <<'PYEOF'
-import json, sys, os
+import json, sys, os, glob, re
 
 manifest_path, root = sys.argv[1], sys.argv[2]
 if not os.path.exists(manifest_path):
-    print(f"✗ spatial-provenance manifest missing: {manifest_path}")
-    sys.exit(1)
+    print(f"✗ spatial-provenance manifest missing: {manifest_path}"); sys.exit(1)
 m = json.load(open(manifest_path))
 min_iou = float(m.get("min_iou", 0.5))
+reach_min_iou = float(m.get("reach_min_iou", 0.6))
+reaches = m.get("reaches", {})
+layers = m.get("layers", {})
+failures = 0
 
 def bbox(rel):
     path = os.path.join(root, rel)
@@ -31,78 +37,99 @@ def bbox(rel):
     gj = json.load(open(path))
     xs, ys = [], []
     def walk(a):
-        if a and isinstance(a[0], (int, float)):
-            xs.append(a[0]); ys.append(a[1])
+        if a and isinstance(a[0], (int, float)): xs.append(a[0]); ys.append(a[1])
         elif a:
             for x in a: walk(x)
     for f in gj.get("features", []):
         walk((f.get("geometry") or {}).get("coordinates"))
-    if not xs:
-        return None, f"no coordinates: {rel}"
+    if not xs: return None, f"no coordinates: {rel}"
     return (min(xs), min(ys), max(xs), max(ys)), None
 
 def iou(a, b):
     ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
     iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
-    ua = (a[2]-a[0]) * (a[3]-a[1])
-    ub = (b[2]-b[0]) * (b[3]-b[1])
-    union = ua + ub - inter
+    union = (a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - inter
     return inter / union if union > 0 else 0.0
 
 def min_pair_iou(group):
-    """Lowest pairwise bbox IoU in a group, plus per-file errors."""
     boxes, errs = {}, []
     for rel in group["layers"]:
         bb, err = bbox(rel)
-        if err: errs.append(err)
-        else: boxes[rel] = bb
-    if errs:
-        return None, errs
-    names = list(boxes)
-    worst = 1.0; worst_pair = None
+        (errs.append(err) if err else boxes.__setitem__(rel, bb))
+    if errs: return None, errs
+    names = list(boxes); worst = 1.0; worst_pair = None
     for i in range(len(names)):
         for j in range(i+1, len(names)):
             v = iou(boxes[names[i]], boxes[names[j]])
-            if v < worst:
-                worst, worst_pair = v, (names[i], names[j])
+            if v < worst: worst, worst_pair = v, (names[i], names[j])
     return (worst, worst_pair), []
 
-failures = 0
+# ── Gate 1: provenance — every served layer declared, every declared layer exists
+served = {os.path.relpath(p, root) for p in glob.glob(os.path.join(root, "web/public/maps/*.geojson"))}
+undeclared = sorted(served - set(layers))
+for rel in undeclared:
+    print(f"✗ [provenance] served layer not declared in the manifest: {rel}"); failures += 1
+for rel in layers:
+    if not os.path.exists(os.path.join(root, rel)):
+        print(f"✗ [provenance] declared layer missing on disk: {rel}"); failures += 1
+if not undeclared:
+    print(f"✓ [provenance] all {len(served)} served map layers are declared")
 
-# 1. Declared comparisons: every pair must be co-located.
+# ── Gate 3: extent reconciliation — defined vs imaged per reach
+for rid, r in reaches.items():
+    db, ib = r.get("defined_bbox"), r.get("imaged_bbox")
+    if not (db and ib): continue
+    v = iou(db, ib)
+    if v < reach_min_iou and not r.get("discrepancy_ack"):
+        print(f"✗ [extent] reach '{rid}': defined-vs-imaged IoU {v:.3f} < {reach_min_iou} with no discrepancy_ack.")
+        print(f"    the imaged/scored extent differs materially from the declared reach — acknowledge or reconcile it.")
+        failures += 1
+    elif v < reach_min_iou:
+        print(f"✓ [extent] reach '{rid}': IoU {v:.3f} — divergence acknowledged")
+    else:
+        print(f"✓ [extent] reach '{rid}': defined-vs-imaged IoU {v:.3f}")
+
+# ── Gate 4: name ↔ geometry — an ephemeral-drainage name on river-shaped geometry
+DRAINAGE = re.compile(r'\b(arroyo|wash|creek|draw|gulch)\b', re.I)
+RIVERISH = re.compile(r'\b(river|mainstem|subwatershed|corridor)\b', re.I)
+for rid, r in reaches.items():
+    name, morph = r.get("name", ""), r.get("morphology", "")
+    if DRAINAGE.search(name) and RIVERISH.search(morph) and not r.get("discrepancy_ack"):
+        print(f"✗ [name↔geometry] reach '{rid}': name '{name}' implies an ephemeral drainage, "
+              f"but morphology is '{morph}' — needs a discrepancy_ack.")
+        failures += 1
+
+# ── Gate 2: co-location of declared comparisons, + the self-test
 for g in m.get("comparisons", []):
     res, errs = min_pair_iou(g)
     if errs:
-        print(f"✗ {g['name']}: {'; '.join(errs)}"); failures += 1; continue
+        print(f"✗ [co-location] {g['name']}: {'; '.join(errs)}"); failures += 1; continue
     worst, pair = res
     if worst < min_iou:
-        print(f"✗ {g['name']} ({g.get('reach','')}) — layers are NOT co-located.")
-        print(f"    worst pairwise bbox IoU {worst:.3f} < {min_iou} between:")
-        print(f"      {os.path.basename(pair[0])}")
-        print(f"      {os.path.basename(pair[1])}")
+        print(f"✗ [co-location] {g['name']} ({g.get('reach','')}) — NOT co-located "
+              f"(worst pairwise IoU {worst:.3f} < {min_iou}):")
+        print(f"      {os.path.basename(pair[0])} vs {os.path.basename(pair[1])}")
         print(f"    fix: compare layers on the SAME reach, or split into separate comparisons.")
         failures += 1
     else:
-        print(f"✓ {g['name']}: co-located (min pairwise IoU {worst:.3f})")
+        print(f"✓ [co-location] {g['name']}: co-located (min pairwise IoU {worst:.3f})")
 
-# 2. Self-test: the known-bad pairing MUST still be caught.
 for g in m.get("selftest_expected_fail", []):
     res, errs = min_pair_iou(g)
     if errs:
-        print(f"✓ selftest {g['name']}: not evaluable ({'; '.join(errs)}) — layers gone, ok")
-        continue
-    worst, pair = res
+        print(f"✓ [self-test] {g['name']}: not evaluable ({'; '.join(errs)}) — layers gone, ok"); continue
+    worst, _ = res
     if worst >= min_iou:
-        print(f"✗ SELF-TEST BROKEN: {g['name']} was expected to FAIL but passed (IoU {worst:.3f}).")
-        print(f"    The gate no longer catches the retracted conflation. Fix the gate.")
+        print(f"✗ SELF-TEST BROKEN: {g['name']} expected to FAIL but passed (IoU {worst:.3f}). Fix the gate.")
         failures += 1
     else:
-        print(f"✓ selftest {g['name']}: correctly flagged (IoU {worst:.3f} < {min_iou})")
+        print(f"✓ [self-test] {g['name']}: correctly flagged (IoU {worst:.3f} < {min_iou})")
 
 if failures:
-    print(f"\n✗ {failures} spatial-provenance problem(s). A 'head-to-head' of non-co-located layers "
-          f"compares different ground — the exact 2026-08-21 reach-provenance gap.")
+    print(f"\n✗ {failures} spatial-provenance problem(s). A result whose data/labels/imagery/score/map "
+          f"don't describe the same ground is the 2026-08-21 reach-provenance gap.")
     sys.exit(1)
-print("\n✓ all declared comparisons are co-located; the known-bad pairing is still caught.")
+print("\n✓ spatial provenance: layers declared, comparisons co-located, extents reconciled/ack'd, "
+      "names consistent, self-test still catching the known-bad pairing.")
 PYEOF
