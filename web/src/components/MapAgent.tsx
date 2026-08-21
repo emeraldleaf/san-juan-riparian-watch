@@ -47,7 +47,12 @@ export default function MapAgent() {
       });
       const d = await r.json();
       const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
-      const highlight = Object.values(d.resolved || {}).filter(Boolean)[0];
+      // Prefer the riparian delineation polygons for the highlight, so the map
+      // shows the actual riparian area (never off into non-riparian) and only
+      // falls back to the reach centerline when there are no polygons.
+      const riparian = Object.values(d.riparian_geom || {}).filter(Boolean)[0];
+      const resolved = Object.values(d.resolved || {}).filter(Boolean)[0];
+      const highlight = riparian || resolved;
       if (context || highlight) dispatchEvent(new CustomEvent('mapagent:geom', { detail: { context, highlight } }));
       else dispatchEvent(new CustomEvent('mapagent:clear'));
       // The agent can toggle overlays (rf/fm/invasive) via map(action="layer", …).
