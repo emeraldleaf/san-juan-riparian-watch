@@ -1,5 +1,7 @@
 # The foundation model earns its keep — but only where the baseline was blind
 
+> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **arroyo may never have been modeled**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 **Date:** 2026-08-01 · **Status:** result · settles the
 [FM-vs-RF deploy decision](specs/2026-07-19-fm-vs-rf-deploy-decision.md) against the measured
 [RF bar](2026-07-20-diverse-reach-transfer.md). Metric/method background:

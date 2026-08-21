@@ -1,5 +1,7 @@
 # Stage 2 — native-vs-invasive, and does it survive the beetle
 
+> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **arroyo may never have been modeled**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 **Date:** 2026-08-01 · **Status:** experiment spec (spec-before-spend) · the Stage-2 analogue of the
 settled [Stage-1 extent LORO result](../2026-08-01-fm-vs-rf-loro-result.md) · depends on
 [Phase 3 deep-time](2026-07-18-phase3-deeptime-change.md),

@@ -1,5 +1,7 @@
 # San Juan Riparian Watch
 
+> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **arroyo may never have been modeled**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 ## 🌐 [**Live site → riparian.emeraldleaf.dev**](https://riparian.emeraldleaf.dev)
 
 An interactive story map of the corridor, the **Random Forest vs. Ai2's OlmoEarth** field test, and a **grounded RAG agent** you can ask anything — answers stream in and cite their sources.

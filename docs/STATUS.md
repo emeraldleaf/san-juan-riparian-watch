@@ -1,5 +1,7 @@
 # Project Status
 
+> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **arroyo may never have been modeled**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 **Last updated:** 2026-08-17
 
 Cross-session entry point. Surfaced automatically at session start by the

@@ -35,7 +35,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
-    <div class="kpi"><div class="n b">0.557→0.889</div><div class="l">RF→OlmoEarth AUC on the held-out arroyo</div></div>
+    <div class="kpi"><div class="n b">~0.88</div><div class="l">RF &amp; OlmoEarth transfer AUC on the river reaches (the arroyo result is under review)</div></div>
     <div class="kpi"><div class="n">1984→</div><div class="l">Landsat archive depth we probed, and where it breaks</div></div>
     <div class="kpi"><div class="n g">2</div><div class="l">tempting results a pre-registered test killed</div></div>
   </div>
@@ -197,6 +197,16 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <section class="reveal" id="models"><div class="wrap">
   <div class="kicker">The OlmoEarth field test, Random Forest vs Ai2's foundation model</div>
   <h2>On rivers they tie. One arroyo decides it.</h2>
+  <div class="poc-note" style="border-color:color-mix(in srgb,var(--invasive) 45%,var(--line))">
+    <span class="badge" style="background:var(--invasive);color:#fff">Under review — do not rely on this</span>
+    <p><b>This result is being re-verified and the headline "arroyo rescue" is retracted pending that check.</b>
+    The reach labeled "Malpais arroyo" is the HUC12 <em>Malpais Arroyo–San Juan</em> — a subwatershed
+    dominated by the San Juan mainstem, not a pure arroyo. On the maps the models sit on the river while
+    the ground truth follows the wash, and the 12-month imagery that trained them does not appear to cover
+    the arroyo itself — so the arroyo may never have been modeled, which means the <b>0.557 → 0.889</b>
+    gap cannot be attributed to arroyo morphology as claimed below. We're auditing the scoring before
+    restating anything. See <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/RETRACTIONS.md">the retraction note</a>.</p>
+  </div>
   <p>First, what's actually being compared: two very different ways to turn satellite pixels into a map.</p>
   <div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="num" style="font-size:17px;color:var(--accent)">Random Forest (RF)</div><div class="lab">The classic workhorse. It looks at each pixel on its own, reads its colour across the seasons, and votes with hundreds of little decision trees. Simple, fast, runs on any laptop, no GPU. A genuinely strong baseline, not a straw man.</div></div>
