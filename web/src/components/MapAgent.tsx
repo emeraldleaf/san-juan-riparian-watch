@@ -30,8 +30,16 @@ export default function MapAgent() {
   const [pausedForAsk, setPausedForAsk] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const scrollDown = () =>
-    requestAnimationFrame(() => logRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' }));
+  // Pin to the bottom whenever the log changes — as an effect (after the DOM has
+  // committed the new, possibly-tall message), so it always lands at the true
+  // bottom rather than a stale height. A trailing rAF covers late layout.
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    const id = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    return () => cancelAnimationFrame(id);
+  }, [msgs, busy, pausedForAsk]);
 
   useEffect(() => {
     fetch('/agent/map/coverage')
@@ -49,14 +57,12 @@ export default function MapAgent() {
       setPresPlaying(!!d.playing);
       setScene({ index: d.index, total: d.total, title: d.title, phenology: !!d.phenology });
       setMsgs((m) => [...m, { role: 'agent', text: d.narration, pres: true }]);
-      scrollDown();
     };
     const onMonth = (e: any) => setMonth({ index: e.detail?.index ?? 0, label: e.detail?.label ?? '' });
     const onState = (e: any) => setPresPlaying(!!e.detail?.playing);
     const onEnd = () => {
       setPresenting(false); setPresPlaying(false); setScene(null); setPausedForAsk(false);
       setMsgs((m) => [...m, { role: 'agent', text: "That's the walkthrough. Ask me anything about it, or explore the layers yourself." }]);
-      scrollDown();
     };
     addEventListener('pres:scene', onScene);
     addEventListener('pres:month', onMonth);
@@ -111,7 +117,6 @@ export default function MapAgent() {
       setMsgs((m) => [...m, { role: 'agent', text: 'The map agent is unreachable right now.' }]);
     } finally {
       setBusy(false);
-      scrollDown();
     }
   }
 
