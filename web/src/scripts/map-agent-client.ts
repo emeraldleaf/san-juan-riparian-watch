@@ -44,7 +44,7 @@ else if (container) {
   const PRODUCTS: Record<string, { color: string; opacity: number; files: string[]; outline?: string }> = {
     // Absolute paths: this page is served at /map/, so a RELATIVE 'maps/x' would
     // resolve to /map/maps/x and the box returns the SPA-fallback HTML (not the
-    // GeoJSON) — MapLibre renders nothing and fitToProduct's fetch throws.
+    // GeoJSON) — MapLibre renders nothing and any layer fetch throws.
     rf: { color: '#16a34a', opacity: 0.5, files: ['/maps/present-extent-2020.geojson', '/maps/reach-malpais-rf.geojson', '/maps/extent-bloomfield-rf.geojson'] },
     fm: { color: '#0891b2', opacity: 0.5, files: ['/maps/fm_bloomfield.geojson', '/maps/fm_malpais.geojson'] },
     invasive: { color: '#e11d48', opacity: 0.72, files: ['/maps/present-invasive-in-corridor.geojson'] },
@@ -60,24 +60,6 @@ else if (container) {
   const BBOX_COVERED = [-108.8239, 36.8071, -108.6962, 36.8930];
   const rect = (b: number[]) => ({ type: 'Feature' as const, properties: {}, geometry: {
     type: 'Polygon' as const, coordinates: [[[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]] } });
-
-  // Fit the map to a product's extent (lazy-fetched, cached) so toggling a layer
-  // ON also zooms you to where it has data.
-  const productBounds: Record<string, maplibregl.LngLatBounds | null> = {};
-  async function fitToProduct(key: string) {
-    if (!(key in productBounds)) {
-      const b = new maplibregl.LngLatBounds();
-      for (const file of PRODUCTS[key]?.files || []) {
-        try {
-          const gj = await (await fetch(file)).json();
-          (gj.features || []).forEach((f: any) => eachCoord(f.geometry, (c) => b.extend(c as any)));
-        } catch { /* skip a missing file */ }
-      }
-      productBounds[key] = b.isEmpty() ? null : b;
-    }
-    const bb = productBounds[key];
-    if (bb) map.fitBounds(bb, { padding: 60, maxZoom: 13, duration: 800 });
-  }
 
   // ── Agent-narrated map presentation ──────────────────────────────────────
   // A keynote where the slides ARE the map: each scene sets the camera + which
@@ -356,6 +338,5 @@ else if (container) {
     ids.forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'));
     const cb = document.querySelector<HTMLInputElement>(`[data-product="${key}"]`);
     if (cb) cb.checked = visible;
-    if (visible) fitToProduct(key);
   });
 }
