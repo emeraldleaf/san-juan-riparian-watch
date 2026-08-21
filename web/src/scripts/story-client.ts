@@ -5,10 +5,8 @@
 import maplibregl from 'maplibre-gl';
 
 const root = document.documentElement;
-const tog = document.getElementById('tog');
 root.classList.add('js-reveal');
-const curTheme = () => root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
-tog?.addEventListener('click', () => root.setAttribute('data-theme', curTheme() === 'dark' ? 'light' : 'dark'));
+// The theme toggle (#tog) is wired + persisted by the shared script in Base.astro.
 
 const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.1 });
 document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
