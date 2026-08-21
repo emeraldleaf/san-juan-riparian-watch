@@ -65,6 +65,8 @@ export async function turnstileToken(): Promise<string | undefined> {
       };
       const timer = setTimeout(() => finish(undefined), 8000);
       try {
+        // An invisible widget auto-executes on render, so we don't call
+        // execute() ourselves (doing so logs "already executing").
         id = ts.render(holder, {
           sitekey: SITEKEY,
           size: 'invisible',
@@ -72,7 +74,6 @@ export async function turnstileToken(): Promise<string | undefined> {
           'error-callback': () => finish(undefined),
           'timeout-callback': () => finish(undefined),
         });
-        ts.execute(id);
       } catch {
         finish(undefined);
       }
