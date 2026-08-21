@@ -3,6 +3,7 @@
 // the imperative map (map-agent-client.ts) via a window CustomEvent. Same seam the
 // story maps use: React fetches, the map listens.
 import { useEffect, useRef, useState } from 'react';
+import { turnstileToken } from '../scripts/turnstile';
 
 type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[] };
 type Reach = { name: string; reaches: number };
@@ -36,9 +37,12 @@ export default function MapAgent() {
     setMsgs((m) => [...m, { role: 'user', text: q }]);
     setBusy(true);
     try {
+      const token = await turnstileToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token) headers['X-Turnstile-Token'] = token;
       const r = await fetch('/agent/map', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ question: q }),
       });
       const d = await r.json();

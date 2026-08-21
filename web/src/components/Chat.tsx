@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { turnstileToken } from '../scripts/turnstile';
 
 // The grounded RAG agent, as a React island. It streams tokens from the full
 // Quartzose /query/stream pipeline, renders numbered source chips, and lets the
@@ -280,7 +281,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctrl.abort(), 30000); };
     bump();
     try {
-      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
+      const token = await turnstileToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token) headers['X-Turnstile-Token'] = token;
+      const r = await fetch(url, { method: 'POST', headers, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
       if (!r.ok || !r.body) throw new Error('agent ' + r.status);
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '', full = ''; const ctx: any[] = [];
       for (;;) {
@@ -310,7 +314,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const body = isQuery ? { query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current } : { question: q, top_k: 8 };
     const t = withTimeout(60000);
     try {
-      const r = await fetch(AGENT_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: t.signal, body: JSON.stringify(body) });
+      const token = await turnstileToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token) headers['X-Turnstile-Token'] = token;
+      const r = await fetch(AGENT_URL, { method: 'POST', headers, signal: t.signal, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('agent ' + r.status);
       const res = await r.json();
       if (isQuery) {
