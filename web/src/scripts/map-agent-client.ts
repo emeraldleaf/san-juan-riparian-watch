@@ -113,8 +113,9 @@ if (container) {
     ready = true;
   });
 
-  // Draw the full river (context) with the analyzed reach highlighted, fit to the
-  // whole river so you see its full in-AOI extent — not just the scored stretch.
+  // Draw the full river (context) faint for orientation, with the riparian area
+  // highlighted — but fit to the HIGHLIGHT (the riparian polygons / mapped reaches),
+  // not the full mainstem centerline, so the map lands on what the answer is about.
   addEventListener('mapagent:geom', (e: any) => {
     if (!ready) return;
     const context = e.detail?.context;
@@ -123,7 +124,7 @@ if (container) {
     (map.getSource('resolved') as any)?.setData(fc(highlight));
     try {
       const b = new maplibregl.LngLatBounds();
-      eachCoord(context || highlight, (c) => b.extend(c as any));
+      eachCoord(highlight || context, (c) => b.extend(c as any));
       if (!b.isEmpty()) map.fitBounds(b, { padding: 70, maxZoom: 12, duration: 800 });
     } catch { /* geometry with no coords — leave the view */ }
   });
