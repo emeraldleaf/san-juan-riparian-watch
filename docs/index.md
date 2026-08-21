@@ -75,6 +75,11 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Decision records
 
+- [Basin-scale productionization — wall-to-wall riparian + invasive, annually](decisions/2026-08-21-basin-scale-productionization.md)
+  — how the four-reach experiment becomes a recurring basin product: classify the **hydrography buffer**
+  (not the whole basin), tile it, drive a resumable `(tile, year)` manifest, stream imagery + two-stage
+  GPU inference (OlmoEarth extent, invasive when its LORO clears), on a batch orchestrator, with a cost
+  model measured from a one-HUC10 proof. Honest validation-at-scale, since you can't hand-check a basin.
 - [The conversational map agent — one loop core, two policies](decisions/2026-08-18-map-agent-runtime.md)
   — a **second agent** on the platform without forking the runtime: factor the tool loop into a generic
   **core** and a per-agent **policy** (soul, registry, seed, empty-fallback, citation). The document
