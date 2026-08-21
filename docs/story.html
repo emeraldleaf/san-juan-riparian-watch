@@ -358,7 +358,7 @@
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
-    <div class="kpi"><div class="n b">0.557→0.889</div><div class="l">RF→OlmoEarth AUC on the held-out arroyo</div></div>
+    <div class="kpi"><div class="n b">0.557→0.889</div><div class="l">RF→OlmoEarth AUC on the held-out out-of-distribution reach</div></div>
     <div class="kpi"><div class="n">1984→</div><div class="l">Landsat archive depth we probed, and where it breaks</div></div>
     <div class="kpi"><div class="n g">2</div><div class="l">tempting results a pre-registered test killed</div></div>
   </div>
@@ -515,7 +515,15 @@
 <!-- ── FINDING 2: RF vs FM ────────────────────────────────────────── -->
 <section class="reveal" id="models"><div class="wrap">
   <div class="kicker">The OlmoEarth field test, Random Forest vs Ai2's foundation model</div>
-  <h2>On rivers they tie. One arroyo decides it.</h2>
+  <h2>On familiar ground they tie. One unfamiliar reach decides it.</h2>
+  <div style="border:2px solid #2563eb;background:#eff6ff;color:#1e3a5f;padding:12px 14px;border-radius:8px;margin:12px 0;font-size:14px">
+    <strong>Corrected 2026-08-21 — the result stands, the label didn't.</strong> The RF bar reproduced and
+    both models were scored on the same held-out pixels, so RF 0.557 → OlmoEarth 0.889 holds. But "Malpais"
+    is a <strong>river-dominated subwatershed</strong>, not a desert arroyo (<em>attribution to arroyo
+    morphology is unverified</em>), and the edge is brittleness to distribution shift on an
+    out-of-distribution reach — not arroyo shape and not tamarisk (RF near-chance on native 0.59 and
+    invasive 0.53 alike).
+  </div>
   <p>First, what's actually being compared: two very different ways to turn satellite pixels into a map.</p>
   <div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="num" style="font-size:17px;color:var(--accent)">Random Forest (RF)</div><div class="lab">The classic workhorse. It looks at each pixel on its own, reads its colour across the seasons, and votes with hundreds of little decision trees. Simple, fast, runs on any laptop, no GPU. A genuinely strong baseline, not a straw man.</div></div>
@@ -524,25 +532,27 @@
   <p><strong>Why put them head to head?</strong> Because "just use the fancy model" isn't a plan. A foundation model costs real money and hardware, so it's only worth deploying where it <em>measurably</em> beats the cheap baseline. The goal here isn't to crown a winner; it's to find the exact conditions under which OlmoEarth earns its keep, and to say so plainly where it doesn't. That's a real deployment decision, made on evidence instead of hype.</p>
   <p>The test that matters isn't how well a model scores on data it trained on; it's whether it
     <strong>transfers to a place it has never seen</strong>. So we train on some reaches and predict a
-    held-out one. A per-pixel Random Forest, pooled across four very different reaches, transfers
-    <em>well</em> to unfamiliar river corridors. It has exactly one blind spot: the lone
-    <strong>arroyo</strong>, the only landform of its kind in the set. And that's precisely where a
-    foundation model should have the edge, it comes down to spatial context on a shape the training data
-    barely covers. This is the honest test of whether OlmoEarth actually delivers there.</p>
+    held-out one. A per-pixel Random Forest, pooled across four reaches, transfers <em>well</em> to
+    reaches that resemble the ones it trained on (0.85–0.90). It has exactly one blind spot: the held-out
+    reach whose landscape is <strong>unlike the rest</strong> — Malpais, a San-Juan-valley subwatershed
+    with a heavy irrigated-ag and desert-upland mix — where it collapses to near-chance (0.56). And that's
+    precisely where a foundation model should have the edge: its pre-trained representation is far less
+    <strong>brittle</strong> when a test reach falls outside the training distribution. This is the honest
+    test of whether OlmoEarth actually delivers there.</p>
 
   <figure class="fig"><div class="body">
     <div class="board" role="img" aria-label="Leave-one-reach-out transfer AUC: Farmington 0.905, Aztec/Animas 0.886, Kirtland 0.845, Malpais arroyo 0.557, where the foundation model reaches 0.889.">
       <div class="brow"><div class="rl">Farmington<small>wide confluence</small></div><div class="track"><div class="bar riv" style="width:81%"></div></div><div class="rv">0.905</div></div>
       <div class="brow"><div class="rl">Aztec / Animas<small>montane tributary</small></div><div class="track"><div class="bar riv" style="width:77.2%"></div></div><div class="rv">0.886</div></div>
       <div class="brow"><div class="rl">Kirtland<small>semi-arid mainstem</small></div><div class="track"><div class="bar riv" style="width:69%"></div></div><div class="rv">0.845</div></div>
-      <div class="brow"><div class="rl">Malpais<small>narrow ephemeral arroyo</small></div><div class="track"><div class="bar arr" style="width:11.4%"></div><div class="fmmark" style="left:77.8%"></div></div><div class="rv lose">0.557</div></div>
+      <div class="brow"><div class="rl">Malpais<small>San Juan valley · out-of-distribution</small></div><div class="track"><div class="bar arr" style="width:11.4%"></div><div class="fmmark" style="left:77.8%"></div></div><div class="rv lose">0.557</div></div>
     </div>
     <div class="baseline">Bars = Random Forest transfer AUC (0.5 = random, at the left edge). The green
-      tick on the arroyo is the fine-tuned foundation model: <b>0.557 → 0.889</b>.</div>
+      tick on Malpais is the fine-tuned foundation model — <b>0.557 → 0.889</b> on the one out-of-distribution reach.</div>
   </div><figcaption><b>OlmoEarth eval card.</b> Task: riparian extent. Protocol: leave-one-reach-out
     transfer over 4 morphologically diverse reaches, scored once on the held-out reach (shared NMRipMap
-    labels). Result: RF and OlmoEarth tie on the <b>common</b> morphology (rivers, mean 0.88); OlmoEarth
-    wins the <b>under-represented</b> one, the arroyo, its single predicted opening, <b>0.557 → 0.889</b>.
+    labels). Result: RF and OlmoEarth are a wash on the three <b>in-distribution</b> reaches (mean ~0.88);
+    OlmoEarth wins the one <b>out-of-distribution</b> reach, Malpais, <b>0.557 → 0.889</b> — robustness to distribution shift, not an arroyo rescue.
     Model: OlmoEarth (Ai2) fine-tuned on the pooled reaches. Reproducible: <a
     href="2026-08-01-fm-vs-rf-loro-result.md">the LORO result</a> · <a
     href="specs/2026-07-19-fm-vs-rf-deploy-decision.md">the pre-registered eval contract</a>.</figcaption></figure>
@@ -813,7 +823,7 @@
   <ul class="k-list">
     <li>Riparian <strong>extent</strong> is already solved for this basin (CO-RIP, κ 0.80), the RF reproduces it; that's the control, not the contribution.</li>
     <li>The invasive discriminator is <strong>phenology / SWIR</strong>, not NDVI, and it looks <strong>beetle-robust</strong>, though the in-basin sample is too small to prove it.</li>
-    <li>The foundation model earns its keep on <strong>under-represented morphology</strong> (the arroyo), not on the river corridors where RF already transfers.</li>
+    <li>The foundation model earns its keep on the <strong>out-of-distribution reach</strong> (Malpais), where the RF collapses — not on the reaches that resemble its training set, where the RF already transfers.</li>
     <li>What we won't claim: a pre-2000 trajectory. What is real: a present-day, corridor-masked, native-vs-invasive product.</li>
   </ul>
   <p style="margin-top:14px;font-size:13px"><b>Built on the Allen Institute for AI's open models</b>, <a href="https://allenai.org/olmo">OlmoEarth</a> (Earth-observation foundation model) for delineation,
@@ -1008,7 +1018,7 @@
     {k:["invasive","corridor","23","how much","percent","share"],
      a:"About 23% of the mapped riparian corridor at Farmington is invasive tamarisk / Russian olive, 1.7 km² of invasive inside a 7.6 km² woody corridor. That figure is in-sample calibration to the 2020 NMRipMap labels, not an independent validation."},
     {k:["foundation","fm","beat","rf","random forest","tie","arroyo","malpais","olmoearth"],
-     a:"On the four river-corridor reaches they tie at ~0.80–0.88 AUC. They part on the lone arroyo (Malpais): RF transfers at 0.557 (barely above random), the fine-tuned foundation model at 0.889. That under-represented morphology, the one landform type the RF had no training sibling for, is why the foundation model ships for the invasive task; for plain extent, RF is as good and needs no GPU."},
+     a:"On the three in-distribution river reaches they essentially tie (~0.85–0.90 AUC). They part on the held-out out-of-distribution reach (Malpais): the RF collapses to near-chance (0.557) while OlmoEarth holds (0.889). That is brittleness to distribution shift — the RF cannot generalize to a reach unlike its training set — not an arroyo or tamarisk effect (RF near-chance on native 0.59 and invasive 0.53 alike). It is why the foundation model is the right pick for the unlabeled basin; for reaches like its training set, RF is as good and needs no GPU."},
     {k:["beetle","diorhabda","invert","inversion","control","russian olive"],
      a:"No inversion. Tamarisk-vs-native holds 0.85 / 0.81 / 0.86 across 2020 / 2015 / 2000. The pre-registered negative control (Russian olive) moved 0.34 over the same span, about seven times the tamarisk 'signal', so the data can't resolve a beetle effect. The control vetoes the claim."},
     {k:["trajectory","1990","pre-2000","over time","history","deep time","past","5x","growth"],
