@@ -201,11 +201,12 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     <span class="badge" style="background:var(--invasive);color:#fff">Under review — do not rely on this</span>
     <p><b>This result is being re-verified and the headline "arroyo rescue" is retracted pending that check.</b>
     The reach labeled "Malpais arroyo" is the HUC12 <em>Malpais Arroyo–San Juan</em> — a subwatershed
-    dominated by the San Juan mainstem, not a pure arroyo. On the maps the models sit on the river while
-    the ground truth follows the wash, and the 12-month imagery that trained them does not appear to cover
-    the arroyo itself — so the arroyo may never have been modeled, which means the <b>0.557 → 0.889</b>
-    gap cannot be attributed to arroyo morphology as claimed below. We're auditing the scoring before
-    restating anything. See <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/RETRACTIONS.md">the retraction note</a>.</p>
+    dominated by the San Juan mainstem, not a pure arroyo. On the maps the expert truth follows the wash up
+    the arroyo, but the model layers sit on the San Juan mainstem — the riparian up the wash isn't in the
+    OlmoEarth layer at all. (An overlay confirms the reach <em>was</em> within the modeled coverage, so this
+    isn't a "never modeled" gap.) So <b>attribution of the 0.557 → 0.889 gap to arroyo morphology is
+    unverified</b> — if the models are scoring the river, the "rescue" isn't an arroyo result. We're auditing
+    the scoring before restating anything. See <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/RETRACTIONS.md">the retraction note</a>.</p>
   </div>
   <p>First, what's actually being compared: two very different ways to turn satellite pixels into a map.</p>
   <div class="stats" style="grid-template-columns:1fr 1fr">
