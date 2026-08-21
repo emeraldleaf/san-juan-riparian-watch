@@ -3,7 +3,7 @@
 :root{
   --font-sans:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;
   --font-display:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;
-  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono','Menlo','Consolas',monospace;
   --ground:#f7f8fa; --panel:#ffffff; --panel-2:#eef1f5; --ink:#171a21; --ink-h:#0e1a45; --muted:#5a6373; --subtle:#8791a1;
   --line:#e5e8ee; --line-2:#d3d8e0;
   --accent:#26347f; --accent-2:#0e1a45; --accent-tint:#eceffb;

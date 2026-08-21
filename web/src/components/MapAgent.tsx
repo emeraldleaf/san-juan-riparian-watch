@@ -99,7 +99,8 @@ export default function MapAgent() {
       const token = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (token) headers['X-Turnstile-Token'] = token;
-      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify({ question: q }) });
+      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify({ question: q }), signal: AbortSignal.timeout(30000) });
+      if (!r.ok) throw new Error(`agent responded ${r.status}`);  // e.g. 403 when the Turnstile token is missing/invalid
       const d = await r.json();
       const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
       const riparian = Object.values(d.riparian_geom || {}).filter(Boolean)[0];

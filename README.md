@@ -1,6 +1,6 @@
 # San Juan Riparian Watch
 
-> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **attribution to arroyo morphology is unverified**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+> **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism: on the one **out-of-distribution** held-out reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
 
 ## 🌐 [**Live site → riparian.emeraldleaf.dev**](https://riparian.emeraldleaf.dev)
 

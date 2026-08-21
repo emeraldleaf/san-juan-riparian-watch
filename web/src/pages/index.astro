@@ -230,7 +230,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     test of whether OlmoEarth actually delivers there.</p>
 
   <figure class="fig"><div class="body">
-    <div class="board" role="img" aria-label="Leave-one-reach-out transfer AUC: Farmington 0.905, Aztec/Animas 0.886, Kirtland 0.845, Malpais arroyo 0.557, where the foundation model reaches 0.889.">
+    <div class="board" role="img" aria-label="Leave-one-reach-out transfer AUC: Farmington 0.905, Aztec/Animas 0.886, Kirtland 0.845, Malpais 0.557, where the foundation model reaches 0.889.">
       <div class="brow"><div class="rl">Farmington<small>wide confluence</small></div><div class="track"><div class="bar riv" style="width:81%"></div></div><div class="rv">0.905</div></div>
       <div class="brow"><div class="rl">Aztec / Animas<small>montane tributary</small></div><div class="track"><div class="bar riv" style="width:77.2%"></div></div><div class="rv">0.886</div></div>
       <div class="brow"><div class="rl">Kirtland<small>semi-arid mainstem</small></div><div class="track"><div class="bar riv" style="width:69%"></div></div><div class="rv">0.845</div></div>
@@ -273,9 +273,9 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     useless. Prevalence swings 47%→82% across reaches, so the transfer metric is <strong>AUC</strong>
     (ranking quality, prevalence-invariant), reported alongside F1 at the deployment threshold, never
     accuracy. For plain <em>extent</em>, RF is as good and needs no GPU; the foundation model earns its
-    keep only on the under-represented morphology.</div>
+    keep only on the out-of-distribution reach.</div>
   <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
-    <button class="askchip" data-ask="Does OlmoEarth beat the Random Forest on the arroyo, and why?">Does OlmoEarth beat the RF on the arroyo — and why? ↗</button>
+    <button class="askchip" data-ask="Does OlmoEarth beat the Random Forest on the held-out out-of-distribution reach, and why?">Does OlmoEarth beat the RF on the held-out reach — and why? ↗</button>
     <button class="askchip" data-ask="Why does the foundation model ship for invasives but not for plain extent?">Why ship the FM for invasives but not extent? ↗</button>
   </div>
 </div></section>
@@ -502,7 +502,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <ul class="k-list">
     <li>Riparian <strong>extent</strong> is already solved for this basin (CO-RIP, κ 0.80), the RF reproduces it; that's the control, not the contribution.</li>
     <li>The invasive discriminator is <strong>phenology / SWIR</strong>, not NDVI, and it looks <strong>beetle-robust</strong>, though the in-basin sample is too small to prove it.</li>
-    <li>The foundation model earns its keep on <strong>under-represented morphology</strong> (the arroyo), not on the river corridors where RF already transfers.</li>
+    <li>The foundation model earns its keep on the <strong>out-of-distribution reach</strong> (Malpais), where the RF collapses — not on the reaches that resemble its training set.</li>
     <li>What we won't claim: a pre-2000 trajectory. What is real: a present-day, corridor-masked, native-vs-invasive product.</li>
   </ul>
   <p style="margin-top:14px;font-size:13px"><b>Built on the Allen Institute for AI's open models</b>, <a href="https://allenai.org/olmo">OlmoEarth</a> (Earth-observation foundation model) for delineation,

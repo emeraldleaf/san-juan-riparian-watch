@@ -142,5 +142,5 @@ if failures:
           f"don't describe the same ground is the 2026-08-21 reach-provenance gap.")
     sys.exit(1)
 print("\n✓ spatial provenance: layers declared, comparisons co-located, extents reconciled/ack'd, "
-      "names consistent, self-test still catching the known-bad pairing.")
+      "names consistent.")
 PYEOF

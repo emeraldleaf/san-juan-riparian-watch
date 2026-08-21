@@ -896,9 +896,9 @@
     });
   })();
 
-  /* ---------- arroyo: RF vs FM vs NMRipMap truth over the held-out reach. Both RF
-       (rf_malpais_full) and FM are full-extent leave-one-reach-out predictions; the view is
-       fit to the labeled reach where truth exists, the valid comparison region. ---------- */
+  /* ---------- held-out reach: RF vs FM vs NMRipMap truth. Both are leave-one-reach-out
+       predictions over the labeled reach; the RF (reach-malpais-rf) fires only in a small
+       eastern pocket while FM tracks the corridor — the near-chance collapse made visible. ---------- */
   (function(){
     var status=document.getElementById('status-arroyo');
     var map=new maplibregl.Map({container:'map-arroyo',center:[-108.760,36.850],zoom:11.7,style:SAT,cooperativeGestures:true});
@@ -910,7 +910,7 @@
     map.on('load',function(){
       map.addSource('a-fm',{type:'geojson',data:'maps/fm_malpais.geojson'});
       map.addLayer({id:'a-fm',type:'fill',source:'a-fm',paint:{'fill-color':'#16a34a','fill-opacity':0.45}});
-      map.addSource('a-rf',{type:'geojson',data:'maps/rf_malpais_full.geojson'});
+      map.addSource('a-rf',{type:'geojson',data:'maps/reach-malpais-rf.geojson'});
       map.addLayer({id:'a-rf',type:'fill',source:'a-rf',paint:{'fill-color':'#f97316','fill-opacity':0.9,'fill-outline-color':'#7c2d12'}});
       map.addSource('a-truth',{type:'geojson',data:'maps/truth_malpais.geojson'});
       map.addLayer({id:'a-truth',type:'line',source:'a-truth',paint:{'line-color':'#e2e8f0','line-width':1.1,'line-opacity':0.85}});

@@ -124,12 +124,13 @@ else if (container) {
   async function loadPhenology() {
     try {
       const m = await (await fetch('/maps/phenology/malpais.json')).json();
-      PHENO.bounds = m.bounds; PHENO.months = m.months; PHENO.loaded = true;
-      const { w, s, e, n } = m.bounds;
+      const { w, s, e, n } = m.bounds;  // throws here if bounds is missing — before we flag loaded
+      PHENO.bounds = m.bounds; PHENO.months = m.months;
       map.addSource('phenology', { type: 'image', url: `/maps/phenology/${m.months[0]}`,
         coordinates: [[w, n], [e, n], [e, s], [w, s]] });
       map.addLayer({ id: 'phenology-lyr', type: 'raster', source: 'phenology',
         layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.95, 'raster-fade-duration': 250 } });
+      PHENO.loaded = true;  // only after the source + layer exist, so setPhenoMonth/startPheno can't hit a missing layer
     } catch { /* imagery not present — the scene falls back to a caption */ }
   }
   function setPhenoMonth(i: number) {
@@ -152,7 +153,8 @@ else if (container) {
     if (PHENO.loaded) map.setLayoutProperty('phenology-lyr', 'visibility', 'none');
   }
   addEventListener('pres:setmonth', (e: any) => {
-    if (phenoTimer) { clearInterval(phenoTimer); phenoTimer = null; }  // scrubbing takes over
+    if (presPlaying) setPlaying(false);  // a manual scrub pauses the keynote's scene auto-advance (+ updates the transport)
+    if (phenoTimer) { clearInterval(phenoTimer); phenoTimer = null; }  // and the phenology auto-loop; scrubbing takes over
     setPhenoMonth(e.detail?.index ?? 0);
   });
 

@@ -51,8 +51,12 @@ say so), the **per-reach trade**, and the GPU cost. No "FM is superior" without 
 ## Data-reality checks (the lessons that bit us)
 
 1. **Class balance swings hard.** Invasive is ~53% of Malpais riparian but only ~1.7% of Aztec's. A reach
-   with too few invasive pixels **cannot be a meaningful held-out fold** — log per-reach invasive counts
-   first; a fold with < N invasive pixels is reported as under-powered, not scored as if solid.
+   with too few invasive pixels **cannot be a meaningful held-out fold.** Pre-registered rule, fixed here so
+   folds cannot be excluded post-hoc: **N = 500 invasive pixels** is the minimum for a scored fold. Log
+   per-reach invasive counts first; a held-out fold with **fewer than 500 invasive pixels** is **reported as
+   under-powered and excluded from the macro-mean and the decision** (with its count stated) — it is never
+   silently dropped, and never scored as if solid. On the current four reaches, Aztec (~1.7%) is the fold
+   most likely to fall under N; if it does, the invasive decision runs on the remaining folds and says so.
    **AUC/F1 always, never accuracy** (a "native everywhere" guess scores high where invasive is rare).
 2. **The IC↔IVD confounder.** Tamarisk in the growing season is spectrally close to irrigated agriculture
    (IVD). Since we score within riparian, ag is excluded from the eval — but note it for the deployment

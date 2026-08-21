@@ -3,16 +3,19 @@
 // makes `new maplibregl.Map(...)` throw a webglcontextcreationerror — and because our
 // map inits run at top level, that uncaught throw also aborts the rest of the page
 // script (theme toggle, reveals, KPIs). Probe first; on failure render a note.
+let cached: boolean | null = null;
+
 export function webglSupported(): boolean {
+  if (cached !== null) return cached; // probed once; several maps per page call this
   try {
     const c = document.createElement('canvas');
-    return !!(
-      window.WebGLRenderingContext &&
-      (c.getContext('webgl') || c.getContext('experimental-webgl'))
-    );
+    const gl = (c.getContext('webgl') || c.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+    cached = !!(window.WebGLRenderingContext && gl);
+    gl?.getExtension('WEBGL_lose_context')?.loseContext(); // release the probe context, don't hold a live one
   } catch {
-    return false;
+    cached = false;
   }
+  return cached;
 }
 
 export function mapFallback(container: HTMLElement): void {
