@@ -39,15 +39,25 @@ if (container) {
 
   // The mapped model products — already materialized as served GeoJSON. Toggled by
   // the legend checkboxes. Each product is one or more files (different reaches).
-  const PRODUCTS: Record<string, { color: string; opacity: number; files: string[] }> = {
+  const PRODUCTS: Record<string, { color: string; opacity: number; files: string[]; outline?: string }> = {
     // Absolute paths: this page is served at /map/, so a RELATIVE 'maps/x' would
     // resolve to /map/maps/x and the box returns the SPA-fallback HTML (not the
     // GeoJSON) — MapLibre renders nothing and fitToProduct's fetch throws.
     rf: { color: '#16a34a', opacity: 0.5, files: ['/maps/present-extent-2020.geojson', '/maps/rf_malpais_full.geojson', '/maps/extent-bloomfield-rf.geojson'] },
     fm: { color: '#0891b2', opacity: 0.5, files: ['/maps/fm_bloomfield.geojson', '/maps/fm_malpais.geojson'] },
     invasive: { color: '#e11d48', opacity: 0.72, files: ['/maps/present-invasive-in-corridor.geojson'] },
+    // NMRipMap expert truth for the Malpais reach (grey + white outline) — so you
+    // can see where the ground truth actually is vs RF/FM.
+    truth: { color: '#cbd5e1', opacity: 0.4, files: ['/maps/truth_malpais.geojson'], outline: '#f8fafc' },
   };
-  const layerIds: Record<string, string[]> = { rf: [], fm: [], invasive: [] };
+  const layerIds: Record<string, string[]> = { rf: [], fm: [], invasive: [], truth: [], bbox: [] };
+
+  // The DEFINED Malpais reach bbox (validate_reach.py) vs the ACTUAL imaged window
+  // coverage — a dashed outline each, so the un-imaged northern strip is visible.
+  const BBOX_DEFINED = [-108.8217, 36.8096, -108.6729, 36.9508];
+  const BBOX_COVERED = [-108.8239, 36.8071, -108.6962, 36.8930];
+  const rect = (b: number[]) => ({ type: 'Feature' as const, properties: {}, geometry: {
+    type: 'Polygon' as const, coordinates: [[[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]] } });
 
   // Fit the map to a product's extent (lazy-fetched, cached) so toggling a layer
   // ON also zooms you to where it has data.
@@ -231,8 +241,24 @@ if (container) {
           paint: { 'fill-color': p.color, 'fill-opacity': p.opacity, 'fill-outline-color': p.color },
         });
         layerIds[key].push(id);
+        if (p.outline) {
+          const oid = `prod-out-${key}-${i}`;
+          map.addLayer({ id: oid, type: 'line', source: id, layout: { visibility: 'none' },
+            paint: { 'line-color': p.outline, 'line-width': 1.3, 'line-opacity': 0.9 } });
+          layerIds[key].push(oid);
+        }
       });
     }
+
+    // Experiment bbox outlines: the DEFINED Malpais reach (red) vs the ACTUAL
+    // imaged window coverage (amber). The gap between them is the un-imaged strip.
+    map.addSource('bbox-defined', { type: 'geojson', data: rect(BBOX_DEFINED) });
+    map.addLayer({ id: 'bbox-defined', type: 'line', source: 'bbox-defined', layout: { visibility: 'none' },
+      paint: { 'line-color': '#e11d48', 'line-width': 2, 'line-dasharray': [3, 2] } });
+    map.addSource('bbox-covered', { type: 'geojson', data: rect(BBOX_COVERED) });
+    map.addLayer({ id: 'bbox-covered', type: 'line', source: 'bbox-covered', layout: { visibility: 'none' },
+      paint: { 'line-color': '#f59e0b', 'line-width': 2, 'line-dasharray': [3, 2] } });
+    layerIds['bbox'].push('bbox-defined', 'bbox-covered');
 
     // Presentation layers — reach-specific, hidden until a scene shows them.
     for (const [key, p] of Object.entries(PRES_LAYERS)) {
@@ -273,10 +299,14 @@ if (container) {
     document.querySelectorAll<HTMLInputElement>('[data-product]').forEach((cb) => {
       cb.addEventListener('change', () => {
         const key = cb.dataset.product || '';
-        // Manual legend toggles only show/hide — they must NOT move the map (you're
-        // comparing layers in place). Only the agent's own layer action flies to it.
+        // Model layers only show/hide (compare in place). The truth/bbox inspection
+        // layers DO fly to the Malpais reach on enable — you're trying to find them.
         (layerIds[key] || []).forEach((id) =>
           map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
+        if (cb.checked && (key === 'truth' || key === 'bbox')) {
+          const b = BBOX_DEFINED;
+          map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 40, duration: 900 });
+        }
       });
     });
     loadPhenology();

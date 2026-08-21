@@ -142,3 +142,7 @@
 .ma-monthkey { font: 500 11px/1.3 var(--font-mono, ui-monospace, monospace); color: var(--muted); white-space: nowrap; }
 .ma-monthslider { flex: 1; accent-color: var(--accent); cursor: pointer; }
 .ma-monthlbl { font: 700 13px/1 var(--font-mono, ui-monospace, monospace); color: var(--ink); min-width: 30px; text-align: right; }
+
+/* inspection swatches: NMRipMap truth + experiment bbox */
+.sw-truth { background: #cbd5e1; border: 1px solid #64748b; }
+.sw-bbox { background: transparent; border: 2px dashed #e11d48; }
