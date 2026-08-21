@@ -11,7 +11,7 @@
 # worse than none). See docs/2026-08-21-reach-provenance-gap.md.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-MANIFEST="$ROOT/experiments/riparian_extent/spatial-provenance.json"
+MANIFEST="$ROOT/.claude/spatial-provenance.json"
 PY="$(command -v python3 || echo python3)"
 
 exec "$PY" - "$MANIFEST" "$ROOT" <<'PYEOF'

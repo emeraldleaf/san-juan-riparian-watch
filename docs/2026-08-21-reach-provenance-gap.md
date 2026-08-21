@@ -98,7 +98,7 @@ Five gates, in rough order of leverage. The first three are cheap and catch this
    able to *see* what area a number covers in one click. Un-viewable extent = un-reviewable claim.
 
 **#2 is now mechanized.** `.claude/scripts/check-layer-colocation.sh` reads a provenance manifest
-(`experiments/riparian_extent/spatial-provenance.json`) and fails the build when any declared
+(`.claude/spatial-provenance.json`) and fails the build when any declared
 head-to-head's layers have bbox IoU < 0.5 — the first drift gate that reaches the *pixels*. It is
 wired into `./dev.sh --check-encoding` and the `encoding-loop.yml` CI job, and it **self-tests**: every
 run re-checks the retracted `rf_malpais` vs `fm_malpais` pairing (IoU **0.162**) and fails loudly if

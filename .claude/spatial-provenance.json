@@ -1,0 +1,27 @@
+{
+  "_doc": "Spatial-provenance manifest. Any set of map layers presented as a head-to-head comparison MUST be co-located (their bounding boxes must overlap >= min_iou). Enforced by .claude/scripts/check-layer-colocation.sh. Rationale + the failure this prevents: docs/2026-08-21-reach-provenance-gap.md.",
+  "min_iou": 0.5,
+  "comparisons": [
+    {
+      "name": "bloomfield-truth-rf-fm",
+      "reach": "Bloomfield — San Juan river reach",
+      "note": "The honest RF-vs-FM head-to-head: expert truth + RF + FM, genuinely co-located.",
+      "layers": [
+        "web/public/maps/nmripmap-bloomfield.geojson",
+        "web/public/maps/extent-bloomfield-rf.geojson",
+        "web/public/maps/fm_bloomfield.geojson"
+      ]
+    }
+  ],
+  "selftest_expected_fail": [
+    {
+      "name": "malpais-rf-vs-fm (RETRACTED — the gate MUST flag this)",
+      "reach": "Malpais Arroyo–San Juan (mislabeled conflation)",
+      "note": "The 2026-08-21 retraction: rf_malpais (~-108.71) and fm_malpais (~-108.76) were shown as one reach but sit ~5 km apart. If this ever passes, the gate is broken.",
+      "layers": [
+        "web/public/maps/rf_malpais_full.geojson",
+        "web/public/maps/fm_malpais.geojson"
+      ]
+    }
+  ]
+}
