@@ -95,6 +95,11 @@ else if (container) {
     btruth: { file: '/maps/nmripmap-bloomfield.geojson', color: '#cbd5e1', opacity: 0.45, outline: '#f8fafc' },
     brf: { file: '/maps/extent-bloomfield-rf.geojson', color: '#16a34a', opacity: 0.5 },
     bfm: { file: '/maps/fm_bloomfield.geojson', color: '#0891b2', opacity: 0.5 },
+    // Malpais — the held-out out-of-distribution reach: RF collapses (fires only
+    // in a small eastern pocket), FM tracks the whole corridor.
+    mtruth: { file: '/maps/truth_malpais.geojson', color: '#cbd5e1', opacity: 0.45, outline: '#f8fafc' },
+    mrf: { file: '/maps/reach-malpais-rf.geojson', color: '#f97316', opacity: 0.85 },
+    mfm: { file: '/maps/fm_malpais.geojson', color: '#0891b2', opacity: 0.45 },
     invasive: { file: '/maps/present-invasive-in-corridor.geojson', color: '#e11d48', opacity: 0.72 },
   };
   const presBounds: Record<string, maplibregl.LngLatBounds | null> = {};
@@ -120,8 +125,11 @@ else if (container) {
       { narration: "So we don't use one image — we stack twelve monthly composites and read the season. Here's a year over this reach in color-infrared, where vegetation glows red. Watch the corridor and the fields pulse as the seasons turn; cottonwood and invasive tamarisk green up and drop at different times, and that seasonal fingerprint is what separates riparian from bare desert. Drag the slider to scrub the months.", layers: [], fit: 'truth', phenology: true },
       { narration: "To judge a model you need expert ground truth AND the model on the very same reach. Here's a San Juan reach near Bloomfield where we have both — this grey layer is the riparian hand-drawn by experts in 2020.", layers: ['btruth'], fit: 'btruth' },
       { narration: "The Random Forest learns the seasonal fingerprint and predicts riparian — in green, over the grey truth. It does well on the river corridors it was trained across.", layers: ['btruth', 'brf'], fit: 'brf' },
-      { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — predicts the same reach with spatial context (teal): it reads the surrounding shape of the land, not just each pixel. Here you can eyeball where the two models and the expert truth agree and differ along the corridor. (A rigorous scored comparison lives in a separate leave-one-reach-out evaluation, kept out of this map while we re-verify how each test reach is labeled.)", layers: ['btruth', 'bfm'], fit: 'bfm' },
-      { narration: "And the invasive share — tamarisk and Russian olive — here in the Farmington corridor. One honest caveat: the model over-counts green farmland near the banks, so read these as model estimates, not ground truth.", layers: ['invasive'], fit: 'invasive' },
+      { narration: "Ai2's OlmoEarth — a fine-tuned foundation model — predicts the same reach with spatial context (teal): it reads the surrounding shape of the land, not just each pixel. On this river reach the two models broadly agree, with each other and with the expert truth. Scored head-to-head here they essentially tie — so where does the foundation model actually earn its keep? The answer is on a reach that looks nothing like these.", layers: ['btruth', 'bfm'], fit: 'bfm' },
+      { narration: "Now the payoff — and it brings us back to the reach we opened on. Malpais is the sharp test: neither model trained on it, and its landscape is unlike the reaches they did train on. Here's the expert truth (grey) — the riparian that's really here.", layers: ['mtruth'], fit: 'mtruth', pitch: 20 },
+      { narration: "Watch the Random Forest. Dropped onto this unfamiliar reach, it fires in just one small pocket at the eastern end — let's fly in to see it. This orange sliver is the whole of its prediction. Its transfer score collapses to near-chance, 0.56: a pixel classifier trained on other reaches simply can't find the riparian here.", layers: ['mtruth', 'mrf'], fit: 'mrf' },
+      { narration: "Now pull back to the whole reach, with both models. The Random Forest's lonely pocket (orange) against OlmoEarth tracking the entire corridor (teal) — 0.89, holding where the RF fell apart. That contrast is the finding: a foundation model is far less brittle when the ground is unlike anything it trained on. Across an unlabeled basin full of unfamiliar reaches, that robustness is the whole game.", layers: ['mtruth', 'mrf', 'mfm'], fit: 'mtruth' },
+      { narration: "And the invasive share — tamarisk and Russian olive — here in the Farmington corridor. One honest caveat: the model over-counts green farmland near the banks, so read these as model estimates, not ground truth. Whether the foundation model also wins at telling invasive from native is the next test we've pre-registered — measured, not assumed.", layers: ['invasive'], fit: 'invasive' },
     ],
   };
 

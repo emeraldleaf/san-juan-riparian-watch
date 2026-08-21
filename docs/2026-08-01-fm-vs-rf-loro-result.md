@@ -10,9 +10,13 @@
 ## The one-sentence answer
 
 Fine-tuning a satellite **foundation model** (OlmoEarth) does **not** beat a plain **Random Forest**
-everywhere — it *ties* the RF on the river reaches the RF already handled — but it **rescues the one
-morphology the RF was blind to** (a desert arroyo: **AUROC 0.557 → 0.889**), and that rescue is enough
-to win the deploy decision.
+everywhere — the two essentially *tie* on the three in-distribution river reaches (the FM even trails
+slightly) — but it **holds on the one out-of-distribution reach the RF collapses on** (Malpais, a
+river-dominated San-Juan-valley subwatershed unlike the training reaches: **AUROC 0.557 → 0.889**), and
+that **robustness to distribution shift** is enough to win the deploy decision for an unlabeled basin.
+*(The earlier "desert arroyo" framing is retracted — attribution to arroyo morphology is unverified, and
+the failure is not invasive-specific; read the arroyo-worded body below through the correction banner at
+the top.)*
 
 ---
 
