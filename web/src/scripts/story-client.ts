@@ -85,7 +85,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
     // RF fill hides the boundaries the map is meant to let you compare against.
     map.addSource('a-fm', { type: 'geojson', data: 'maps/fm_malpais.geojson' });
     map.addLayer({ id: 'a-fm', type: 'fill', source: 'a-fm', paint: { 'fill-color': '#16a34a', 'fill-opacity': 0.45 } });
-    map.addSource('a-rf', { type: 'geojson', data: 'maps/rf_malpais_full.geojson' });
+    map.addSource('a-rf', { type: 'geojson', data: 'maps/reach-malpais-rf.geojson' });
     map.addLayer({ id: 'a-rf', type: 'fill', source: 'a-rf', paint: { 'fill-color': '#f97316', 'fill-opacity': 0.9, 'fill-outline-color': '#7c2d12' } });
     map.addSource('a-truth', { type: 'geojson', data: 'maps/truth_malpais.geojson' });
     map.addLayer({ id: 'a-truth', type: 'line', source: 'a-truth', paint: { 'line-color': '#e2e8f0', 'line-width': 1.1, 'line-opacity': 0.85 } });

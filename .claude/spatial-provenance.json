@@ -41,11 +41,9 @@
     "web/public/maps/nmripmap-bloomfield.geojson":     { "reach": "bloomfield", "kind": "truth" },
     "web/public/maps/extent-bloomfield-rf.geojson":    { "reach": "bloomfield", "kind": "rf" },
     "web/public/maps/fm_bloomfield.geojson":           { "reach": "bloomfield", "kind": "fm" },
-    "web/public/maps/truth_malpais.geojson":           { "reach": "malpais",    "kind": "truth", "note": "San Juan-valley subset (see reach ack)" },
-    "web/public/maps/rf_malpais.geojson":              { "reach": "malpais",    "kind": "rf" },
-    "web/public/maps/rf_malpais_full.geojson":         { "reach": "malpais",    "kind": "rf" },
-    "web/public/maps/rf_malpais_points.geojson":       { "reach": "malpais",    "kind": "rf-points" },
-    "web/public/maps/fm_malpais.geojson":              { "reach": "malpais",    "kind": "fm", "note": "renders the San Juan mainstem within the mislabeled reach" },
+    "web/public/maps/truth_malpais.geojson":           { "reach": "malpais",    "kind": "truth", "note": "NMRipMap expert riparian over the imaged San Juan-valley extent" },
+    "web/public/maps/reach-malpais-rf.geojson":        { "reach": "malpais",    "kind": "rf", "note": "LORO-scored RF (train on the other reaches, predict Malpais); fires only in a small eastern pocket — the RF collapses reach-wide (AUC 0.56), unlike FM (0.89)" },
+    "web/public/maps/fm_malpais.geojson":              { "reach": "malpais",    "kind": "fm", "note": "OlmoEarth over the imaged San Juan-valley extent" },
     "web/public/maps/present-extent-2020.geojson":     { "reach": "corridor",   "kind": "rf" },
     "web/public/maps/present-invasive-in-corridor.geojson": { "reach": "corridor", "kind": "invasive" },
     "web/public/maps/deep-invasive-1990.geojson":      { "reach": "corridor",   "kind": "invasive-deeptime" },
@@ -67,15 +65,6 @@
     }
   ],
 
-  "selftest_expected_fail": [
-    {
-      "name": "malpais-rf-vs-fm (RETRACTED — the gate MUST flag this)",
-      "reach": "malpais",
-      "note": "The 2026-08-21 retraction: rf_malpais (~-108.71) and fm_malpais (~-108.76) shown as one reach but ~5 km apart. If this ever passes co-location, the gate is broken.",
-      "layers": [
-        "web/public/maps/rf_malpais_full.geojson",
-        "web/public/maps/fm_malpais.geojson"
-      ]
-    }
-  ]
+  "_selftest_note": "The former malpais rf-vs-fm self-test was premised on a MISLOCATION reading (rf ~5 km from fm). On re-verification (2026-08-21, bar reproduced + NMRipMap has no wash labels) that reading was superseded: RF and FM cover the SAME reach — the RF simply UNDER-FIRES (near-chance, AUC 0.56, fires only in an eastern pocket) while FM tracks the corridor (0.89). Low RF-vs-FM overlap here is a real model-quality finding, not a provenance error, so it is no longer a 'must-flag' self-test. The co-location gate still self-checks on real comparisons.",
+  "selftest_expected_fail": []
 }

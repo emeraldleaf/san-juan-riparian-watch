@@ -1,20 +1,27 @@
 # Project Status
 
-> **⚠ Retracted / under review (2026-08-21):** the “desert arroyo rescue” (RF 0.557 → OlmoEarth 0.889) is retracted pending a scoring audit — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”; the models map the river while the truth follows the wash, and the **attribution to arroyo morphology is unverified**. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+> **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism: on the one **out-of-distribution** held-out reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
 
 **Last updated:** 2026-08-21
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
 
-## ⏩⏩ Latest (2026-08-21): the arroyo result is **RETRACTED** — a reach-provenance gap the gates couldn't see
+## ⏩⏩ Latest (2026-08-21): the arroyo result is **RE-VERIFIED** — it stands as a distribution-shift transfer win; only the "arroyo" label was wrong
 
-The headline novelty — OlmoEarth *rescuing a desert arroyo* (RF 0.557 → FM 0.889) — is **retracted**.
-Five artifacts labeled "Malpais" (a HUC12 bbox, the rslearn dataset, and the RF/FM/truth display files)
-were assumed co-located; they are not. The reach is the **river-dominated "Malpais Arroyo–San Juan"
-subwatershed**; the LORO scored only the **328 imaged San Juan-valley windows**; the defined reach's
-**arroyo (up the wash) was never imaged or scored.** So 0.557 → 0.889 is a hard-*river*-reach transfer
-number, not an arroyo result — and the "morphology the RF was blind to" premise does not hold.
+The re-verification is **complete, and the result stands.** Re-running the RF bar reproduced it
+(Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and the raw NMRipMap `.gdb` confirmed
+there are **no labels up the wash** — so RF and FM were scored on the **same held-out pixels**, the
+comparison is valid, and RF 0.557 → FM 0.889 **holds**. What was wrong was only the **descriptor**:
+"Malpais" is the **river-dominated "Malpais Arroyo–San Juan" subwatershed**, not a desert arroyo, so
+**attribution to arroyo morphology is unverified**. And the mechanism is *not* the arroyo shape and *not*
+tamarisk — the native-vs-invasive AUC decomposition on the real scored RF showed it near-chance on
+**both** (native 0.59, invasive 0.53). The true story: on the one **out-of-distribution** held-out reach,
+the pixel-wise RF collapses to near-chance while OlmoEarth generalizes (0.89) — **brittleness to
+distribution shift**, which is exactly why the FM is the right model for the unlabeled basin. It is a
+*trade*, not a slam dunk: the FM even trails the RF slightly on the three in-distribution reaches
+(−0.01 Farmington, −0.03 Kirtland, +0.01 Aztec); its entire macro advantage is the one OOD reach.
+Next: prove (or disprove) the same for the invasive task — [pre-registered invasive LORO](specs/2026-08-21-invasive-fm-vs-rf-loro.md).
 
 **It was found by eye, not by a gate** — the author overlaid RF/FM/truth on the map agent and saw the
 models sitting on the San Juan. Every existing check (canon size, diagram pairing, stale refs,

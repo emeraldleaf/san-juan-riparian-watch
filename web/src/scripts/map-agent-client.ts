@@ -45,7 +45,7 @@ else if (container) {
     // Absolute paths: this page is served at /map/, so a RELATIVE 'maps/x' would
     // resolve to /map/maps/x and the box returns the SPA-fallback HTML (not the
     // GeoJSON) — MapLibre renders nothing and fitToProduct's fetch throws.
-    rf: { color: '#16a34a', opacity: 0.5, files: ['/maps/present-extent-2020.geojson', '/maps/rf_malpais_full.geojson', '/maps/extent-bloomfield-rf.geojson'] },
+    rf: { color: '#16a34a', opacity: 0.5, files: ['/maps/present-extent-2020.geojson', '/maps/reach-malpais-rf.geojson', '/maps/extent-bloomfield-rf.geojson'] },
     fm: { color: '#0891b2', opacity: 0.5, files: ['/maps/fm_bloomfield.geojson', '/maps/fm_malpais.geojson'] },
     invasive: { color: '#e11d48', opacity: 0.72, files: ['/maps/present-invasive-in-corridor.geojson'] },
     // NMRipMap expert truth for the Malpais reach (grey + white outline) — so you
