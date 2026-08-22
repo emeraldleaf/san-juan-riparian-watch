@@ -22,6 +22,13 @@ const LAYER_LABEL: Record<string, string> = {
   truth: 'the NMRipMap truth layer',
 };
 
+// One conversation per page load. Sent with every question so the agent can see its
+// own prior turns — without it, "give me a list of those" has no referent and the
+// agent can only ask what you meant.
+const SESSION_ID = (typeof crypto !== 'undefined' && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : String(Math.random()).slice(2);
+
 const FALLBACK: Reach[] = [
   { name: 'San Juan River', reaches: 0 },
   { name: 'Malpais Arroyo', reaches: 0 },
@@ -110,7 +117,7 @@ export default function MapAgent() {
       const token = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (token) headers['X-Turnstile-Token'] = token;
-      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify({ question: q }), signal: AbortSignal.timeout(30000) });
+      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify({ question: q, session_id: SESSION_ID }), signal: AbortSignal.timeout(30000) });
       if (!r.ok) throw new Error(`agent responded ${r.status}`);  // e.g. 403 when the Turnstile token is missing/invalid
       const d = await r.json();
       const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
