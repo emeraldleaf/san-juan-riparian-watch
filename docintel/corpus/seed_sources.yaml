@@ -420,6 +420,265 @@ sources:
     fetch: auto
     topics: [prior-art, tamarisk, phenology, senescence, novelty]
 
+  # ── The project's own canon ───────────────────────────────────────────────
+  # The specs, decisions, results and registries that answer "how did THIS project
+  # do it, and what did it find". Previously only 5 of 37 corpus sources were ours,
+  # so a method question was answered mostly from OTHER people's papers. Tagged
+  # `license: project` so retrieval can be scoped to ours vs the literature.
+  # Ids are `project-<basename>` so citations resolve to the doc on GitHub.
+
+  - id: project-STATUS
+    title: "Project status — current state, latest results, open gates"
+    agency: this project (docs/STATUS.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/STATUS.md
+    year: 2026
+    doc_type: status
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-01-fm-vs-rf-loro-result
+    title: "FM vs RF leave-one-reach-out result (OlmoEarth vs Random Forest transfer)"
+    agency: this project (docs/2026-08-01-fm-vs-rf-loro-result.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-08-01-fm-vs-rf-loro-result.md
+    year: 2026
+    doc_type: result
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-21-reach-provenance-gap
+    title: "The reach-provenance gap — a headline result rested on mismatched extents"
+    agency: this project (docs/2026-08-21-reach-provenance-gap.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-08-21-reach-provenance-gap.md
+    year: 2026
+    doc_type: post-mortem
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-RETRACTIONS
+    title: "Retractions registry — withdrawn claims and their markers"
+    agency: this project (docs/RETRACTIONS.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/RETRACTIONS.md
+    year: 2026
+    doc_type: registry
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-18-methods-and-metrics
+    title: "Methods and metrics — AUC, F1, RF vs FM, overfitting defined"
+    agency: this project (docs/2026-07-18-methods-and-metrics.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-07-18-methods-and-metrics.md
+    year: 2026
+    doc_type: method
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-18-reach-cube-materialization
+    title: "Reach-cube materialization — 12-month phenology cubes from STAC"
+    agency: this project (docs/2026-07-18-reach-cube-materialization.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-07-18-reach-cube-materialization.md
+    year: 2026
+    doc_type: method
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-literature-review
+    title: "Literature review — prior art and why this project is not duplicating it"
+    agency: this project (docs/literature-review.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/literature-review.md
+    year: 2026
+    doc_type: review
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-data-sources
+    title: "Data sources — every input, its endpoint, and the traps in each"
+    agency: this project (docs/data-sources.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/data-sources.md
+    year: 2026
+    doc_type: reference
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-method
+    title: "The encoding-loop method — mechanized honesty and its drift gates"
+    agency: this project (docs/method.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/method.md
+    year: 2026
+    doc_type: method
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-code-review
+    title: "Code review discipline — the merge gate and what it caught"
+    agency: this project (docs/code-review.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/code-review.md
+    year: 2026
+    doc_type: method
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-10-arroyo-map-extent-artifact
+    title: "The map-extent artifact — an earlier, narrower catch"
+    agency: this project (docs/2026-08-10-arroyo-map-extent-artifact.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-08-10-arroyo-map-extent-artifact.md
+    year: 2026
+    doc_type: post-mortem
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-20-diverse-reach-transfer
+    title: "The measured RF transfer bar across four diverse reaches"
+    agency: this project (docs/2026-07-20-diverse-reach-transfer.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/2026-07-20-diverse-reach-transfer.md
+    year: 2026
+    doc_type: result
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-03-stage1-riparian-delineation
+    title: "Stage 1 spec — riparian extent delineation"
+    agency: this project (docs/specs/2026-07-03-stage1-riparian-delineation.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/specs/2026-07-03-stage1-riparian-delineation.md
+    year: 2026
+    doc_type: spec
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-11-stage2-invasives-tamarix
+    title: "Stage 2 spec — invasive vs native cover (Tamarix)"
+    agency: this project (docs/specs/2026-07-11-stage2-invasives-tamarix.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/specs/2026-07-11-stage2-invasives-tamarix.md
+    year: 2026
+    doc_type: spec
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-04-stage3-annual-change
+    title: "Stage 3 spec — annual change detection"
+    agency: this project (docs/specs/2026-07-04-stage3-annual-change.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/specs/2026-07-04-stage3-annual-change.md
+    year: 2026
+    doc_type: spec
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-19-fm-vs-rf-deploy-decision
+    title: "The pre-registered FM-vs-RF deploy-decision contract"
+    agency: this project (docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md
+    year: 2026
+    doc_type: spec
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-21-invasive-fm-vs-rf-loro
+    title: "Pre-registered invasive FM-vs-RF LORO (Stage-2 gate)"
+    agency: this project (docs/specs/2026-08-21-invasive-fm-vs-rf-loro.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/specs/2026-08-21-invasive-fm-vs-rf-loro.md
+    year: 2026
+    doc_type: spec
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-21-basin-scale-productionization
+    title: "ADR — basin-scale productionization, wall-to-wall and annual"
+    agency: this project (docs/decisions/2026-08-21-basin-scale-productionization.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/decisions/2026-08-21-basin-scale-productionization.md
+    year: 2026
+    doc_type: decision
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-08-18-map-agent-runtime
+    title: "ADR — the conversational map agent, one loop core two policies"
+    agency: this project (docs/decisions/2026-08-18-map-agent-runtime.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/decisions/2026-08-18-map-agent-runtime.md
+    year: 2026
+    doc_type: decision
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-03-delineation-over-hydrology-buffers
+    title: "ADR — learn delineation instead of fixed hydrology buffers"
+    agency: this project (docs/decisions/2026-07-03-delineation-over-hydrology-buffers.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/decisions/2026-07-03-delineation-over-hydrology-buffers.md
+    year: 2026
+    doc_type: decision
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
+  - id: project-2026-07-11-model-and-inference-hosting
+    title: "ADR — model artifacts, inference, and hosting"
+    agency: this project (docs/decisions/2026-07-11-model-and-inference-hosting.md)
+    url: https://raw.githubusercontent.com/emeraldleaf/san-juan-riparian-watch/main/docs/decisions/2026-07-11-model-and-inference-hosting.md
+    year: 2026
+    doc_type: decision
+    format: md
+    license: project
+    geo_focus: false
+    fetch: auto
+    topics: [project-method, project-execution, riparian, san-juan]
+
   - id: project-method-ai-assisted-research
     title: "The method — AI-assisted research that catches its own errors"
     agency: this project (docs/method.md)

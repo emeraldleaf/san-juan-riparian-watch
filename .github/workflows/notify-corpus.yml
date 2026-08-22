@@ -1,0 +1,55 @@
+name: Notify corpus of canon changes
+
+# The project's own docs are part of the RAG corpus, so an edited spec or a new
+# retraction must reach the agent's index — otherwise the agent keeps citing the
+# superseded version. That is the worst failure this project can have: a retraction
+# that reaches every surface EXCEPT the thing answering questions about it.
+#
+# Nobody remembers to re-ingest, so this pings the private harness whenever the canon
+# changes on main. Same principle as the drift gates: mechanize it, don't document it.
+#
+# Needs a CORPUS_DISPATCH_TOKEN secret (a PAT with `repo` scope on the harness). If the
+# secret is absent the job SKIPS with a notice rather than failing — a missing token
+# should not redden an unrelated docs push.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'CLAUDE.md'
+      - 'CONTEXT.md'
+      - 'docintel/corpus/seed_sources.yaml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-corpus
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the harness to re-ingest
+        env:
+          TOKEN: ${{ secrets.CORPUS_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::notice::CORPUS_DISPATCH_TOKEN not set — skipping. The corpus will"\
+                 "not pick up this change until someone re-ingests manually."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/resp -w '%{http_code}' -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/repos/emeraldleaf/riparian-rag-harness/dispatches \
+            -d '{"event_type":"canon-changed"}')
+          if [ "$code" = "204" ]; then
+            echo "Re-ingest requested."
+          else
+            echo "::error::dispatch failed (HTTP $code)"; cat /tmp/resp; exit 1
+          fi
