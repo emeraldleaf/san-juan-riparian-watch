@@ -35,7 +35,7 @@ manifest · co-location gate · extent reconciliation · name↔geometry · "dra
 **NMRipMap-truth** and **experiment-bbox (defined vs imaged)** inspection layers so the gap is visible in
 one click.
 
-## Latest (2026-08-01): the FM raced the bar — arroyo rescued (0.557 → 0.889), **provisional GO** (significance computed 2026-08-22: CI includes zero at n=4)
+## Latest (2026-08-01): the FM raced the bar — Malpais reach rescued (0.557 → 0.889), **provisional GO** (significance computed 2026-08-22: CI includes zero at n=4)
 
 The FM-vs-RF deploy decision **points GO — provisionally**. Fine-tuned OlmoEarth (`V1_BASE` 207M +
 per-pixel `UNetDecoder`), scored **leave-one-reach-out over the same 4 reaches** the RF bar used,
