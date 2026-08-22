@@ -14,6 +14,9 @@ class TestReachBlockBootstrap:
         deltas = [fm - rf for fm, rf in LORO_AUROC.values()]
         result = reach_block_bootstrap(deltas)
         assert result.point_estimate == pytest.approx(0.0735, abs=1e-4)
+        assert result.ci_low == pytest.approx(-0.023, abs=1e-3)
+        assert result.ci_high == pytest.approx(0.246, abs=1e-3)
+        assert result.prob_positive == pytest.approx(0.70, abs=1e-2)
         assert result.ci_low < 0.0 < result.ci_high
         assert not result.significant
 
