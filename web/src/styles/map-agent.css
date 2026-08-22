@@ -75,6 +75,26 @@
 }
 .ma-steps { font: 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--subtle); margin-bottom: 4px; }
 .ma-cite { font: 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-top: 5px; }
+.ma-cite a { color: var(--accent); text-underline-offset: 2px; }
+.ma-cite a:hover { color: var(--accent-2, var(--accent)); }
+
+/* Markdown inside an answer — same limited renderer the story chat uses, so an
+   answer looks the same on either surface. Tables scroll rather than overflow the
+   narrow map panel. */
+.ma-text.md > :first-child { margin-top: 0; }
+.ma-text.md > :last-child { margin-bottom: 0; }
+.ma-text.md p { margin: 0 0 .55em; }
+.ma-text.md ul, .ma-text.md ol { margin: .2em 0 .55em; padding-left: 1.25em; }
+.ma-text.md li { margin: 2px 0; }
+.ma-text.md h4 { font-size: 14px; font-weight: 700; margin: .5em 0 .3em; }
+.ma-text.md strong { font-weight: 700; }
+.ma-text.md a { color: var(--accent); }
+.ma-text.md code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px;
+  background: var(--panel); padding: 1px 5px; border-radius: 5px; }
+.ma-text.md table { border-collapse: collapse; width: 100%; margin: .45em 0; font-size: 12.5px;
+  display: block; overflow-x: auto; }
+.ma-text.md th, .ma-text.md td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+.ma-text.md th { background: var(--panel); font-weight: 700; }
 /* "Zoom to" under an answer: the map moves only when the reader asks it to. */
 .ma-zoomrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .ma-zoom {

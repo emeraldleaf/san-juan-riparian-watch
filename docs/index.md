@@ -32,6 +32,7 @@ question that actually matters to a watershed manager:
 | **[Literature review](literature-review.md)** | What has already been done, and why this project is not duplicating it. Written so the novelty claim can be **falsified**, not just asserted. |
 | **[Stage 2 spec — invasive vs native cover (Tamarix)](specs/2026-07-11-stage2-invasives-tamarix.md)** | The product thesis, the phased class schema, the trade-offs accepted, and what was **cut and why**. |
 | **[Invasive FM-vs-RF LORO — pre-registered plan](specs/2026-08-21-invasive-fm-vs-rf-loro.md)** | The extent LORO proved the FM's robustness to distribution shift; whether that extends to **native-vs-invasive discrimination is untested**. This pre-registers the same rigorous LORO for the invasive task — measure it, don't infer it. |
+| **[CAG vs CRAG on the project canon — pre-registered](specs/2026-08-22-cag-vs-crag-project-canon.md)** | Retrieval was the default when this stack was written; context windows grew and caching arrived, and the choice was never re-tested. Measures whether caching the **158k-token project canon** in context beats the graded retrieval we run today — on correctness, **citation validity**, and cost at this traffic. A per-source question, not an architecture religion. |
 
 ---
 
