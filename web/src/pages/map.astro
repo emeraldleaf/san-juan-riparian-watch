@@ -15,14 +15,14 @@ import '../styles/map-agent.css';
   <div class="ma-layout">
     <div class="ma-mapwrap">
       <div id="map-agent-map" class="ma-map"></div>
-      <div class="ma-legend">
-        <div class="ma-legend-title">Model layers</div>
+      <details class="ma-legend" id="ma-legend" open>
+        <summary class="ma-legend-title">Model layers</summary>
         <label><input type="checkbox" data-product="rf" /><span class="sw sw-rf"></span> Riparian · RF</label>
         <label><input type="checkbox" data-product="fm" /><span class="sw sw-fm"></span> Riparian · OlmoEarth</label>
         <label><input type="checkbox" data-product="invasive" /><span class="sw sw-inv"></span> Invasive</label>
         <label><input type="checkbox" data-product="truth" /><span class="sw sw-truth"></span> NMRipMap truth · Malpais</label>
         <label><input type="checkbox" data-product="bbox" /><span class="sw sw-bbox"></span> Experiment bbox (defined vs imaged)</label>
-      </div>
+      </details>
     </div>
     <aside class="ma-panel">
       <div class="ma-head">
@@ -36,5 +36,12 @@ import '../styles/map-agent.css';
     </aside>
   </div>
 
+  <script>
+    // The map is only ~44vh on phones, so start the legend collapsed there and let
+    // the visitor open it. Desktop keeps it expanded. Only the INITIAL state is set,
+    // so a deliberate open/close is never overridden.
+    const legend = document.getElementById('ma-legend') as HTMLDetailsElement | null;
+    if (legend && matchMedia('(max-width: 820px)').matches) legend.open = false;
+  </script>
   <script>import '../scripts/map-agent-client.ts';</script>
 </Base>

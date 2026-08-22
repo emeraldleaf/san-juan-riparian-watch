@@ -19,7 +19,15 @@
   border: 1px solid var(--line); border-radius: var(--radius, 10px);
   padding: 10px 12px; font-size: 13px; box-shadow: var(--shadow, 0 2px 10px rgba(0,0,0,.15));
 }
-.ma-legend-title { font: 600 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-bottom: 7px; letter-spacing: .03em; }
+/* The legend is a native <details>: expanded on desktop, collapsed to its one-line
+   summary on phones (a script sets that at load), where the map is only ~44vh tall
+   and the full five-row panel would cover most of it. */
+.ma-legend-title { font: 600 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted);
+  letter-spacing: .03em; cursor: pointer; list-style: none; user-select: none; }
+.ma-legend-title::-webkit-details-marker { display: none; }
+.ma-legend-title::after { content: " ▾"; color: var(--subtle, var(--muted)); }
+.ma-legend:not([open]) .ma-legend-title::after { content: " ▸"; }
+.ma-legend[open] .ma-legend-title { margin-bottom: 7px; }
 .ma-legend label { display: flex; align-items: center; gap: 7px; padding: 3px 0; cursor: pointer; }
 .ma-legend input { cursor: pointer; }
 .ma-legend .sw { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
@@ -100,6 +108,11 @@
   .ma-layout { grid-template-columns: 1fr; grid-template-rows: 44vh auto; height: auto; }
   .ma-map { min-height: 300px; }
   .ma-panel { border-left: none; border-top: 1px solid var(--line); }
+  /* Keep the legend a small overlay on a short map: tighter, smaller, and never
+     taller than half the map or wider than 62% of it. Scrolls if it must. */
+  .ma-legend { left: 8px; top: 8px; padding: 7px 9px; font-size: 12px;
+    max-width: 62%; max-height: 46%; overflow: auto; }
+  .ma-legend label { padding: 5px 0; gap: 8px; }   /* keep tap targets comfortable */
 }
 
 /* ── Agent-narrated presentation ─────────────────────────────────────────── */
