@@ -10,6 +10,7 @@ const { current } = Astro.props;
   <nav class="topnav">
     <a href="/method">Method</a>
     <a href="/architecture">Architecture</a>
+    <a class="cta ghost" href="/#agent">Ask the agent</a>
     {current !== 'map' && <a class="cta" href="/map">Ask the map <span class="arw" aria-hidden="true">→</span></a>}
     <button class="tog" id="tog" aria-label="Toggle light or dark theme">◐</button>
   </nav>

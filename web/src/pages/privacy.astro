@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import '../styles/hub.css';
 ---
-<Base title='Privacy' description='What this site processes, why, and your rights — a plain-language privacy notice.'>
+<Base title='Privacy' description='What this site processes, why, and your rights, in plain language.'>
 <div class="topbar"><div class="wrap">
   <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
   <a class="back" href="/">← back to the story</a>
@@ -20,7 +20,7 @@ import '../styles/hub.css';
 <section>
   <h2>Reading the pages</h2>
   <p>Just browsing the site sets <strong>no cookies</strong>, runs <strong>no analytics or trackers</strong>,
-    and loads <strong>no third-party fonts or scripts that would expose your IP</strong> — the fonts are
+    and loads <strong>no third-party fonts or scripts that would expose your IP</strong>; the fonts are
     served from this domain. Standard web-server access logs (including IP address) may be kept briefly for
     security and abuse prevention, on the basis of legitimate interest.</p>
 </section>
@@ -31,8 +31,8 @@ import '../styles/hub.css';
   <table>
     <thead><tr><th>Data</th><th>Purpose &amp; handling</th></tr></thead>
     <tbody>
-      <tr><td>Your question</td><td>Sent to the retrieval pipeline and to a large-language-model provider to generate a grounded answer. Please don't enter personal or sensitive information — it isn't needed to ask about the science.</td></tr>
-      <tr><td>Model provider</td><td>Generation runs on a third-party, OpenAI-compatible LLM API via <strong>OpenRouter</strong> (the model is selectable — e.g. Qwen, Llama, or Ai2's OLMo), which may process the request <strong>outside the EU</strong>. Responses are scrubbed for personal identifiers before they're returned.</td></tr>
+      <tr><td>Your question</td><td>Sent to the retrieval pipeline and to a large-language-model provider to generate a grounded answer. Please don't enter personal or sensitive information; it isn't needed to ask about the science.</td></tr>
+      <tr><td>Model provider</td><td>Generation runs on a third-party, OpenAI-compatible LLM API via <strong>OpenRouter</strong> (the model is selectable, e.g. Qwen or Llama today, with Ai2's OLMo the moment a provider serves it), which may process the request <strong>outside the EU</strong>. Responses are scrubbed for personal identifiers before they're returned.</td></tr>
       <tr><td>IP address</td><td>Used transiently for per-IP rate-limiting and abuse prevention (legitimate interest). Not used to profile or track you across sites.</td></tr>
       <tr><td>Session id</td><td>A random identifier generated fresh on each page load, held in memory to thread a single conversation. It is not a persistent cookie and does not identify you.</td></tr>
     </tbody>
@@ -45,9 +45,9 @@ import '../styles/hub.css';
 <section>
   <h2>Third parties</h2>
   <div class="tags">
-    <span class="tag"><b>OpenRouter</b> — LLM generation (model-agnostic)</span>
-    <span class="tag"><b>Esri</b> — satellite basemap tiles</span>
-    <span class="tag"><b>Hetzner</b> (EU) — hosting</span>
+    <span class="tag"><b>OpenRouter</b> · LLM generation (model-agnostic)</span>
+    <span class="tag"><b>Esri</b> · satellite basemap tiles</span>
+    <span class="tag"><b>Hetzner</b> (EU) · hosting</span>
   </div>
   <p>Map tiles are requested from Esri's imagery service when you view a map; your browser contacts them
     directly, as it would for any embedded map.</p>
@@ -57,14 +57,14 @@ import '../styles/hub.css';
   <h2>Your rights</h2>
   <p>Under the GDPR you can request access to, correction of, or erasure of any personal data held about you,
     and you may object to processing or lodge a complaint with a supervisory authority. Because the site keeps
-    essentially no identifying records, there is usually nothing to retrieve — but if you have a question or a
+    essentially no identifying records, there is usually nothing to retrieve. But if you have a question or a
     request, contact <a href="mailto:joshua.dell@outlook.com">joshua.dell@outlook.com</a>.</p>
 </section>
 
 </div>
 
 <footer><div class="wrap">
-  Part of <a href="/">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  Part of <a href="/">San Juan Riparian Watch</a>, an independent field test of Ai2's OlmoEarth.
   <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="/privacy">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
 </div></footer>
 </Base>

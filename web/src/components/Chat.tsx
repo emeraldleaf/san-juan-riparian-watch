@@ -23,16 +23,16 @@ type Tier = { id: string; label: string; note: string; available: boolean };
 const SUGGEST = [
   "What are the biggest threats to this project's central claim, and how does it defend against them?",
   'What did this project get wrong, and how did it catch it?',
-  'Summarize the project — its methods, findings, and what makes it novel.',
+  'Summarize the project: its methods, findings, and what makes it novel.',
   'How does OlmoEarth compare to the Random Forest?',
   'How was this agent built?',
 ];
 
 const FALLBACK: { k: string[]; a: string }[] = [
   { k: ['invasive', 'corridor', '23', 'how much', 'percent', 'share'], a: 'About 23% of the mapped riparian corridor at Farmington is invasive tamarisk / Russian olive, 1.7 km² of invasive inside a 7.6 km² woody corridor. That figure is in-sample calibration to the 2020 NMRipMap labels, not an independent validation.' },
-  { k: ['foundation', 'fm', 'beat', 'rf', 'random forest', 'tie', 'arroyo', 'malpais', 'olmoearth', 'distribution'], a: "On the three in-distribution reaches, RF and OlmoEarth broadly tie (~0.85–0.90 transfer AUC — OlmoEarth even trails slightly). The decisive result is the held-out OUT-OF-DISTRIBUTION reach, Malpais: the pixel-wise RF collapses to near-chance (0.557) while OlmoEarth holds (0.889). This was re-verified — the RF bar reproduced, and NMRipMap has no labels up the wash, so both models were scored on the SAME held-out pixels; the comparison is valid and the number stands. What we retracted is only the “desert arroyo” label: Malpais is a river-dominated San-Juan-valley subwatershed (attribution to arroyo morphology is unverified), and the mechanism is brittleness to distribution shift — not arroyo shape and not tamarisk (the RF is near-chance on native AND invasive riparian alike, 0.59 vs 0.53). That makes OlmoEarth the right model for the unlabeled basin: a trade you buy for robustness on out-of-distribution ground you can't hand-check." },
+  { k: ['foundation', 'fm', 'beat', 'rf', 'random forest', 'tie', 'arroyo', 'malpais', 'olmoearth', 'distribution'], a: "On the three familiar reaches the two models essentially tie (about 0.85 to 0.90 AUC; OlmoEarth even trails slightly). The decisive result is the held-out unfamiliar reach, Malpais: the Random Forest collapses to a coin flip (0.557) while OlmoEarth holds (0.889). That result was re-verified: the Random-Forest scores reproduced on a re-run, and both models were scored on the same held-out pixels, so the comparison is valid and the number stands. What was retracted is only the \"desert arroyo\" label. Malpais is a river-dominated San-Juan-valley subwatershed (the attribution to arroyo morphology is unverified), and the mechanism is not arroyo terrain and not tamarisk (the Random Forest is near-chance on native and invasive vegetation alike, 0.59 vs 0.53). It is brittleness on unfamiliar ground, and that is exactly why OlmoEarth is the right model for the unlabeled basin: you pay for robustness on ground you can't hand-check." },
   { k: ['beetle', 'diorhabda', 'invert', 'inversion', 'control', 'russian olive'], a: "No inversion. Tamarisk-vs-native holds 0.85 / 0.81 / 0.86 across 2020 / 2015 / 2000. The pre-registered negative control (Russian olive) moved 0.34 over the same span, about seven times the tamarisk 'signal', so the data can't resolve a beetle effect. The control vetoes the claim." },
-  { k: ['trajectory', '1990', 'pre-2000', 'over time', 'history', 'deep time', 'past', '5x', 'growth'], a: "We won't claim a pre-2000 trajectory. Window composites, indices and relative radiometric normalisation stabilised 2000–2010, but before ~2000 (pure Landsat-5 TM) single-year swings of ~1 percentage point swamp any trend, the apparent '5× growth' was an artifact of an under-sampled 1990. It's a documented negative; only the present-day product is reliable." },
+  { k: ['trajectory', '1990', 'pre-2000', 'over time', 'history', 'deep time', 'past', '5x', 'growth'], a: "I won't claim a pre-2000 trend. Window composites, indices and relative radiometric normalisation stabilised 2000 to 2010, but before ~2000 (pure Landsat-5 TM) single-year swings of ~1 percentage point swamp any trend, the apparent '5× growth' was an artifact of an under-sampled 1990. It's a documented negative; only the present-day product is reliable." },
   { k: ['ndvi', 'phenology', 'swir', 'senescen', 'season', 'signal', 'discriminat', 'spectral'], a: 'NDVI alone is nearly random for this (AUC ≈ 0.50). The discriminator is phenological: tamarisk greens and senesces on a different schedule than native cottonwood, with a distinct SWIR water signature, so the models get the full 12-month, 144-D spectro-temporal vector, not a greenness index.' },
 ];
 
@@ -164,7 +164,7 @@ const stripSources = (t: string) => (t || '').replace(/\n{1,}\s*SOURCE:[\s\S]*$/
 function fallbackAnswer(text: string): string {
   const t = text.toLowerCase(); let best: string | null = null, bs = 0;
   FALLBACK.forEach((it) => { let s = 0; it.k.forEach((k) => { if (t.indexOf(k) >= 0) s += k.length; }); if (s > bs) { bs = s; best = it.a; } });
-  return bs > 0 ? (best as string) : "Offline right now, I can speak to what's on this page: the 23% invasive share, the RF-vs-OlmoEarth transfer test (OlmoEarth holds on the out-of-distribution reach where the RF collapses), the beetle control, the pre-2000 negative, or why NDVI isn't enough.";
+  return bs > 0 ? (best as string) : "Offline right now, I can speak to what's on this page: the 23% invasive share, the RF-vs-OlmoEarth transfer test (OlmoEarth holds on the unfamiliar reach where the Random Forest collapses), the beetle control, the pre-2000 negative, or why NDVI isn't enough.";
 }
 
 // Cross-island bridge: tell the map module to focus / show geometry.
@@ -187,7 +187,7 @@ function withTimeout(ms: number) {
 
 export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', text: "I'm the assistant for this project — ask about the riparian science and findings, how the maps were made, the RF-vs-OlmoEarth field test, the engineering method behind it, or how this agent itself was built. Tap a question below or type your own. When I'm live, answers are grounded in the sources with citations, and a reach mention flies the map; offline, you'll get short pre-written notes." },
+    { role: 'assistant', text: "I'm the assistant for this project. Ask about the riparian science and findings, how the maps were made, the RF-vs-OlmoEarth field test, the engineering method behind it, or how this agent itself was built. Tap a question below or type your own. When I'm live, answers are grounded in the sources with citations, and a reach mention flies the map; offline, you'll get short pre-written notes." },
   ]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -385,7 +385,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
             {tiers.map((t) => (
               <button key={t.id} role="radio" aria-checked={t.id === tier} disabled={!t.available}
                 className={t.id === tier ? 'on' : ''}
-                title={!t.available ? 'OLMo isn’t being served right now — this switch goes live the moment a host (Ai2 / OpenRouter) serves it.' : undefined}
+                title={!t.available ? "OLMo isn't being served right now; this switch goes live the moment a host (Ai2 / OpenRouter) serves it." : undefined}
                 onClick={() => { if (t.available && !busy) setTier(t.id); }}>
                 {t.id === 'olmo' && <span className={'sd ' + (t.available ? 'up' : 'down')}></span>}
                 <span>{t.label}</span>
@@ -407,7 +407,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
               (m.streaming && !m.text) ? '…thinking' : (
                 <>
                   {m.standalone && (
-                    <div className="rewrite" title="A follow-up — resolved using the conversation so far">↳ {m.standalone}</div>
+                    <div className="rewrite" title="A follow-up, resolved using the conversation so far">↳ {m.standalone}</div>
                   )}
                   {/* Render markdown LIVE while streaming: m.html is set only at
                       finalize, so until then parse the partial each tick so bold,

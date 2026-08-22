@@ -3,14 +3,14 @@ import Base from '../layouts/Base.astro';
 import '../styles/hub.css';
 import Nav from '../components/Nav.astro';
 ---
-<Base title='System architecture' description='The full stack behind San Juan Riparian Watch: a STAC Earth-observation pipeline, a PostGIS medallion store, RF + OlmoEarth model tracks, a .NET services layer, and a React map front-end — plus the distributed-systems reference app it shares a discipline with.'>
+<Base title='System architecture' description='The full stack behind San Juan Riparian Watch: a STAC Earth-observation pipeline, a PostGIS medallion store, RF + OlmoEarth model tracks, a .NET services layer, and a React map front-end, plus the distributed-systems reference app it shares a discipline with.'>
 <Nav />
 
 <header class="hero"><div class="wrap">
   <div class="eyebrow">// system-architecture · end to end</div>
   <h1>From a satellite pixel to a cited answer</h1>
   <p class="lede">One person built every layer here: the Earth-observation pipeline, the spatial database,
-    two model tracks, a typed services API, the map front-end, and the grounded agent — each behind its own
+    two model tracks, a typed services API, the map front-end, and the grounded agent. Each sits behind its own
     quality gate. Below is how they fit together, and the distributed-systems app they share a discipline with.</p>
 </div></header>
 
@@ -18,7 +18,7 @@ import Nav from '../components/Nav.astro';
 
 <section>
   <h2>The riparian pipeline</h2>
-  <p>Data flows one direction — raw imagery in, a cited, mapped answer out — with every stage reproducible
+  <p>Data flows one direction, raw imagery in and a cited, mapped answer out, with every stage reproducible
     and independently checked.</p>
   <div class="flow">
     <div class="node"><div class="k">ingest</div><div class="v">STAC ETL</div><div class="s">Sentinel-2 / Landsat via Planetary Computer</div></div>
@@ -45,7 +45,7 @@ import Nav from '../components/Nav.astro';
     <div class="card"><span class="k">// two model tracks</span>
       <h3>Random Forest vs OlmoEarth</h3>
       <p>A 144-D spectro-temporal Random Forest baseline, and Ai2's OlmoEarth foundation model fine-tuned on the
-        pooled reaches — scored head-to-head under a pre-registered leave-one-reach-out contract. The FM earns its
+        pooled reaches, scored head-to-head under a pre-registered leave-one-reach-out contract. The FM earns its
         keep only on under-represented morphology.</p></div>
     <div class="card"><span class="k">// services + tiles</span>
       <h3>.NET services, vector tiles</h3>
@@ -68,7 +68,7 @@ import Nav from '../components/Nav.astro';
 <section>
   <h2>The distributed-systems app it shares a discipline with</h2>
   <p>The same encoding-loop and the same senior standards run a full microservices reference platform
-    (<span class="mono">NextAurora</span>) — proof the approach isn't specific to one codebase.</p>
+    (<span class="mono">NextAurora</span>), proof the approach isn't specific to one codebase.</p>
   <div class="flow">
     <div class="node"><div class="k">edge</div><div class="v">React 19 SPA</div><div class="s">Vite · Tailwind · TanStack</div></div>
     <div class="arrow">→</div>
@@ -98,21 +98,21 @@ import Nav from '../components/Nav.astro';
   <h2>Cross-cutting</h2>
   <div class="tiles">
     <div class="tile"><div class="n">OTel</div><div class="l">tracing across every service + span-per-method</div></div>
-    <div class="tile"><div class="n">CI</div><div class="l">lint, tests, drift-gates, AI review — green to merge</div></div>
+    <div class="tile"><div class="n">CI</div><div class="l">lint, tests, drift-gates, AI review; green to merge</div></div>
     <div class="tile"><div class="n">TLS</div><div class="l">hardened deploy: key-only SSH, CSP, rate limits</div></div>
     <div class="tile"><div class="n">IaC</div><div class="l">Aspire + azd / Fly.io + docker-compose</div></div>
   </div>
   <div class="note"><span class="t">The through-line</span>
-    Right tool for each job — Python for EO, .NET for services, React for interactive UI, static HTML for this
-    narrative — each with observability and a quality gate, none of it copy-pasted from a template.</div>
+    Right tool for each job: Python for the satellite work, .NET for services, React for interactive UI, static HTML for this
+    narrative. Each with observability and a quality gate, none of it copy-pasted from a template.</div>
 </section>
 
 </div>
 
 <footer><div class="wrap">
-  Part of <a href="/">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  Part of <a href="/">San Juan Riparian Watch</a>, an independent field test of Ai2's OlmoEarth.
   <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified model outputs. All figures and
-    RF / OlmoEarth results are provisional — in-sample calibration, not validated ground truth — and may change as the work is refined.</p>
+    RF / OlmoEarth results are provisional (calibrated to their training labels, not validated ground truth) and may change as the work is refined.</p>
   <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="/privacy">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
   <div class="footlinks">
     <a href="/">← The story</a>

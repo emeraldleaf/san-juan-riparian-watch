@@ -3,14 +3,14 @@ import Base from '../layouts/Base.astro';
 import '../styles/hub.css';
 import Nav from '../components/Nav.astro';
 ---
-<Base title='The AI-assisted engineering method' description='Mechanized honesty: how AI-assisted research is kept correct by enforcement, not exhortation — the encoding-loop method, its drift gates, and the real regressions they caught.'>
+<Base title='The AI-assisted engineering method' description='Mechanized honesty: how AI-assisted research is kept correct by enforcement, not exhortation: the encoding-loop method, its drift gates, and the real regressions they caught.'>
 <Nav />
 
 <header class="hero"><div class="wrap">
   <div class="eyebrow">// the-other-method · how the work stays honest</div>
   <h1>Honesty you can't forget to enforce</h1>
   <p class="lede">This project was built fast, with heavy AI assistance. That is exactly where research
-    quietly goes wrong, so the interesting engineering isn't only the model — it's the machinery that keeps
+    quietly goes wrong, so the interesting engineering isn't only the model. It's the machinery that keeps
     an AI-accelerated codebase <strong>correct</strong> when nobody is watching every line.</p>
 </div></header>
 
@@ -19,7 +19,7 @@ import Nav from '../components/Nav.astro';
 <section>
   <h2>The failure mode nobody catches</h2>
   <p>Hallucinated code is the <em>easy</em> failure: it doesn't compile, and a compiler catches it in
-    seconds. The dangerous failures are <strong>semantic</strong> — they compile, they pass the tests, and
+    seconds. The dangerous failures are <strong>semantic</strong>: they compile, they pass the tests, and
     they read beautifully, while being wrong. AI is very good at producing fluent, plausible, finished-looking
     output, which is precisely what makes a wrong result invisible.</p>
   <table>
@@ -43,7 +43,7 @@ import Nav from '../components/Nav.astro';
 <section>
   <h2>The encoding loop</h2>
   <p>Each hard-won lesson is encoded across several <strong>surfaces</strong> (the canon file, agent + command
-    definitions, review-bot rules, docs and diagrams) and backed by <strong>enforcement tiers</strong> — from
+    definitions, review-bot rules, docs and diagrams) and backed by <strong>enforcement tiers</strong>, from
     an editor hint, to a pre-commit hook, to a CI gate that fails the build. A lesson learned once becomes a
     check that can't be un-learned.</p>
   <div class="flow">
@@ -60,22 +60,22 @@ import Nav from '../components/Nav.astro';
 </section>
 
 <section>
-  <h2>Drift gates — the checks a compiler can't do</h2>
+  <h2>Drift gates: the checks a compiler can't do</h2>
   <p>Ordinary CI checks file <em>shape</em>: does it build, do tests pass, is formatting clean. None of that
     can see a doc presenting a withdrawn result as current, or a retired threshold living on in a docstring.
     Those are <strong>semantic drift</strong>, and they get their own gates:</p>
   <table>
     <thead><tr><th>Gate</th><th>What it makes impossible</th></tr></thead>
     <tbody>
-      <tr><td class="mono">tombstones</td><td>Resurrecting a retired identifier or a killed metric threshold in any doc, comment, or config — CI fails.</td></tr>
+      <tr><td class="mono">tombstones</td><td>Resurrecting a retired identifier or a killed metric threshold in any doc, comment, or config, and CI fails.</td></tr>
       <tr><td class="mono">retractions</td><td>Stating a withdrawn claim <em>unless</em> the same doc also retracts it. A result can't quietly come back.</td></tr>
-      <tr><td class="mono">doc-orphans</td><td>A spec or decision record that nothing links to — unreachable docs rot into lies, so they fail the build.</td></tr>
+      <tr><td class="mono">doc-orphans</td><td>A spec or decision record that nothing links to. Unreachable docs rot into lies, so they fail the build.</td></tr>
       <tr><td class="mono">canon-refs</td><td>A paraphrase of the canon that drifts from its source; stale cross-references after a file move.</td></tr>
     </tbody>
   </table>
   <div class="note warn"><span class="t">Why this is unusual</span>
     Most teams write these rules in a wiki and hope. Here they run identically on a laptop and in CI, so the
-    completion criterion for a cleanup isn't "the docs someone remembered are updated" — it's
+    completion criterion for a cleanup isn't "the docs someone remembered are updated." It is
     <code>the gate passes</code>.</div>
 </section>
 
@@ -84,16 +84,16 @@ import Nav from '../components/Nav.astro';
 <section>
   <h2>The receipts</h2>
   <p>A method is only as honest as its record of being wrong. Each gate exists because something real slipped
-    through first — and those are kept in the record, not scrubbed:</p>
+    through first, and those are kept in the record, not scrubbed:</p>
   <div class="grid2">
     <div class="card"><span class="k">// caught late, by reading</span>
       <h3>Extent was already solved</h3>
       <p>The novelty claim assumed no one had mapped basin-wide riparian extent. A 2018 paper (CO-RIP, κ 0.80)
-        had. Found by <em>reading the literature</em>, not by a gate — which is exactly why a paper-audit
+        had. Found by <em>reading the literature</em>, not by a gate, which is exactly why a paper-audit
         command now exists to try to falsify the claim on demand.</p></div>
     <div class="card"><span class="k">// green check, no review</span>
       <h3>The merge gate was theatre</h3>
-      <p>For 25 of the first 29 merged PRs, a skipped AI review still posted a green check — "no findings" was
+      <p>For 25 of the first 29 merged PRs, a skipped AI review still posted a green check; "no findings" was
         indistinguishable from "no review." Caught only when a reviewer asked a question that couldn't be
         answered without actually checking. Now the review, not the check, is the gate.</p></div>
     <div class="card"><span class="k">// $ ≠ end-of-string</span>
@@ -130,7 +130,7 @@ import Nav from '../components/Nav.astro';
     <span class="tag">paper-audit command</span>
   </div>
   <div class="note good"><span class="t">The point</span>
-    The deliverable isn't just a map or an agent — it's a way of doing AI-accelerated engineering where being
+    The deliverable isn't just a map or an agent. It's a way of doing AI-accelerated engineering where being
     fast and being honest aren't in tension, because the honesty is enforced by the same machinery that makes
     you fast.</div>
 </section>
@@ -138,9 +138,9 @@ import Nav from '../components/Nav.astro';
 </div>
 
 <footer><div class="wrap">
-  Part of <a href="/">San Juan Riparian Watch</a> — an independent field test of Ai2's OlmoEarth.
+  Part of <a href="/">San Juan Riparian Watch</a>, an independent field test of Ai2's OlmoEarth.
   <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified model outputs. All figures and
-    RF / OlmoEarth results are provisional — in-sample calibration, not validated ground truth — and may change as the work is refined.</p>
+    RF / OlmoEarth results are provisional (calibrated to their training labels, not validated ground truth) and may change as the work is refined.</p>
   <div class="mono" style="margin-top:12px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="/privacy">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
   <div class="footlinks">
     <a href="/">← The story</a>
