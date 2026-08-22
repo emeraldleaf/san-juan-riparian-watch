@@ -40,4 +40,7 @@ const { current } = Astro.props;
     if (menu && !menu.hidden && !(e.target as HTMLElement).closest('.topbar')) setOpen(false);
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  // Leaving the mobile breakpoint (rotate / resize) closes the menu, so its open
+  // state and aria-expanded never linger on a layout where the button is hidden.
+  matchMedia('(min-width: 641px)').addEventListener('change', (e) => { if (e.matches) setOpen(false); });
 </script>
