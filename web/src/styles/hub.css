@@ -88,7 +88,16 @@ strong{font-weight:600;} em{color:var(--ink);}
   .mobile-menu:not([hidden]){display:block;}
   .topnav{gap:10px;}
 }
-@media (max-width:560px){ .brand .btxt{display:none;} .topnav a.cta{padding:7px 11px;font-size:12px;} }
+/* Narrow phones: keep the brand NAME (it is the site identity) and buy room from
+   padding, type size and the CTA arrow instead. Ellipsis only as a last resort. */
+@media (max-width:640px){
+  .topbar .wrap{padding:0 14px;}
+  .brand{font-size:13px;min-width:0;overflow:hidden;}
+  .brand .btxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topnav{flex:none;}
+  .topnav a.cta{padding:7px 11px;font-size:12px;}
+  .topnav a.cta .arw{display:none;}
+}
 
 /* hero */
 .hero{padding:64px 0 8px;}
