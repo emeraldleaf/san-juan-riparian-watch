@@ -96,8 +96,7 @@ Rather than leave the arroyo without a real RF map, the prediction was regenerat
    width (west half 100%, east half 100%), so the east-only firing is model behavior, not a data gap —
    exactly the extent/coverage check this whole note is about, applied to its own follow-up.
 
-The valid layer is `docs/maps/rf_malpais_full.geojson` (full-extent). An honest RF-vs-FM map can now be
-rebuilt from it — the withdrawal was of the *artifact*, not of the comparison itself.
+The layer used at the time was `docs/maps/rf_malpais_full.geojson`; it has since been superseded by the co-located, LORO-scored `reach-malpais-rf.geojson` (2026-08-21 re-verification). The withdrawal was of the *artifact*, not of the comparison itself — which now stands.
 
 ## Fixes required
 

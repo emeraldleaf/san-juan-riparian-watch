@@ -1,4 +1,6 @@
 ---
+
+> **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism: on the one **out-of-distribution** held-out reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
 layout: default
 title: San Juan Riparian Watch
 ---
@@ -23,12 +25,13 @@ question that actually matters to a watershed manager:
 | **[▸ Live story map — ask the agent](story.html)** | The scrollytelling tour of the findings (23% invasive corridor · the RF-vs-foundation-model arroyo *result*, **0.557 vs 0.889 AUROC** · the beetle-control null · the pre-2000 negative) over the live Farmington map, ending in a **grounded, cited AI agent** you can ask. |
 | **[▸ Interactive method map](method-map.html)** | The whole method, made explorable — inputs → the phenology data cube → RF vs a fine-tuned foundation model → the output maps (with the real chips) → the honest findings, plus a guided Q&A. **Start here for the visual tour.** |
 | **[▸ Live extent map — Bloomfield reach](extent-map.html)** | The actual **product** artifact: predicted riparian extent (8,511 polygons, 8.0% of the AOI) from the pooled RF, over a reach it never trained on, on satellite imagery. The honest RF baseline the foundation model must beat. |
-| **[▸ FM vs RF — the arroyo](fm-vs-rf-malpais.html)** | The held-out Malpais arroyo — the one morphology the RF had no training sibling for. Scored transfer: **RF 0.557 vs FM 0.889 AUROC** (leave-one-reach-out). On the map (full-extent LORO predictions over the labeled reach), the RF **barely fires** — a thin channel sliver over ~0.1% of the reach — while the FM tracks the corridor. (An earlier RF layer was a partial export; [regenerated at full extent](2026-08-10-arroyo-map-extent-artifact.md).) |
+| **[▸ FM vs RF — the out-of-distribution reach](fm-vs-rf-malpais.html)** | **Verified 2026-08-21 — the result stands; only the label was wrong.** The "Malpais" fold is the **river-dominated** "Malpais Arroyo–San Juan" HUC12 — a San-Juan-valley subwatershed, not a desert arroyo (*attribution to arroyo morphology is unverified*). But the RF bar reproduced and RF and FM were scored on the **same held-out pixels**, so RF 0.557 → FM 0.889 **holds**. On this **out-of-distribution** reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific. Post-mortem: **[the reach-provenance gap](2026-08-21-reach-provenance-gap.md)**. (Earlier, narrower catch: [map-extent artifact](2026-08-10-arroyo-map-extent-artifact.md).) |
 | **[▸ FM vs RF — the deployable map (Bloomfield)](fm-vs-rf-bloomfield.html)** | Both models deployed over an unseen reach: FM (green) vs RF (orange) vs NMRipMap truth. On a well-sampled river they agree closely — the FM's edge is on the hard morphologies. |
 | **[▸ Riparian corridor vs invasive (Farmington)](extent-vs-invasive.html)** | The product a watershed manager actually wants: the green riparian-woody corridor (7.6 km²) with the invasive tamarisk/Russian-olive share **within** it (1.7 km²) in red. **23% of the corridor is invasive** — a figure the model reproduces from the NMRipMap labels it was trained on (in-sample calibration, not an independent validation). Present-day, label-anchored. |
 | **[Engineering & methodology walkthrough](engineering-review.html)** | How the pipeline works end to end — STAC satellite ETL, weak-label and reference-trained delineation, spatial cross-validation, RF vs OlmoEarth, the PostGIS medallion schema, the C# API and the MapLibre map — with **verbatim code** and a *"where a reviewer should attack this"* section. |
 | **[Literature review](literature-review.md)** | What has already been done, and why this project is not duplicating it. Written so the novelty claim can be **falsified**, not just asserted. |
 | **[Stage 2 spec — invasive vs native cover (Tamarix)](specs/2026-07-11-stage2-invasives-tamarix.md)** | The product thesis, the phased class schema, the trade-offs accepted, and what was **cut and why**. |
+| **[Invasive FM-vs-RF LORO — pre-registered plan](specs/2026-08-21-invasive-fm-vs-rf-loro.md)** | The extent LORO proved the FM's robustness to distribution shift; whether that extends to **native-vs-invasive discrimination is untested**. This pre-registers the same rigorous LORO for the invasive task — measure it, don't infer it. |
 
 ---
 
@@ -72,6 +75,11 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Decision records
 
+- [Basin-scale productionization — wall-to-wall riparian + invasive, annually](decisions/2026-08-21-basin-scale-productionization.md)
+  — how the four-reach experiment becomes a recurring basin product: classify the **hydrography buffer**
+  (not the whole basin), tile it, drive a resumable `(tile, year)` manifest, stream imagery + two-stage
+  GPU inference (OlmoEarth extent, invasive when its LORO clears), on a batch orchestrator, with a cost
+  model measured from a one-HUC10 proof. Honest validation-at-scale, since you can't hand-check a basin.
 - [The conversational map agent — one loop core, two policies](decisions/2026-08-18-map-agent-runtime.md)
   — a **second agent** on the platform without forking the runtime: factor the tool loop into a generic
   **core** and a per-agent **policy** (soul, registry, seed, empty-fallback, citation). The document

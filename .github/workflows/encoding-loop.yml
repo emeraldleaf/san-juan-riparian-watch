@@ -22,7 +22,7 @@ jobs:
     name: CLAUDE.md size budget (soft 400 / hard 500)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Enforce the canon budget
@@ -43,7 +43,7 @@ jobs:
     name: Every .excalidraw has a sibling .svg
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Check pairing
@@ -68,7 +68,7 @@ jobs:
     name: Drift gates (tombstones · retracted claims · doc orphans)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Run the deterministic drift gates
@@ -82,3 +82,7 @@ jobs:
           ./.claude/scripts/check-tombstones.sh
           ./.claude/scripts/check-retracted-claims.sh
           ./.claude/scripts/check-doc-orphans.sh
+          # Spatial-provenance: layers shown head-to-head must be co-located. The first
+          # gate that reaches the pixels — it would have caught the 2026-08-21 reach-
+          # provenance gap (rf_malpais vs fm_malpais, ~5 km apart, shown as one reach).
+          ./.claude/scripts/check-layer-colocation.sh

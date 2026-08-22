@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { turnstileToken } from '../scripts/turnstile';
 
 // The grounded RAG agent, as a React island. It streams tokens from the full
 // Quartzose /query/stream pipeline, renders numbered source chips, and lets the
@@ -23,13 +24,13 @@ const SUGGEST = [
   "What are the biggest threats to this project's central claim, and how does it defend against them?",
   'What did this project get wrong, and how did it catch it?',
   'Summarize the project — its methods, findings, and what makes it novel.',
-  'Does OlmoEarth beat the Random Forest on the arroyo, and why?',
+  'How does OlmoEarth compare to the Random Forest?',
   'How was this agent built?',
 ];
 
 const FALLBACK: { k: string[]; a: string }[] = [
   { k: ['invasive', 'corridor', '23', 'how much', 'percent', 'share'], a: 'About 23% of the mapped riparian corridor at Farmington is invasive tamarisk / Russian olive, 1.7 km² of invasive inside a 7.6 km² woody corridor. That figure is in-sample calibration to the 2020 NMRipMap labels, not an independent validation.' },
-  { k: ['foundation', 'fm', 'beat', 'rf', 'random forest', 'tie', 'arroyo', 'malpais', 'olmoearth'], a: 'On the four river-corridor reaches they tie at ~0.80–0.88 AUC. They part on the lone arroyo (Malpais): RF transfers at 0.557 (barely above random), the fine-tuned foundation model at 0.889. That under-represented morphology, the one landform type the RF had no training sibling for, is why the foundation model ships for the invasive task; for plain extent, RF is as good and needs no GPU.' },
+  { k: ['foundation', 'fm', 'beat', 'rf', 'random forest', 'tie', 'arroyo', 'malpais', 'olmoearth', 'distribution'], a: "On the three in-distribution reaches, RF and OlmoEarth broadly tie (~0.85–0.90 transfer AUC — OlmoEarth even trails slightly). The decisive result is the held-out OUT-OF-DISTRIBUTION reach, Malpais: the pixel-wise RF collapses to near-chance (0.557) while OlmoEarth holds (0.889). This was re-verified — the RF bar reproduced, and NMRipMap has no labels up the wash, so both models were scored on the SAME held-out pixels; the comparison is valid and the number stands. What we retracted is only the “desert arroyo” label: Malpais is a river-dominated San-Juan-valley subwatershed (attribution to arroyo morphology is unverified), and the mechanism is brittleness to distribution shift — not arroyo shape and not tamarisk (the RF is near-chance on native AND invasive riparian alike, 0.59 vs 0.53). That makes OlmoEarth the right model for the unlabeled basin: a trade you buy for robustness on out-of-distribution ground you can't hand-check." },
   { k: ['beetle', 'diorhabda', 'invert', 'inversion', 'control', 'russian olive'], a: "No inversion. Tamarisk-vs-native holds 0.85 / 0.81 / 0.86 across 2020 / 2015 / 2000. The pre-registered negative control (Russian olive) moved 0.34 over the same span, about seven times the tamarisk 'signal', so the data can't resolve a beetle effect. The control vetoes the claim." },
   { k: ['trajectory', '1990', 'pre-2000', 'over time', 'history', 'deep time', 'past', '5x', 'growth'], a: "We won't claim a pre-2000 trajectory. Window composites, indices and relative radiometric normalisation stabilised 2000–2010, but before ~2000 (pure Landsat-5 TM) single-year swings of ~1 percentage point swamp any trend, the apparent '5× growth' was an artifact of an under-sampled 1990. It's a documented negative; only the present-day product is reliable." },
   { k: ['ndvi', 'phenology', 'swir', 'senescen', 'season', 'signal', 'discriminat', 'spectral'], a: 'NDVI alone is nearly random for this (AUC ≈ 0.50). The discriminator is phenological: tamarisk greens and senesces on a different schedule than native cottonwood, with a distinct SWIR water signature, so the models get the full 12-month, 144-D spectro-temporal vector, not a greenness index.' },
@@ -163,7 +164,7 @@ const stripSources = (t: string) => (t || '').replace(/\n{1,}\s*SOURCE:[\s\S]*$/
 function fallbackAnswer(text: string): string {
   const t = text.toLowerCase(); let best: string | null = null, bs = 0;
   FALLBACK.forEach((it) => { let s = 0; it.k.forEach((k) => { if (t.indexOf(k) >= 0) s += k.length; }); if (s > bs) { bs = s; best = it.a; } });
-  return bs > 0 ? (best as string) : "Offline right now, I can speak to what's on this page: the 23% invasive share, the RF-vs-foundation-model arroyo split, the beetle control, the pre-2000 negative, or why NDVI isn't enough.";
+  return bs > 0 ? (best as string) : "Offline right now, I can speak to what's on this page: the 23% invasive share, the RF-vs-OlmoEarth transfer test (OlmoEarth holds on the out-of-distribution reach where the RF collapses), the beetle control, the pre-2000 negative, or why NDVI isn't enough.";
 }
 
 // Cross-island bridge: tell the map module to focus / show geometry.
@@ -280,7 +281,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctrl.abort(), 30000); };
     bump();
     try {
-      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
+      const token = await turnstileToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token) headers['X-Turnstile-Token'] = token;
+      const r = await fetch(url, { method: 'POST', headers, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
       if (!r.ok || !r.body) throw new Error('agent ' + r.status);
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '', full = ''; const ctx: any[] = [];
       for (;;) {
@@ -310,7 +314,10 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const body = isQuery ? { query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current } : { question: q, top_k: 8 };
     const t = withTimeout(60000);
     try {
-      const r = await fetch(AGENT_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: t.signal, body: JSON.stringify(body) });
+      const token = await turnstileToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token) headers['X-Turnstile-Token'] = token;
+      const r = await fetch(AGENT_URL, { method: 'POST', headers, signal: t.signal, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('agent ' + r.status);
       const res = await r.json();
       if (isQuery) {

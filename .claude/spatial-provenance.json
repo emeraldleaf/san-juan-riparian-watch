@@ -1,0 +1,69 @@
+{
+  "_doc": "Spatial-provenance manifest. Enforced by .claude/scripts/check-layer-colocation.sh (wired into ./dev.sh --check-encoding and encoding-loop.yml CI). Four gates: (1) every served web/public/maps/*.geojson must be declared in `layers`; (2) any `comparisons` head-to-head must be co-located (bbox IoU >= min_iou); (3) each reach's imaged extent must not be a TRUNCATION of the declared reach: the center-offset of imaged-vs-defined bbox must be <= offset_threshold OR the reach carries a discrepancy_ack (raw IoU is reported but does not gate, since a narrow river centered in a tall AOI has low IoU yet is not truncated); (4) a reach whose NAME implies a morphology (arroyo/wash/...) that conflicts with its declared `morphology` must carry a discrepancy_ack. Rationale + the failure this prevents: docs/2026-08-21-reach-provenance-gap.md.",
+  "min_iou": 0.5,
+  "offset_threshold": 0.10,
+
+  "reaches": {
+    "malpais": {
+      "name": "Malpais Arroyo–San Juan",
+      "morphology": "river-dominated subwatershed",
+      "defined_bbox": [-108.8217, 36.8096, -108.6729, 36.9508],
+      "imaged_bbox": [-108.8239, 36.8071, -108.6962, 36.8930],
+      "discrepancy_ack": "RETRACTED 2026-08-21: the imaged windows cover only the southern San Juan valley; the defined reach extends ~6 km north (up the wash) and the arroyo was never imaged or scored. Name says 'Arroyo' but the geometry is river-dominated. See docs/2026-08-21-reach-provenance-gap.md."
+    },
+    "kirtland": {
+      "name": "Kirtland — San Juan mainstem",
+      "morphology": "San Juan mainstem, semi-arid",
+      "defined_bbox": [-108.55, 36.67, -108.37, 36.81],
+      "imaged_bbox": [-108.5529, 36.7148, -108.3686, 36.7706],
+      "note": "Reviewed 2026-08-21 (the 'Malpais treatment'): the low bbox IoU (0.395) is a NARROW-CORRIDOR artifact, not a truncation. The imaged band is CENTERED in the AOI (center-offset 0.02) and spans the full E-W river length — it is the San Juan mainstem through the middle of a tall rectangular AOI; the N/S extremes are upland with no riparian. Unlike Malpais (offset 0.21, missing the northern arroyo), Kirtland was NOT truncated. The 0.845 river-reach transfer score stands. The extent gate now flags center-offset, not raw IoU, so this no longer trips."
+    },
+    "aztec_animas": {
+      "name": "Aztec / Animas",
+      "morphology": "Animas tributary, montane-fed",
+      "defined_bbox": [-108.10, 36.79, -107.92, 36.93],
+      "imaged_bbox": [-108.0947, 36.7830, -107.9214, 36.9111]
+    },
+    "bloomfield": {
+      "name": "Bloomfield — San Juan river reach",
+      "morphology": "San Juan river reach",
+      "defined_bbox": [-108.10, 36.66, -107.92, 36.79],
+      "imaged_bbox": [-108.1015, 36.6544, -107.9138, 36.7915]
+    },
+    "corridor": {
+      "name": "Farmington corridor",
+      "morphology": "San Juan river corridor"
+    }
+  },
+
+  "layers": {
+    "web/public/maps/nmripmap-bloomfield.geojson":     { "reach": "bloomfield", "kind": "truth" },
+    "web/public/maps/extent-bloomfield-rf.geojson":    { "reach": "bloomfield", "kind": "rf" },
+    "web/public/maps/fm_bloomfield.geojson":           { "reach": "bloomfield", "kind": "fm" },
+    "web/public/maps/truth_malpais.geojson":           { "reach": "malpais",    "kind": "truth", "note": "NMRipMap expert riparian over the imaged San Juan-valley extent" },
+    "web/public/maps/reach-malpais-rf.geojson":        { "reach": "malpais",    "kind": "rf", "note": "LORO-scored RF (train on the other reaches, predict Malpais); fires only in a small eastern pocket — the RF collapses reach-wide (AUC 0.56), unlike FM (0.89)" },
+    "web/public/maps/fm_malpais.geojson":              { "reach": "malpais",    "kind": "fm", "note": "OlmoEarth over the imaged San Juan-valley extent" },
+    "web/public/maps/present-extent-2020.geojson":     { "reach": "corridor",   "kind": "rf" },
+    "web/public/maps/present-invasive-in-corridor.geojson": { "reach": "corridor", "kind": "invasive" },
+    "web/public/maps/deep-invasive-1990.geojson":      { "reach": "corridor",   "kind": "invasive-deeptime" },
+    "web/public/maps/deep-invasive-2000.geojson":      { "reach": "corridor",   "kind": "invasive-deeptime" },
+    "web/public/maps/deep-invasive-2010.geojson":      { "reach": "corridor",   "kind": "invasive-deeptime" },
+    "web/public/maps/deep-invasive-2020.geojson":      { "reach": "corridor",   "kind": "invasive-deeptime" }
+  },
+
+  "comparisons": [
+    {
+      "name": "bloomfield-truth-rf-fm",
+      "reach": "bloomfield",
+      "note": "The honest RF-vs-FM head-to-head: expert truth + RF + FM, genuinely co-located.",
+      "layers": [
+        "web/public/maps/nmripmap-bloomfield.geojson",
+        "web/public/maps/extent-bloomfield-rf.geojson",
+        "web/public/maps/fm_bloomfield.geojson"
+      ]
+    }
+  ],
+
+  "_selftest_note": "The former malpais rf-vs-fm self-test was premised on a MISLOCATION reading (rf ~5 km from fm). On re-verification (2026-08-21, bar reproduced + NMRipMap has no wash labels) that reading was superseded: RF and FM cover the SAME reach — the RF simply UNDER-FIRES (near-chance, AUC 0.56, fires only in an eastern pocket) while FM tracks the corridor (0.89). Low RF-vs-FM overlap here is a real model-quality finding, not a provenance error, so it is no longer a 'must-flag' self-test. The co-location gate still self-checks on real comparisons.",
+  "selftest_expected_fail": []
+}

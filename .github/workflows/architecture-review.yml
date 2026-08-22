@@ -50,7 +50,7 @@ jobs:
         run: |
           echo "::notice title=architecture-review dormant::Set the ANTHROPIC_API_KEY secret to activate the self-owned architecture gate. Soft-passing until then."
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: env.HAS_KEY == 'true'
         with:
           fetch-depth: 0
@@ -131,7 +131,7 @@ jobs:
 
       - name: Upload the review for the comment job
         if: env.HAS_KEY == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: architecture-review
           path: review.md
@@ -147,7 +147,7 @@ jobs:
       pull-requests: write   # to post the review comment — this job touches NO PR code
     steps:
       - name: Download the review
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: architecture-review
 

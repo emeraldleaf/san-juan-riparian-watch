@@ -21,7 +21,7 @@ Properties are minimal: `class` (`riparian` | `invasive`) and `min_prob`.
 | `extent-bloomfield-rf.geojson` | riparian extent | RF | Bloomfield |
 | `fm_bloomfield.geojson` | riparian extent | **OlmoEarth (FM)** | Bloomfield |
 | `fm_malpais.geojson` | riparian extent | **OlmoEarth (FM)** | Malpais |
-| `rf_malpais_full.geojson`, `rf_malpais_points.geojson` | riparian extent | RF | Malpais |
+| `reach-malpais-rf.geojson` | riparian extent | RF (LORO, co-located) | Malpais |
 | `nmripmap-bloomfield.geojson`, `truth_malpais.geojson` | NMRipMap ground truth | — | Bloomfield / Malpais |
 
 ## Where they're used

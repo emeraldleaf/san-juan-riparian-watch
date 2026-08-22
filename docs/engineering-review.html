@@ -535,6 +535,17 @@
   <header class="masthead">
     <div class="eyebrow">Methodology &amp; engineering walkthrough</div>
     <h1>San Juan Riparian Watch: how the pipeline actually works</h1>
+    <div style="border:2px solid #2563eb;background:#eff6ff;color:#1e3a5f;padding:14px 16px;border-radius:8px;margin:12px 0">
+      <strong>✅ Re-verified (2026-08-21) — the result stands; only the label was wrong:</strong> the
+      RF-vs-FM transfer result below <strong>holds</strong> — the RF bar reproduced (0.90 / 0.85 / 0.89 / 0.56),
+      and because NMRipMap has no labels up the wash, RF and FM were scored on the <strong>same held-out
+      pixels</strong>, so RF 0.557 &rarr; OlmoEarth 0.889 is a valid comparison. What is retracted is only the
+      &ldquo;desert arroyo rescue&rdquo; descriptor: &ldquo;Malpais&rdquo; is the <strong>river-dominated
+      subwatershed</strong> HUC12 &ldquo;Malpais Arroyo&ndash;San Juan&rdquo;, so <strong>attribution to arroyo
+      morphology is unverified</strong>. The real mechanism is brittleness to distribution shift on the one
+      out-of-distribution reach — RF near-chance on native (0.59) <em>and</em> invasive (0.53) riparian alike,
+      not arroyo shape and not tamarisk — the attribution to arroyo morphology is unverified. See <code>docs/RETRACTIONS.md &rarr; arroyo-rescue-attribution-2026-08-21</code>.
+    </div>
     <p class="standfirst">
       A basin-scale system that learns <em>where riparian vegetation is</em> from satellite time
       series — replacing fixed hydrology buffers — then scores its condition and serves it on a map.

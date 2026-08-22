@@ -52,6 +52,7 @@ living on in a component docstring. All three actually happened.
 - `.claude/tombstones.txt` — retired identifiers; CI fails any doc/comment/config resurrecting one.
 - `docs/RETRACTIONS.md` — withdrawn *claims*; a doc may state one **only if it also retracts it**.
 - Doc orphans — every spec/ADR must be linked from the Pages hub (`docs/index.md`).
+- Layer co-location (`spatial-provenance.json`) — layers shown head-to-head must be co-located (bbox IoU ≥ 0.5); the first gate that reaches the *pixels*. Caught by nothing on 2026-08-21 when a river reach was compared as an "arroyo" — see `docs/2026-08-21-reach-provenance-gap.md`.
 
 When you retire a value or withdraw a result, **add it to the registry**. The sweep's completion
 criterion is "`./dev.sh --check-encoding` passes", not "the docs someone remembered are updated".
@@ -139,6 +140,11 @@ conventions. Quick: `./dev.sh --sonar` (start server), `./dev.sh --lint` (scan p
 and with an approval on an **older commit than the one you are merging** (a reviewer that never saw
 your last push has not reviewed your PR). Verify with `./dev.sh --review-status <PR>`; `main` is a
 protected branch and the server enforces it.
+
+**Issue closure — use `Closes #N`.** There is **no issue automation** here (no project board, no
+auto-close workflow), so the PR that does an issue's work MUST carry `Closes #N` in its body — that
+GitHub-native keyword is the only thing that closes an issue on merge. Otherwise issues are closed by
+hand (`gh issue close`), which drifts. Track in-progress work with the issue body's `- [ ]` checklist.
 
 Not ceremony: CodeRabbit's review on #5 caught a live SQL-injection weakening that CI, SonarQube, 20
 unit tests and a careful human all passed — `MvtTileSql` validated layer names with `^[a-z_]+$`, but

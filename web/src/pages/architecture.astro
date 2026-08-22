@@ -1,12 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
 import '../styles/hub.css';
+import Nav from '../components/Nav.astro';
 ---
 <Base title='System architecture' description='The full stack behind San Juan Riparian Watch: a STAC Earth-observation pipeline, a PostGIS medallion store, RF + OlmoEarth model tracks, a .NET services layer, and a React map front-end — plus the distributed-systems reference app it shares a discipline with.'>
-<div class="topbar"><div class="wrap">
-  <div class="brand"><span class="dot"></span> San Juan Riparian Watch</div>
-  <a class="back" href="/">← back to the story</a>
-</div></div>
+<Nav />
 
 <header class="hero"><div class="wrap">
   <div class="eyebrow">// system-architecture · end to end</div>

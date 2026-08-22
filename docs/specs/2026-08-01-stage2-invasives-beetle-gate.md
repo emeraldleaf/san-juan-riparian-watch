@@ -1,5 +1,7 @@
 # Stage 2 — native-vs-invasive, and does it survive the beetle
 
+> **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism: on the one **out-of-distribution** held-out reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). See [RETRACTIONS.md](../RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 **Date:** 2026-08-01 · **Status:** experiment spec (spec-before-spend) · the Stage-2 analogue of the
 settled [Stage-1 extent LORO result](../2026-08-01-fm-vs-rf-loro-result.md) · depends on
 [Phase 3 deep-time](2026-07-18-phase3-deeptime-change.md),

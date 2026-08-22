@@ -1,0 +1,27 @@
+{
+  "reach": "Malpais Arroyo–San Juan (river-dominated San Juan reach)",
+  "size": [
+    1271,
+    831
+  ],
+  "bounds": {
+    "w": -108.82576271406016,
+    "s": 36.80702541330293,
+    "e": -108.69419451952658,
+    "n": 36.893046789901994
+  },
+  "months": [
+    "malpais-m00.webp",
+    "malpais-m01.webp",
+    "malpais-m02.webp",
+    "malpais-m03.webp",
+    "malpais-m04.webp",
+    "malpais-m05.webp",
+    "malpais-m06.webp",
+    "malpais-m07.webp",
+    "malpais-m08.webp",
+    "malpais-m09.webp",
+    "malpais-m10.webp",
+    "malpais-m11.webp"
+  ]
+}

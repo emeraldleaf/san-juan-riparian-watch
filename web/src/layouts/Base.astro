@@ -39,5 +39,23 @@ const favicon =
 </head>
 <body>
   <slot />
+  {/* Shared theme toggle: wires any #tog on the page and PERSISTS the choice to
+      localStorage, so toggling on one page carries to every page (the boot above
+      reads it before first paint). */}
+  <script is:inline>
+    (function () {
+      var root = document.documentElement;
+      function current() {
+        return root.getAttribute('data-theme') ||
+          (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+      }
+      var tog = document.getElementById('tog');
+      if (tog) tog.addEventListener('click', function () {
+        var next = current() === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('theme', next); } catch (e) {}
+      });
+    })();
+  </script>
 </body>
 </html>

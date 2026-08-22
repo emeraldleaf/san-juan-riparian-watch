@@ -3,12 +3,11 @@
 // widgets are inherently imperative, so they live here rather than in React.
 // The agent (a React island) talks to the maps through window CustomEvents.
 import maplibregl from 'maplibre-gl';
+import { webglSupported, mapFallback } from './webgl';
 
 const root = document.documentElement;
-const tog = document.getElementById('tog');
 root.classList.add('js-reveal');
-const curTheme = () => root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
-tog?.addEventListener('click', () => root.setAttribute('data-theme', curTheme() === 'dark' ? 'light' : 'dark'));
+// The theme toggle (#tog) is wired + persisted by the shared script in Base.astro.
 
 const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.1 });
 document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
@@ -50,6 +49,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
   const status = document.getElementById('status-corridor');
   const container = document.getElementById('map-corridor');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.26, 36.745], zoom: 11.4, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
@@ -73,6 +73,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
   const status = document.getElementById('status-arroyo');
   const container = document.getElementById('map-arroyo');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.76, 36.85], zoom: 11.7, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));
@@ -84,7 +85,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
     // RF fill hides the boundaries the map is meant to let you compare against.
     map.addSource('a-fm', { type: 'geojson', data: 'maps/fm_malpais.geojson' });
     map.addLayer({ id: 'a-fm', type: 'fill', source: 'a-fm', paint: { 'fill-color': '#16a34a', 'fill-opacity': 0.45 } });
-    map.addSource('a-rf', { type: 'geojson', data: 'maps/rf_malpais_full.geojson' });
+    map.addSource('a-rf', { type: 'geojson', data: 'maps/reach-malpais-rf.geojson' });
     map.addLayer({ id: 'a-rf', type: 'fill', source: 'a-rf', paint: { 'fill-color': '#f97316', 'fill-opacity': 0.9, 'fill-outline-color': '#7c2d12' } });
     map.addSource('a-truth', { type: 'geojson', data: 'maps/truth_malpais.geojson' });
     map.addLayer({ id: 'a-truth', type: 'line', source: 'a-truth', paint: { 'line-color': '#e2e8f0', 'line-width': 1.1, 'line-opacity': 0.85 } });
@@ -108,6 +109,7 @@ const MAPS: Record<string, { map: any; bbox: any; ready: boolean }> = {};
     ticks = document.querySelectorAll('.tticks span'), status = document.getElementById('status-time');
   const container = document.getElementById('map-time');
   if (!container) return;
+  if (!webglSupported()) { mapFallback(container); return; }
   const map = new maplibregl.Map({ container, center: [-108.26, 36.745], zoom: 11.4, style: SAT, cooperativeGestures: true });
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }));

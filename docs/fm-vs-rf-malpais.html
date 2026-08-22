@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>The arroyo — where the foundation model earns its keep (Malpais)</title>
+<title>The out-of-distribution reach — where the foundation model earns its keep (Malpais)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
       integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
@@ -35,24 +35,28 @@
 <div id="map"></div>
 
 <div id="info" class="card">
-  <h1>The arroyo, where the foundation model earns its keep</h1>
-  <p class="sub">Malpais Arroyo, San Juan Basin · both models held this reach out · Sentinel-2 2020</p>
+  <h1>The out-of-distribution reach, where the foundation model earns its keep</h1>
+  <p class="sub">Malpais Arroyo–San Juan (a river-dominated San Juan subwatershed) · both models held this reach out · Sentinel-2 <b>2020</b> imagery, matched to the <b>2020</b> NMRipMap labels (no imagery/label vintage gap)</p>
   <div class="stat">
     <div class="fm"><b>0.889</b><span>FM riparian AUROC</span></div>
     <div class="rf"><b>0.557</b><span>RF riparian AUC</span></div>
   </div>
-  <p>A narrow desert wash — the one morphology unlike the wide-river reaches the models trained on. On a
-  scored <b>leave-one-reach-out</b> transfer, the per-pixel RF is near-chance (0.557) while the foundation
-  model, reading spatial context, reaches 0.889.</p>
+  <p>The one held-out reach whose landscape is unlike the reaches the models trained on. On a scored
+  <b>leave-one-reach-out</b> transfer, the per-pixel RF collapses to near-chance (0.557) while the
+  foundation model — whose pre-trained representation is far less <b>brittle to this distribution
+  shift</b> — reaches 0.889. <em>(Not a "desert arroyo": attribution to arroyo morphology is unverified —
+  this is a river-dominated subwatershed. And not tamarisk-specific: the RF is near-chance on native
+  <b>and</b> invasive riparian alike, 0.59 vs 0.53.)</em></p>
   <p style="margin-bottom:4px"><b>On the map</b> (over the NMRipMap-labeled reach): green = FM predicted
-  riparian, orange = RF predicted riparian, blue outline = NMRipMap truth. The RF fires <b>only in the
-  wetter eastern end</b> — where the spectra resemble the river reaches it trained on — and misses the
-  western dry wash that the FM tracks. Genuine under-prediction (~0.1% of pixels, verified against a
-  fully-covered cube), and the 0.557-vs-0.889 gap made spatial.</p>
-  <p class="caveat"><b>Note on the RF layer:</b> an earlier version of this map used a partial RF export
-  (~1/5 of the reach) and was withdrawn as an invalid comparison. This uses the <b>regenerated
-  full-extent</b> RF prediction (reproduces AUROC 0.561 vs the documented 0.557).
-  <a href="2026-08-10-arroyo-map-extent-artifact.md">The catch, and the lesson.</a></p>
+  riparian, orange = RF predicted riparian, blue outline = NMRipMap truth. The evidence is the
+  <b>scored AUROC (0.56, near-chance)</b>; the map merely illustrates it — the RF predicts riparian in only
+  a small eastern pocket and leaves most of the corridor, consistent with a model that barely ranks
+  riparian above background here, while the FM tracks it. (Both layers are co-located over the labeled
+  reach; the earlier mislocated-RF map that confounded this was withdrawn.)</p>
+  <p class="caveat"><b>Re-verified 2026-08-21:</b> the RF bar reproduced (0.561 vs the documented 0.557),
+  and NMRipMap has no labels up the wash, so RF and FM were scored on the same held-out pixels — the
+  0.557→0.889 comparison stands; only the "arroyo" descriptor was retracted.
+  <a href="2026-08-21-reach-provenance-gap.md">The catch, and the lesson.</a></p>
 </div>
 
 <div id="legend" class="card">
@@ -80,7 +84,7 @@
     map.addSource("fm", { type: "geojson", data: "maps/fm_malpais.geojson" });
     map.addLayer({ id: "fm-fill", type: "fill", source: "fm",
       paint: { "fill-color": "#22c55e", "fill-opacity": 0.45 } });
-    map.addSource("rf", { type: "geojson", data: "maps/rf_malpais_full.geojson" });
+    map.addSource("rf", { type: "geojson", data: "maps/reach-malpais-rf.geojson" });
     map.addLayer({ id: "rf-fill", type: "fill", source: "rf",
       paint: { "fill-color": "#f97316", "fill-opacity": 0.9, "fill-outline-color": "#7c2d12" } });
     map.addSource("truth", { type: "geojson", data: "maps/truth_malpais.geojson" });

@@ -1,5 +1,7 @@
 # The foundation model earns its keep — but only where the baseline was blind
 
+> **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism is **brittleness to distribution shift** on the one out-of-distribution held-out reach (RF collapses to near-chance 0.56, OlmoEarth holds 0.89) — **not** arroyo morphology and **not** invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). The body below still frames it as "the arroyo"; read it through this correction. See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
+
 **Date:** 2026-08-01 · **Status:** result · settles the
 [FM-vs-RF deploy decision](specs/2026-07-19-fm-vs-rf-deploy-decision.md) against the measured
 [RF bar](2026-07-20-diverse-reach-transfer.md). Metric/method background:
@@ -8,9 +10,13 @@
 ## The one-sentence answer
 
 Fine-tuning a satellite **foundation model** (OlmoEarth) does **not** beat a plain **Random Forest**
-everywhere — it *ties* the RF on the river reaches the RF already handled — but it **rescues the one
-morphology the RF was blind to** (a desert arroyo: **AUROC 0.557 → 0.889**), and that rescue is enough
-to win the deploy decision.
+everywhere — the two essentially *tie* on the three in-distribution river reaches (the FM even trails
+slightly) — but it **holds on the one out-of-distribution reach the RF collapses on** (Malpais, a
+river-dominated San-Juan-valley subwatershed unlike the training reaches: **AUROC 0.557 → 0.889**), and
+that **robustness to distribution shift** is enough to win the deploy decision for an unlabeled basin.
+*(The earlier "desert arroyo" framing is retracted — attribution to arroyo morphology is unverified, and
+the failure is not invasive-specific; read the arroyo-worded body below through the correction banner at
+the top.)*
 
 ---
 
