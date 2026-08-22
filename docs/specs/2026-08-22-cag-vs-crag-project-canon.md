@@ -33,6 +33,31 @@ Note the distinction that makes this precise:
 - **Full-context reading** (neither): loading one fresh document per task, e.g.
   `/paper-audit`. No reuse, so no cache benefit — do not call this CAG.
 
+## Prerequisite: there is no "canon path" today
+
+Checked 2026-08-22, and it changes the work. `search_corpus` retrieves from **one
+blended collection** — project canon *and* the 37 external PDFs, unfiltered — and
+**both** agents call that same tool. So neither agent is canon-only, and there is no
+canon path to switch.
+
+That means CAG cannot simply be swapped in. It requires splitting the source first:
+
+- **the canon** → cached context (static, fits, reused);
+- **the literature** → a retrieval tool (large, must stay ranked);
+- the agent **chooses**, which is what a tool-calling agent is for.
+
+Both agents would get the same two sources and the same choice — this is a change to
+how a *source* is served, not a per-agent architecture.
+
+The split is worth measuring on its own, independent of CAG, because blending has a
+cost we currently absorb silently: **a method question competes in one ranking against
+similarly-worded agency prose**, so "how did this project handle X" can be outranked by
+a PDF paragraph about X. Splitting removes that competition even if the canon then
+stays on retrieval.
+
+The naive alternative — prefill the canon on every query — is rejected: it pays 158k
+tokens for questions a PDF answers.
+
 ## Hypotheses, stated before the run
 
 1. **CAG wins on recall.** No retrieval step means no retrieval miss — the failure mode
