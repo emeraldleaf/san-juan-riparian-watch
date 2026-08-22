@@ -22,6 +22,26 @@ const LAYER_LABEL: Record<string, string> = {
   truth: 'the NMRipMap truth layer',
 };
 
+// One conversation per page load. Sent with every question so the agent can see its
+// own prior turns — without it, "give me a list of those" has no referent and the
+// agent can only ask what you meant.
+//
+// It must come from a CSPRNG: this id is the key to a conversation's stored history,
+// so a guessable one would let a visitor load someone else's. If no CSPRNG exists we
+// send NO id and the agent answers statelessly — degraded but private. Never a shared
+// constant, which would merge every such visitor into one conversation.
+function newSessionId(): string | undefined {
+  const c = typeof crypto !== 'undefined' ? crypto : undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  if (c?.getRandomValues) {
+    return Array.from(c.getRandomValues(new Uint8Array(16)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return undefined;
+}
+const SESSION_ID = newSessionId();
+
 const FALLBACK: Reach[] = [
   { name: 'San Juan River', reaches: 0 },
   { name: 'Malpais Arroyo', reaches: 0 },
@@ -110,7 +130,7 @@ export default function MapAgent() {
       const token = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (token) headers['X-Turnstile-Token'] = token;
-      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify({ question: q }), signal: AbortSignal.timeout(30000) });
+      const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify(SESSION_ID ? { question: q, session_id: SESSION_ID } : { question: q }), signal: AbortSignal.timeout(30000) });
       if (!r.ok) throw new Error(`agent responded ${r.status}`);  // e.g. 403 when the Turnstile token is missing/invalid
       const d = await r.json();
       const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
