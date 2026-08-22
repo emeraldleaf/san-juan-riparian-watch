@@ -74,7 +74,13 @@ strong{font-weight:600;} em{color:var(--ink);}
 .back{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);text-decoration:none;}
 .back:hover{color:var(--ink);}
 @media (max-width:640px){ .topnav a:not(.cta){display:none;} .topnav{gap:12px;} }
-@media (max-width:460px){ .topnav a.cta.ghost{display:none;} }
+/* Small screens: keep BOTH CTAs; collapse the brand to its dot and compact the buttons. */
+@media (max-width:560px){
+  .brand .btxt{display:none;}
+  .topnav{gap:8px;}
+  .topnav a.cta{padding:7px 11px;font-size:12px;}
+  .topnav a.cta.ghost{padding:6px 10px;}
+}
 
 /* hero */
 .hero{padding:64px 0 8px;}
