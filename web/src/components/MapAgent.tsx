@@ -216,17 +216,33 @@ export default function MapAgent() {
         </div>
       ) : (
         <details className="ma-picker" open={pickerOpen} onToggle={(e) => setPickerOpen((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary>Mapped reaches{items.length ? ` (${items.length})` : ''} — ask about any</summary>
+          <summary>What you can ask</summary>
           <div className="ma-examples">
             {msgs.length > 0 && (
               <button className="ma-chip ma-chip-present" onClick={startPresentation} type="button">▶ Walkthrough</button>
             )}
-            {items.map((r) => (
-              <button key={r.name} className="ma-chip" onClick={() => ask(`How much of ${r.name} is riparian?`)} type="button">
-                {r.name}{r.reaches ? <span className="ma-count"> · {r.reaches} reaches</span> : null}
+            {/* Capability chips: one per thing the agent genuinely does — a measured
+                number, an overlay, a head-to-head, and an honest refusal. Better than
+                N copies of the same question with a different place name. */}
+            <button className="ma-chip" onClick={() => ask('Show me the invasive vegetation')} type="button">Show the invasive layer</button>
+            <button className="ma-chip" onClick={() => ask('Compare the Random Forest and OlmoEarth riparian maps')} type="button">Compare RF vs OlmoEarth</button>
+            {items[0] && (
+              <button className="ma-chip" onClick={() => ask(`How much riparian is along ${items[0].name}?`)} type="button">
+                Riparian acres along {items[0].name}
               </button>
-            ))}
+            )}
+            <button className="ma-chip" onClick={() => ask('How much of the corridor is invasive?')} type="button">How much is invasive?</button>
           </div>
+          {items.length > 1 && (
+            <div className="ma-examples ma-places">
+              <span className="ma-places-label">…or a place:</span>
+              {items.slice(1).map((r) => (
+                <button key={r.name} className="ma-chip ma-chip-quiet" onClick={() => ask(`How much riparian is along ${r.name}?`)} type="button">
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          )}
         </details>
       )}
 
