@@ -75,6 +75,14 @@
 }
 .ma-steps { font: 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--subtle); margin-bottom: 4px; }
 .ma-cite { font: 11px/1.4 var(--font-mono, ui-monospace, monospace); color: var(--muted); margin-top: 5px; }
+/* "Zoom to" under an answer: the map moves only when the reader asks it to. */
+.ma-zoomrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.ma-zoom {
+  padding: 6px 11px; font-size: 12.5px; font-weight: 550; cursor: pointer;
+  color: var(--accent-2, #0e1a45); background: var(--panel);
+  border: 1px solid var(--accent); border-radius: 8px; line-height: 1.3;
+}
+.ma-zoom:hover { background: var(--accent-tint, #eceffb); }
 .ma-busy { color: var(--muted); font-style: italic; }
 
 /* Persistent, collapsible reach picker above the input — accessible after the
