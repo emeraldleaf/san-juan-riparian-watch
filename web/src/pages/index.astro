@@ -5,7 +5,7 @@ import Chat from '../components/Chat.tsx';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../styles/story.css';
 const title = 'Mapping the invaders, an independent field test of OlmoEarth';
-const description = "An independent, leave-one-reach-out field evaluation of Ai2's OlmoEarth foundation model on San Juan riparian mapping, where it beats a Random Forest and where it ties.";
+const description = "An independent field evaluation of Ai2's OlmoEarth foundation model on San Juan riparian mapping: on familiar reaches it ties a cheap Random Forest; on the unfamiliar one it holds while the Random Forest collapses.";
 const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoEarth vs a Random Forest on San Juan riparian mapping (leave-one-reach-out). Not produced or endorsed by Ai2; their open models are used under license.";
 ---
 <Base title={title} description={description} ogDescription={ogDescription}>
@@ -18,26 +18,26 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <div class="wrap">
   <div class="eyebrow">An independent field evaluation · San Juan River basin · not affiliated with Ai2</div>
   <h1>How healthy is the river's forest, and which way is it heading?</h1>
-  <div class="thesis">A Western river's health shows in its corridor: how much native cottonwood and
-    willow still holds the banks, and how much ground the invasives have taken. This maps both across
-    four decades of satellite imagery and sets up to <strong>watch them year over year, so the signs that
-    matter (native forest shrinking, invasives spreading) surface early enough to act.</strong></div>
-  <p class="lede">The question underneath it all is whether a river corridor is <em>healthy</em>, and
-    whether it's holding steady or slipping. This works that out from decades of Landsat and Sentinel-2
-    imagery: mapping the native riparian forest and the invasive share, then tracking how each shifts over
-    time. Along the way it puts a Random Forest up against <strong>Ai2's OlmoEarth</strong> foundation
-    model in a real field test, on ground neither model has seen, to find where the foundation model
-    genuinely earns its keep and where the two simply tie. It's just as candid about what didn't hold up:
-    two tempting results that came apart under scrutiny, kept in rather than quietly dropped. And the agent
-    that answers your own questions is designed to run on <strong>Ai2's OLMo</strong> — there's no live
-    OLMo endpoint served yet, so for now it speaks through another open model, and OLMo becomes selectable
-    the moment a provider serves it. The intent: OlmoEarth sees; OLMo speaks.</p>
+  <div class="thesis">In the desert Southwest, most of a river's life crowds into the thin green ribbon
+    at the water's edge. Two invaders from Eurasia, tamarisk and Russian olive, have spent decades taking
+    that ribbon over, and <strong>from the ground you can't see how far they've gotten.</strong></div>
+  <p class="lede">From orbit you can, if you read <em>time</em> instead of color. On any single day an
+    invaded stretch looks exactly as green as a healthy one. But tamarisk holds its green for weeks after
+    the native trees brown out, and that timing signature is written into forty years of satellite
+    imagery. I built a system that reads it: where the river forest is, how much of it has turned
+    invasive, and which way both are heading.</p>
+  <p class="lede">It's also a field test with real stakes. Every map here is made two ways, once by a
+    classic Random Forest and once by <strong>Ai2's OlmoEarth</strong> foundation model, to find out
+    where the bigger model actually earns its cost on stretches of river neither has seen. And the whole
+    thing shows its work. Two tempting headline results failed their own tests and stayed on the page as
+    negatives instead of quietly disappearing. Ask the agent at the bottom about any of it. It answers
+    from the project's own documents and cites them.</p>
 
   <div class="kpis">
     <div class="kpi"><div class="n r">23%</div><div class="l">of the mapped corridor is invasive (Farmington, 2020)</div></div>
     <div class="kpi"><div class="n b">0.89</div><div class="l">OlmoEarth on the held-out reach where the Random Forest collapses to 0.56</div></div>
-    <div class="kpi"><div class="n">1984→</div><div class="l">Landsat archive depth we probed, and where it breaks</div></div>
-    <div class="kpi"><div class="n g">2</div><div class="l">tempting results a pre-registered test killed</div></div>
+    <div class="kpi"><div class="n">1984→</div><div class="l">how far back the satellite record reaches, and where it stops being trustworthy</div></div>
+    <div class="kpi"><div class="n g">2</div><div class="l">headline results killed by their own tests, and kept on the page</div></div>
   </div>
 
   <div class="stack">
@@ -51,21 +51,18 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 
   <div class="ai2note">
     <span class="badge">Independent</span>
-    <p>An <b>independent, unaffiliated project</b> — <b>not produced, sponsored, or endorsed by the Allen
-      Institute for AI (Ai2)</b>. It's built <em>on</em> Ai2's open models, used under their open licenses:
-      <b>OlmoEarth</b> (Earth-observation foundation model) delineates the vegetation and <b>OLMo</b> (open LLM)
-      grounds the answers. An outside field test and application of those models, not a benchmark Ai2 ran.
-      "OlmoEarth" and "OLMo" are Ai2's names, used here only to identify the models evaluated.</p>
+    <p>This is an <b>independent project, not produced, sponsored, or endorsed by the Allen Institute
+      for AI (Ai2)</b>. It is built on Ai2's open models under their open licenses: <b>OlmoEarth</b>
+      maps the vegetation, and <b>OLMo</b> is the model the agent is built for. Their names appear here
+      only to identify the models being evaluated.</p>
   </div>
 
   <div class="poc-note">
     <span class="badge">Proof of concept</span>
-    <p><b>Experimental — not verified data.</b> Every map, number, and model output on this site (both the
-      Random Forest and the OlmoEarth results) is <b>an in-progress research prototype and has not been
-      independently validated</b>. The figures are in-sample calibration, not ground truth. This was built
-      with genuine scientific rigor and will keep being validated and refined to represent the real world
-      more accurately over time — but for now, <b>treat every output as provisional and possibly wrong, not
-      as fact.</b></p>
+    <p><b>Experimental, not verified data.</b> Every map and number on this site, from both models, is a
+      research prototype that <b>has not been independently validated</b>. The work is done with real
+      scientific rigor, and each figure says how it was measured. Still: <b>treat every output as
+      provisional and possibly wrong, not as fact.</b></p>
   </div>
 </div></header>
 
@@ -87,9 +84,9 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <p>There was a hopeful intervention. In the 2000s the <strong>tamarisk leaf beetle</strong> was released
     across the West as a biological control, meant to defoliate saltcedar and give the natives room to
     recover. Whether it has durably rolled the invasion back is genuinely unsettled: the beetle spread,
-    but tamarisk often grows back, and the net effect has been hard to pin down. This project's own attempt
-    to find that effect in the satellite record came up empty, which is a result we keep in rather than
-    bury. That kind of uncertainty is precisely what long-term monitoring exists to resolve.</p>
+    but tamarisk often grows back, and the net effect has been hard to pin down. My own attempt to find
+    that effect in the satellite record came up empty. That result stays on this page, because that kind
+    of uncertainty is exactly what long-term monitoring exists to resolve.</p>
   <div class="note info"><span class="t">The long game</span>
     The aim isn't one reach or one year. It's to map <strong>riparian extent and its invasive share across
     the entire San Juan watershed</strong>, reconstruct how both have shifted over the four-decade Landsat
@@ -117,12 +114,14 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <!-- ── METHOD ──────────────────────────────────────────────────────── -->
 <section class="reveal" id="method"><div class="wrap">
   <div class="kicker">Method</div>
-  <h2>A bounding box becomes a phenology cube, then a decision</h2>
-  <p>What separates tamarisk from native cottonwood isn't how they look on any single day, it's their
-    <strong>timing</strong>. The two leaf out and drop their leaves on different schedules, and hold water
-    differently in a way the shortwave-infrared bands can see. So one snapshot is the wrong input.
-    Instead, each reach becomes a <strong>12-month cube</strong> of median mosaics, all composited the
-    same way, and both models get to read the whole year's rhythm rather than a single greenness number.</p>
+  <h2>The trick is timing: read the whole year, not one photo</h2>
+  <p>What separates tamarisk from native cottonwood isn't how they look on any single day. It's their
+    <strong>timing</strong>. The two species leaf out and shed on different schedules, and they hold
+    water differently in a way the satellite's infrared bands can see. Ecologists call this seasonal
+    rhythm <strong>phenology</strong>, and it's the fingerprint everything here runs on. So instead of
+    one photo, each stretch of river becomes a stack of <strong>twelve monthly images</strong>, one
+    cloud-free composite per month, built the identical way every time. Both models read the year's
+    whole rhythm instead of a single greenness number.</p>
   <figure class="fig"><div class="body">
     <div class="pipe">
       <div class="pnode"><div class="pk">Ingest</div><div class="pv">STAC time-series</div><div class="ps">Sentinel-2 / Landsat via Planetary Computer</div></div>
@@ -135,14 +134,16 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <div class="parrow">→</div>
       <div class="pnode"><div class="pk">Product</div><div class="pv">Corridor + invasive</div><div class="ps">GeoJSON, corridor-masked</div></div>
     </div>
-  </div><figcaption>The pipeline. <b>Identical compositing is the experiment</b>, a mis-composited
-    single-scene shortcut once collapsed a cross-reach transfer to AUC 0.37.</figcaption></figure>
+  </div><figcaption>The pipeline. <b>Building every monthly stack the identical way is not a detail, it
+    is the experiment</b>: a shortcut that used single scenes once dropped a model's score on an unseen
+    reach from 0.80 to 0.37.</figcaption></figure>
 
-  <h3 style="margin-top:26px">Why not just NDVI?</h3>
+  <h3 style="margin-top:26px">Why not just measure greenness?</h3>
   <p>Because for this particular problem, greenness is almost blind. Ask a model to tell invasive from
-    native using the <strong>NDVI greenness index alone, and it scores AUC ≈ 0.50, a coin flip.</strong>
-    The real signal lives elsewhere: in the shortwave-infrared and red-edge bands, followed across the
-    season. Tamarisk simply stays green later into the fall than cottonwood does.</p>
+    native using the standard greenness index (NDVI) alone and it scores <strong>AUC ≈ 0.50</strong>.
+    AUC is the score used throughout this page: 1.0 is a perfect classifier, 0.5 is a coin flip. So:
+    <strong>a coin flip</strong>. The real signal lives elsewhere, in the infrared bands followed across
+    the season. Tamarisk simply stays green later into the fall than cottonwood does.</p>
   <figure class="fig"><div class="body">
     <svg class="chart" viewBox="0 0 320 150" role="img" aria-label="Seasonal greenness curves: tamarisk holds green later into fall than native cottonwood, the late-season divergence that carries the signal.">
       <line class="c-axis" x1="20" y1="130" x2="310" y2="130"></line>
@@ -171,9 +172,10 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <section class="reveal" id="corridor"><div class="wrap">
   <div class="kicker">The product</div>
   <h2>Nearly a quarter of the corridor is invasive</h2>
-  <p>Green is the predicted riparian-woody corridor (<strong>7.6&nbsp;km²</strong>); red is the invasive
-    tamarisk / Russian-olive share <strong>within</strong> it (<strong>1.7&nbsp;km²</strong>). Toggle
-    either layer. This is the real prediction, on satellite imagery.</p>
+  <p>Here is what that instrument sees over Farmington. Green is the predicted river-forest corridor
+    (<strong>7.6&nbsp;km²</strong>). Red is the share of it the model calls invasive
+    (<strong>1.7&nbsp;km²</strong>). Toggle either layer. This is the real prediction, drawn on
+    satellite imagery.</p>
   <figure class="fig" id="wrap-corridor">
     <div id="map-corridor" class="maplib"></div>
     <div class="maplegend" aria-label="Corridor map legend">
@@ -183,12 +185,13 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     </div>
     <figcaption>San Juan River at Farmington · 2020 · Landsat, NMRipMap-labelled. Imagery © Esri.</figcaption>
   </figure>
-  <div class="note"><span class="t">In-sample calibration, not independent validation</span>
-    The 23% masked prediction <em>reproduces</em> the NMRipMap label proportion (15,656 / 67,625 woody
-    pixels invasive = 23%): well-calibrated to the 2020 labels it trained on. A spatially-held-out test
-    is the honest next step, and it's named as such rather than dressed up as validation.</div>
+  <div class="note"><span class="t">A model agreeing with its teacher, not passing an exam</span>
+    The 23% reproduces the proportion in the expert 2020 labels the model trained on (15,656 of 67,625
+    woody pixels). In other words it's well calibrated, not independently validated. The honest next step
+    is a test on ground the model never saw, and I name it as that instead of dressing this up as
+    validation.</div>
   <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
-    <button class="askchip" data-ask="How much of the corridor is invasive, and how confident are you in that number?">How much is invasive — and how sure? ↗</button>
+    <button class="askchip" data-ask="How much of the corridor is invasive, and how confident are you in that number?">How much is invasive, and how sure? ↗</button>
     <button class="askchip" data-ask="Why is NDVI not enough to map the invasives?">Why isn't NDVI enough? ↗</button>
   </div>
 </div></section>
@@ -197,37 +200,20 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <section class="reveal" id="models"><div class="wrap">
   <div class="kicker">The OlmoEarth field test, Random Forest vs Ai2's foundation model</div>
   <h2>On familiar ground they tie. One unfamiliar reach decides it.</h2>
-  <div class="poc-note" style="border-color:color-mix(in srgb,var(--accent) 45%,var(--line))">
-    <span class="badge" style="background:var(--accent);color:#fff">Corrected — the result stands, the label didn't</span>
-    <p><b>Re-verification is complete, and the transfer result holds.</b> Re-running the Random-Forest bar
-    reproduced it almost exactly (Farmington 0.90, Kirtland 0.85, Aztec 0.89, Malpais 0.56), and both models
-    were scored on the <b>same held-out pixels</b> — NMRipMap has no labels up the wash, so nothing was
-    silently missing from either. What was wrong was the <b>word "arroyo"</b>: the reach is the HUC12
-    <em>Malpais Arroyo–San Juan</em>, a <b>river-dominated subwatershed</b> of the San Juan valley, not a
-    desert arroyo. And the edge is <b>not about arroyo shape or spatial context, and not about tamarisk</b>
-    — the RF is near-chance on native <em>and</em> invasive riparian alike (0.59 vs 0.53). What actually
-    happened is simpler and stronger: on the one <b>held-out reach whose landscape is unlike the training
-    reaches</b>, the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) —
-    <b>brittleness to distribution shift</b>, exactly what a foundation model is supposed to buy. The
-    "desert-arroyo rescue" story (attribution to arroyo morphology is unverified) is retracted; the number
-    and the comparison are not. See <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/2026-08-21-reach-provenance-gap.md">the post-mortem</a>
-    and <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/RETRACTIONS.md">the retraction note</a>.</p>
-  </div>
   <p>First, what's actually being compared: two very different ways to turn satellite pixels into a map.</p>
   <div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="num" style="font-size:17px;color:var(--accent)">Random Forest (RF)</div><div class="lab">The classic workhorse. It looks at each pixel on its own, reads its colour across the seasons, and votes with hundreds of little decision trees. Simple, fast, runs on any laptop, no GPU. A genuinely strong baseline, not a straw man.</div></div>
     <div class="stat"><div class="num" style="font-size:17px;color:var(--accent)">OlmoEarth (the FM)</div><div class="lab">Ai2's Earth-observation <em>foundation model</em>: a large network pre-trained on enormous volumes of satellite imagery, then fine-tuned for this task. Unlike the RF, it reads each pixel <em>in context</em>, its neighbours, the shape of the corridor. More capable, but it needs a GPU.</div></div>
   </div>
   <p><strong>Why put them head to head?</strong> Because "just use the fancy model" isn't a plan. A foundation model costs real money and hardware, so it's only worth deploying where it <em>measurably</em> beats the cheap baseline. The goal here isn't to crown a winner; it's to find the exact conditions under which OlmoEarth earns its keep, and to say so plainly where it doesn't. That's a real deployment decision, made on evidence instead of hype.</p>
-  <p>The test that matters isn't how well a model scores on data it trained on; it's whether it
-    <strong>transfers to a place it has never seen</strong>. So we train on some reaches and predict a
-    held-out one. A per-pixel Random Forest, pooled across four reaches, transfers <em>well</em> to
-    reaches that resemble the ones it trained on (0.85–0.90). It has exactly one blind spot: the held-out
-    reach whose landscape is <strong>unlike the rest</strong> — Malpais, a San-Juan-valley subwatershed
-    with a heavy irrigated-ag and desert-upland mix — where it collapses to near-chance (0.56). And that's
-    precisely where a foundation model should have the edge: its pre-trained representation is far less
-    <strong>brittle</strong> when a test reach falls outside the training distribution. This is the honest
-    test of whether OlmoEarth actually delivers there.</p>
+  <p>The test that matters isn't how well a model scores on data it trained on. It's whether the model
+    survives a place it has never seen. So I train both models on three stretches of river and make them
+    predict a held-out fourth, taking turns until every reach has been the unseen one. On reaches that
+    resemble the training set, the cheap Random Forest does fine (0.85 to 0.90) and the foundation model
+    merely matches it. But on Malpais, the one reach whose landscape is unlike the rest (a valley of
+    irrigated fields and dry upland), the Random Forest collapses to a coin flip at 0.56 while OlmoEarth
+    holds at 0.89. That is the whole result: <strong>the foundation model doesn't see better, it breaks
+    less on unfamiliar ground.</strong> And an unlabeled basin is almost entirely unfamiliar ground.</p>
 
   <figure class="fig"><div class="body">
     <div class="board" role="img" aria-label="Leave-one-reach-out transfer AUC: Farmington 0.905, Aztec/Animas 0.886, Kirtland 0.845, Malpais 0.557, where the foundation model reaches 0.889.">
@@ -237,23 +223,32 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <div class="brow"><div class="rl">Malpais<small>San Juan valley · out-of-distribution</small></div><div class="track"><div class="bar arr" style="width:11.4%"></div><div class="fmmark" style="left:77.8%"></div></div><div class="rv lose">0.557</div></div>
     </div>
     <div class="baseline">Bars = Random Forest transfer AUC (0.5 = random, at the left edge). The green
-      tick on Malpais is the fine-tuned foundation model — <b>0.557 → 0.889</b> on the one out-of-distribution reach.</div>
+      tick on Malpais is the fine-tuned foundation model: <b>0.557 → 0.889</b> on the one unfamiliar reach.</div>
   </div><figcaption><b>OlmoEarth eval card.</b> Task: riparian extent. Protocol: leave-one-reach-out
     transfer over 4 morphologically diverse reaches, scored once on the held-out reach (shared NMRipMap
-    labels). Result: RF and OlmoEarth are a wash on the three <b>in-distribution</b> reaches (mean ~0.88 —
-    the FM even trails on Kirtland, 0.812 vs 0.845); OlmoEarth wins the one <b>out-of-distribution</b> reach,
-    Malpais, <b>0.557 → 0.889</b>. Its whole edge is robustness to distribution shift — a trade you buy for
-    the unlabeled basin, not a free win. Model: OlmoEarth (Ai2) fine-tuned on the pooled reaches. Reproducible: <a
+    labels). Result: on the three familiar reaches the two are a wash (mean ~0.88; OlmoEarth even trails
+    slightly on Kirtland, 0.812 vs 0.845). OlmoEarth wins the one unfamiliar reach, Malpais,
+    <b>0.557 → 0.889</b>. Its whole edge is robustness on ground unlike its training data; a trade you
+    buy for the unlabeled basin, not a free win. Model: OlmoEarth (Ai2) fine-tuned on the pooled reaches. Reproducible: <a
     href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/2026-08-01-fm-vs-rf-loro-result.md">the LORO result</a> · <a
     href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md">the pre-registered eval contract</a>.</figcaption></figure>
 
-  <p>Here are all three over the labeled reach. The foundation model (green) tracks the corridor; the
-    NMRipMap reference labels (outline) are the comparison baseline; and the Random Forest (orange), dropped
-    onto a held-out reach it never trained on, fires <strong>only in a small eastern pocket</strong>, the
-    stretch whose spectra most resemble the reaches it did learn, while missing the rest of the corridor
-    that both the foundation model and the truth pick up. That's the near-chance collapse (AUC 0.56) made
-    visible — the RF can't find the riparian across this out-of-distribution reach at all, of either
-    kind. To the eye, the foundation model is simply the more accurate map.</p>
+  <div class="note info"><span class="t">This result survived its own audit</span>
+    An earlier version of this page called Malpais a "desert arroyo" and credited the win to that terrain.
+    A spatial audit showed the reach is actually a river-dominated subwatershed of the San Juan valley, so
+    the attribution to arroyo morphology is unverified and that framing was retracted. The numbers
+    themselves held up: the Random-Forest scores reproduced on a re-run (0.90 / 0.85 / 0.89 / 0.56), and
+    both models were scored on the same held-out pixels. It is also not a tamarisk effect; the Random
+    Forest is near-chance on native and invasive vegetation alike (0.59 vs 0.53). What you just read is
+    the corrected explanation. The full trail:
+    <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/2026-08-21-reach-provenance-gap.md">the post-mortem</a> ·
+    <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/RETRACTIONS.md">the retraction note</a>.</div>
+
+  <p>Here are all three on the same reach. The expert labels are the outline. The foundation model
+    (green) tracks the whole corridor. The Random Forest (orange), dropped onto ground it never trained
+    on, fires in <strong>one small eastern pocket</strong>, the stretch that most resembles the reaches
+    it learned, and misses everything else. That is the coin-flip collapse made visible. To the eye, the
+    foundation model is simply the more accurate map.</p>
   <figure class="fig" id="wrap-arroyo">
     <div id="map-arroyo" class="maplib"></div>
     <div class="maplegend" aria-label="Arroyo map legend">
@@ -262,20 +257,21 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <button type="button" class="row" data-map="arroyo" data-layer="a-truth" aria-pressed="true"><span class="sw ring"></span> NMRipMap truth</button>
       <output id="status-arroyo" aria-live="polite">loading…</output>
     </div>
-    <figcaption>RF vs FM over the held-out Malpais reach (a San-Juan-valley subwatershed, not a desert
-      arroyo), both leave-one-reach-out predictions, viewed over the NMRipMap-labeled reach. The RF fires
-      only in a small eastern pocket and misses the rest; the FM tracks the whole corridor — the
-      0.557-vs-0.889 gap, and the RF near-chance on native and invasive riparian alike. Imagery © Esri.
-      <b style="color:color-mix(in srgb,var(--warn) 72%,var(--ink))">⚠ Experimental model output — provisional, not validated ground truth.</b></figcaption>
+    <figcaption>Both models over the held-out Malpais reach (a San-Juan-valley subwatershed, not a desert
+      arroyo), each predicting ground it never trained on. The Random Forest fires in one small eastern
+      pocket and misses the rest; OlmoEarth tracks the whole corridor. This is the 0.557-versus-0.889 gap,
+      drawn on the map. Imagery © Esri.
+      <b style="color:color-mix(in srgb,var(--warn) 72%,var(--ink))">⚠ Experimental model output, provisional, not validated ground truth.</b></figcaption>
   </figure>
   <div class="note"><span class="t">Why AUC, not accuracy</span>
-    Malpais is 82% invasive; a model that guessed "invasive everywhere" would score 82% accuracy and be
-    useless. Prevalence swings 47%→82% across reaches, so the transfer metric is <strong>AUC</strong>
-    (ranking quality, prevalence-invariant), reported alongside F1 at the deployment threshold, never
-    accuracy. For plain <em>extent</em>, RF is as good and needs no GPU; the foundation model earns its
+    Malpais is 82% invasive, so a model that just guessed "invasive everywhere" would score 82% accuracy
+    and be useless. The invasive share also swings from 47% to 82% across reaches. So the score here is
+    <strong>AUC</strong>, which measures how well a model ranks its answers and gives no credit for
+    guessing the majority, reported alongside F1 at the deployment threshold, never accuracy. For plain
+    extent mapping, the Random Forest is as good and needs no GPU; the foundation model earns its
     keep only on the out-of-distribution reach.</div>
   <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
-    <button class="askchip" data-ask="Does OlmoEarth beat the Random Forest on the held-out out-of-distribution reach, and why?">Does OlmoEarth beat the RF on the held-out reach — and why? ↗</button>
+    <button class="askchip" data-ask="Does OlmoEarth beat the Random Forest on the held-out reach, and why?">Does OlmoEarth beat the RF on the held-out reach, and why? ↗</button>
     <button class="askchip" data-ask="Why does the foundation model ship for invasives but not for plain extent?">Why ship the FM for invasives but not extent? ↗</button>
   </div>
 </div></section>
@@ -284,11 +280,12 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <section class="reveal"><div class="wrap">
   <div class="kicker">A negative, kept in</div>
   <h2>The beetle that didn't break the classifier</h2>
-  <p>We expected a tamarisk classifier trained on today's imagery to <strong>flip</strong> once you ran it
-    back past the tamarisk beetle's arrival (~2004–07), when the plant's greenness signal changes. It
-    didn't budge. And the <strong>negative control we'd declared up front</strong>, Russian olive, which
-    the beetle doesn't touch, moved seven times more than the tamarisk "signal" did. That's the tell: the
-    cross-era noise is simply too large to resolve a beetle effect at all.</p>
+  <p>I expected a tamarisk classifier trained on today's imagery to <strong>flip</strong> once I ran it
+    back past the beetle's arrival around 2004, because the beetle changes how green the plant looks.
+    It didn't budge. Better: before the run I declared a <strong>negative control</strong>, Russian olive,
+    a plant the beetle doesn't touch. If the record were clean, its score should have stayed put. Instead
+    it moved seven times more than the tamarisk "signal" did. That's the tell: the noise between eras is
+    simply too large to measure a beetle effect at all.</p>
   <table class="tbl">
     <thead><tr><th>taxon vs native (AUROC)</th><th class="n">2020</th><th class="n">2015</th><th class="n">2000 pre-beetle</th><th class="n">Δ</th></tr></thead>
     <tbody>
@@ -297,8 +294,8 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     </tbody>
   </table>
   <p class="disc" style="padding:0">Declaring the control <em>in advance</em> is what let it veto the
-    result instead of us over-reading a 0.013 wiggle. The honest read: a beetle-robust discriminator, on
-    a sample too small and too cross-sensor-confounded to say more.</p>
+    result, instead of me over-reading a 0.013 wiggle. The honest read: the classifier looks beetle-proof,
+    but the sample is too small, and too tangled across satellite generations, to say more.</p>
 </div></section>
 
 <!-- ── FINDING 4: DEEP-TIME NEGATIVE ──────────────────────────────── -->
@@ -306,11 +303,12 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <div class="kicker">A negative, kept in</div>
   <h2>The "5× growth" that was an artifact</h2>
   <p>The first pass back through the Landsat archive looked like a clean <strong>~5× rise</strong> in
-    invasive extent since 1990. Every robustness check dissolved it. Two things sink it. The pre-2000
-    numbers <strong>swing with the compositing recipe</strong>, no normalization fixes it, because 1990
-    is pure Landsat-5 TM, spectrally too far from the training year to reconcile. And once the invasive
-    layer is properly gated to woody vegetation, even the face-value change is small: from under 1% to
-    about 1.4% of the area, most of it within the method's own noise.</p>
+    invasive cover since 1990. Every robustness check dissolved it. Two things sink it. First, the
+    pre-2000 numbers <strong>change depending on how the imagery is assembled</strong>, and no correction
+    fixes that, because 1990 comes from an older satellite whose sensor is too different from the
+    training year to reconcile. Second, once the invasive layer is limited to woody vegetation, even the
+    face-value change is small: from under 1% to about 1.4% of the area, most of it within the method's
+    own noise.</p>
   <figure class="fig"><div class="body">
     <svg class="chart" viewBox="0 0 320 165" role="img" aria-label="Extent-gated invasive estimate by year. Before 2000 it is recipe-dependent and marked no-claim; from 2000 to 2020 it is stable and small, rising only from about 0.8 to 1.4 percent of area.">
       <!-- y grid at 0,1,2,3% : y = 135 - p/3*120 -->
@@ -348,9 +346,10 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     Only the present-day product is asserted.</figcaption></figure>
 
   <p style="margin-top:24px">See it directly. Drag the year: the map shows the model's actual invasive
-    prediction for each epoch, over the same corridor (green reference). Watch the flag in the corner, from ~2000 on the estimate is stable; slide to 1990 and it turns amber, because that pure Landsat-5
-    map moves with the compositing recipe. <strong>This isn't a growth animation. It's a demonstration
-    of where the record stops being trustworthy.</strong></p>
+    prediction for each decade, over the same corridor (green reference). Watch the flag in the corner.
+    From about 2000 on the estimate is stable; slide to 1990 and it turns amber, because that estimate
+    changes with how the imagery is assembled. <strong>This isn't a growth animation. It's a
+    demonstration of where the record stops being trustworthy.</strong></p>
   <figure class="fig" id="wrap-time">
     <div id="map-time" class="maplib"></div>
     <div class="tbadge"><b id="tyear">2020</b><span class="cf ok" id="tconf">present-day · calibrated</span></div>
@@ -361,7 +360,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <output id="status-time" aria-live="polite" style="font-size:11px;color:var(--muted)"></output>
     </div>
     <figcaption>Invasive-woody prediction over the Farmington corridor, per composite epoch. Green =
-      the 2020 riparian corridor reference; red = invasive prediction for the selected year. Imagery © Esri. <b style="color:color-mix(in srgb,var(--warn) 72%,var(--ink))">⚠ Experimental model output — provisional, not validated ground truth.</b></figcaption>
+      the 2020 riparian corridor reference; red = invasive prediction for the selected year. Imagery © Esri. <b style="color:color-mix(in srgb,var(--warn) 72%,var(--ink))">⚠ Experimental model output, provisional, not validated ground truth.</b></figcaption>
   </figure>
 </div></section>
 
@@ -369,35 +368,36 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
 <section class="reveal" id="rigor"><div class="wrap">
   <div class="kicker">Why you can trust the parts that stand</div>
   <h2>The method is the deliverable</h2>
-  <p>What separates this from a demo is simple: the ways it could be wrong were hunted down, not hidden.
-    Four habits do most of that work.</p>
+  <p>By this point you've watched two negatives and a retraction survive on the same page as the
+    results. That isn't an accident. I hunted down the ways this work could be wrong instead of hiding
+    them, and four habits do most of that job.</p>
   <div class="stats" style="grid-template-columns:1fr 1fr">
-    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Spatial CV</div><div class="lab">Leave-one-<em>reach</em>-out, not random pixels, the only split that measures real deployment transfer across morphology.</div></div>
-    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Pre-registered controls</div><div class="lab">The Russian-olive control was declared before the run, so it could <em>veto</em> the beetle result rather than be quietly dropped.</div></div>
-    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Recipe-robustness</div><div class="lab">Every deep-time number was recomputed under multiple compositing recipes; the ones that moved were retired, not reported.</div></div>
-    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Prior-art falsification</div><div class="lab">The novelty claim is actively attacked against the literature, CO-RIP already owned <em>extent</em>, so extent is framed as the control, not the win.</div></div>
+    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Held-out reaches</div><div class="lab">Models are tested on whole stretches of river they never saw, not on random pixels. That is the only split that predicts real deployment.</div></div>
+    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Controls declared first</div><div class="lab">The Russian-olive control was declared before the beetle run, so it could <em>veto</em> the result rather than be quietly dropped.</div></div>
+    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">Robustness re-runs</div><div class="lab">Every deep-time number was recomputed under several ways of assembling the imagery. The ones that moved were retired, not reported.</div></div>
+    <div class="stat"><div class="num" style="font-size:19px;color:var(--accent)">The novelty claim gets attacked</div><div class="lab">The claim of newness is tested against the literature on purpose. Extent mapping was already solved (CO-RIP), so it is framed as the control, not the win.</div></div>
   </div>
   <div class="note info"><span class="t">Calibrated language, on purpose</span>
-    You'll notice "in-sample calibration," "documented negative," "cannot resolve", not "validated,"
-    "proven," "breakthrough." The claims are sized to the evidence. That restraint <em>is</em> the
-    credibility.</div>
+    You'll notice the wording here: "well calibrated," "documented negative," "cannot resolve." Not
+    "validated," "proven," "breakthrough." The claims are sized to the evidence, and that restraint
+    <em>is</em> the credibility.</div>
   <div class="askrow-ctx"><span class="askrow-label">Ask the agent</span>
-    <button class="askchip" data-ask="What are the biggest threats to this project's central claim, and how does it defend against them?">Biggest threats to the claim — and the defense? ↗</button>
-    <button class="askchip" data-ask="What did this project get wrong, and how did it catch it?">What did it get wrong — and how was it caught? ↗</button>
+    <button class="askchip" data-ask="What are the biggest threats to this project's central claim, and how does it defend against them?">Biggest threats to the claim, and the defense? ↗</button>
+    <button class="askchip" data-ask="What did this project get wrong, and how did it catch it?">What did it get wrong, and how was it caught? ↗</button>
   </div>
 </div></section>
 
 <!-- ── AI-ASSISTED METHOD ──────────────────────────────────────────── -->
 <section class="reveal" id="ai-method"><div class="wrap">
-  <div class="kicker">The other method, how the work itself stays honest</div>
+  <div class="kicker">How the work itself stays honest</div>
   <h2>AI-assisted research that catches its own errors</h2>
-  <p>This was built fast, with a lot of AI assistance, which is exactly where research quietly goes
+  <p>I built this fast, with a lot of AI assistance, and that is exactly where research quietly goes
     wrong. Hallucinated code is the <em>easy</em> kind of failure; a compiler catches it in seconds. The
-    dangerous failures are <strong>semantic</strong>: they compile, they pass the tests, and they read
-    beautifully, while being wrong.</p>
+    dangerous failures are the ones that <strong>mean the wrong thing</strong>: they compile, they pass
+    the tests, and they read beautifully, while being wrong.</p>
   <blockquote class="pull">AI-assisted research fails by producing work that is fast, fluent, plausible,
     and <em>wrong</em>, and the wrongness is invisible precisely because the output looks finished.
-    Exhortation doesn't fix this. Gates do.</blockquote>
+    Good intentions don't fix this. Gates do.</blockquote>
   <table class="tbl">
     <thead><tr><th>Failure mode</th><th>Caught by</th></tr></thead>
     <tbody>
@@ -408,18 +408,18 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
       <tr class="bad"><td>A novelty claim already falsified by a 2018 paper</td><td class="n">nothing</td></tr>
     </tbody>
   </table>
-  <p>So honesty here is <strong>mechanized, not exhorted.</strong> Retired numbers, withdrawn claims and
-    orphaned docs are caught by drift gates that run identically on a laptop and in CI. The finding, stated
-    plainly in <a href="/method">the method write-up</a>: <strong>every rule that was merely
-    <em>documented</em> eventually drifted; every rule that was <em>mechanized</em> held.</strong></p>
+  <p>So honesty here is <strong>enforced by machinery, not by reminders.</strong> Retired numbers,
+    withdrawn claims and orphaned docs are caught by automated checks that run identically on my laptop
+    and in CI. The finding, stated plainly in <a href="/method">the method write-up</a>: <strong>every
+    rule that was merely written down eventually drifted; every rule a machine enforced held.</strong></p>
   <div class="note warn"><span class="t">The most honest receipt</span>
     The project's own merge gate was <strong>theatre for 25 of its first 29 merged PRs</strong>, a
     skipped AI review still posts a green check, and "no findings" is indistinguishable from "no review."
     It was caught only because a reviewer asked a question that couldn't be answered without checking.
     That failure is kept in the record, not scrubbed, which is the whole point.</div>
   <h3 style="margin-top:28px">How it's built</h3>
-  <p>The same discipline runs through the stack, a reproducible EO pipeline, a typed spatial store, two
-    model tracks, a services API, and the grounded agent, each behind its own gate.</p>
+  <p>The same discipline runs through the stack: a reproducible satellite pipeline, a spatial database,
+    two model tracks, a services API, and the grounded agent. Each sits behind its own checks.</p>
   <div class="arch">
     <div class="an"><div class="ak">Ingest</div><div class="av">STAC ETL · Planetary Computer</div></div>
     <div class="aa">→</div>
@@ -445,8 +445,8 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <div class="kicker">What this demonstrates</div>
   <h2>Four disciplines, one artifact</h2>
   <p>Mapping invasive riparian vegetation honestly, and shipping it as a live product, usually takes four
-    different people. This is one person doing all four, and every claim below is backed by something on
-    this page or in the code.</p>
+    different people. Here it was one person, me. Every claim below is backed by something on this page
+    or in the code.</p>
   <div class="disc-grid">
     <div class="disc-card">
       <div class="disc-ico">🌿</div>
@@ -489,11 +489,11 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <div class="kicker">Interrogate it</div>
   <h2>Ask the agent, it answers from the documents, and cites them</h2>
   <p>Everything above, the findings, the methods, and the watershed literature behind them, is indexed
-    in a hybrid-retrieval system (dense embeddings + BM25). Ask it anything. The answer is written by an
-    open LLM — <strong>Ai2's OLMo</strong> the moment a provider serves it, another open model until then
-    — <strong>grounded in the retrieved sources with clickable citations</strong>, and if you mention a
-    reach the map flies to it. No source, no claim; the same Ai2 open stack that <em>maps</em> the
-    vegetation is built to <em>explain</em> it.</p>
+    for search by meaning and by keyword. Ask it anything. The answer is written by an open language
+    model and <strong>grounded in the retrieved sources with clickable citations</strong>; mention a
+    reach and the map flies to it. The agent is built for <strong>Ai2's OLMo</strong>. No provider serves
+    a live OLMo endpoint yet, so for now it speaks through another open model, and OLMo becomes
+    selectable the moment one does. The rule underneath is simple: <strong>no source, no claim.</strong></p>
   <Chat client:load agentUrl="/query" />
 </div></section>
 
@@ -502,8 +502,8 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
   <ul class="k-list">
     <li>Riparian <strong>extent</strong> is already solved for this basin (CO-RIP, κ 0.80), the RF reproduces it; that's the control, not the contribution.</li>
     <li>The invasive discriminator is <strong>phenology / SWIR</strong>, not NDVI, and it looks <strong>beetle-robust</strong>, though the in-basin sample is too small to prove it.</li>
-    <li>The foundation model earns its keep on the <strong>out-of-distribution reach</strong> (Malpais), where the RF collapses — not on the reaches that resemble its training set.</li>
-    <li>What we won't claim: a pre-2000 trajectory. What is real: a present-day, corridor-masked, native-vs-invasive product.</li>
+    <li>The foundation model earns its keep on the <strong>unfamiliar reach</strong> (Malpais), where the Random Forest collapses, not on the reaches that resemble its training set.</li>
+    <li>What I won't claim: a pre-2000 trend. What is real: a present-day, corridor-limited, native-versus-invasive product.</li>
   </ul>
   <p style="margin-top:14px;font-size:13px"><b>Built on the Allen Institute for AI's open models</b>, <a href="https://allenai.org/olmo">OlmoEarth</a> (Earth-observation foundation model) for delineation,
     <a href="https://allenai.org/olmo">OLMo</a> for the grounded agent. Imagery via Microsoft Planetary
@@ -512,7 +512,7 @@ const ogDescription = "An independent, unaffiliated field test: Ai2's open OlmoE
     OlmoEarth evaluation: <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/2026-08-01-fm-vs-rf-loro-result.md">LORO result</a> ·
     <a href="https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/specs/2026-07-19-fm-vs-rf-deploy-decision.md">eval contract</a> · <a href="/method">method</a>.</p>
   <p class="pocline"><b>⚠ Proof of concept.</b> Experimental, independently unverified model outputs. All figures, maps,
-    and RF / OlmoEarth predictions are provisional — in-sample calibration, not validated ground truth — and may change as
+    and RF / OlmoEarth predictions are provisional (calibrated to their training labels, not validated ground truth) and may change as
     the work is refined. Do not rely on them as fact.</p>
   <div class="mono" style="margin-top:16px;font-size:12px;color:var(--subtle)">© 2026 Joshua Dell · <a href="/privacy">Privacy</a> · <b>Independent project — not affiliated with or endorsed by Ai2; OlmoEarth &amp; OLMo used under open licenses.</b> · Imagery © Esri · data: USGS · NMRipMap · Planetary Computer</div>
 </div></footer>
