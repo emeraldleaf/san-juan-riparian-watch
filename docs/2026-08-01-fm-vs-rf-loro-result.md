@@ -153,9 +153,14 @@ comparison.
    fine-tune *overfit* this scarce-label regime — the frozen-encoder + trained-decoder stage was best.
    Reported numbers are from that best checkpoint (correct behaviour), but it says the 207 M-param
    encoder is not being fully exploited here; more/broader labels would likely help.
-3. **Significance is not yet computed.** The pre-registered contract asks for a **cluster-aware
-   (reach-block) bootstrap CI** on the FM−RF difference. The point estimates are clear (especially the
-   arroyo), but the river-reach deltas are small enough that "tie" should be read as *not yet
+3. **Significance: computed 2026-08-22, and the interval includes zero.** The pre-registered
+   cluster-aware **reach-block bootstrap** (resample reaches, not pixels; 100k draws, fixed seed;
+   `riparian/validation/reach_block_bootstrap.py`) gives macro-mean FM−RF **+0.074, 95% CI
+   [−0.023, +0.246]**, P(mean > 0) = 0.70. The point estimate clears the +0.04 bar; the interval does
+   **not** exclude zero, so at n = 4 reaches the contract's significance condition is **not met**. The
+   second contract path also fails outright (Kirtland regresses −0.033 > 0.01). Honest reading: the GO
+   stays **provisional on the point estimate**; four reaches cannot establish significance, and the fix
+   is more held-out reaches, not more resamples. The river-reach "ties" likewise remain *not
    distinguished*, not *proven equal*.
 4. **One year, one label vintage.** Fit on 2020 imagery against NMRipMap (NAIP-2020) labels. Transfer
    across *time* and *sensor* are separate, already-measured axes

@@ -2,7 +2,7 @@
 
 > **✅ Re-verified (2026-08-21) — the result stands; only the label was wrong.** The RF-vs-FM transfer result holds: the RF bar reproduced (Farmington 0.90 / Kirtland 0.85 / Aztec 0.89 / Malpais 0.56), and RF and FM were scored on the **same held-out pixels** (NMRipMap has no labels up the wash). What is retracted is only the **“desert arroyo” descriptor** — “Malpais” is the **river-dominated subwatershed** HUC12 “Malpais Arroyo–San Juan”, so **attribution to arroyo morphology is unverified**. The real mechanism: on the one **out-of-distribution** held-out reach the pixel-wise RF collapses to near-chance (0.56) while OlmoEarth holds (0.89) — brittleness to distribution shift, not an arroyo rescue and not invasive-specific (RF near-chance on native 0.59 AND invasive 0.53). See [RETRACTIONS.md](RETRACTIONS.md) → `arroyo-rescue-attribution-2026-08-21`.
 
-**Last updated:** 2026-08-21
+**Last updated:** 2026-08-22
 
 Cross-session entry point. Surfaced automatically at session start by the
 `inject-status.sh` hook. Refresh with `/sync-status`.
@@ -35,15 +35,14 @@ manifest · co-location gate · extent reconciliation · name↔geometry · "dra
 **NMRipMap-truth** and **experiment-bbox (defined vs imaged)** inspection layers so the gap is visible in
 one click.
 
-## Latest (2026-08-01): the FM raced the bar — arroyo rescued (0.557 → 0.889), **provisional GO** (significance pending)
+## Latest (2026-08-01): the FM raced the bar — arroyo rescued (0.557 → 0.889), **provisional GO** (significance computed 2026-08-22: CI includes zero at n=4)
 
 The FM-vs-RF deploy decision **points GO — provisionally**. Fine-tuned OlmoEarth (`V1_BASE` 207M +
 per-pixel `UNetDecoder`), scored **leave-one-reach-out over the same 4 reaches** the RF bar used,
 **ties the RF on the river reaches it already handled and rescues the one morphology the RF was blind
 to** — the Malpais desert arroyo, **AUROC 0.557 → 0.889**. Macro-mean transfer **0.798 → 0.872**
 (+0.074), clearing the pre-registered **+0.04** bar **on the point estimate**. But the contract is
-**not formally closed**: the cluster-aware reach-block **bootstrap-CI significance is not yet computed**
-(#9/#47 reopened for it), so the river-reach "ties" are *not yet distinguished*; and the winning
+**not formally closed**: the cluster-aware reach-block **bootstrap CI was computed 2026-08-22** — macro FM−RF +0.074, 95% CI [−0.023, +0.246], **not significant at n=4** (closes the #9/#47 reopened item; more reaches, not more resamples, is the fix) — so the river-reach "ties" are *not distinguished*; and the winning
 checkpoint was the **frozen-encoder** stage — the full fine-tune overfit the scarce labels. The arroyo
 rescue is decisive; the FM ships where it wins (the arroyo / harder invasive task; the RF stays cheaper
 and GPU-free for river extent). Full result: [`docs/2026-08-01-fm-vs-rf-loro-result.md`](2026-08-01-fm-vs-rf-loro-result.md).
@@ -73,15 +72,15 @@ weakness visible: model predicts 8.0% riparian vs NMRipMap's 5.7% truth, over-fi
 because **80% of the AOI is unlabeled** so the RF was never taught to reject upland/ag — the per-pixel,
 no-corridor-constraint failure the FM's spatial context is meant to fix.
 
-### ➡️ Provisional GO — significance still to compute
+### ➡️ Provisional GO — significance computed: CI includes zero at n=4
 
 The LORO run executed on a GPU exactly as the CPU-validated wiring specified (`build_loro_dataset.py`
 combines the 4 reaches into one dataset — hardlinked, 1404 windows, labels rasterized; `run_loro.py`
 sets each fold). It is **unbiased by construction** — the held-out reach is the `test` set scored once;
 epoch selection uses a `val` slice of the *three training reaches* (not the held-out one), so the FM
 number is comparable to the single-shot RF bar. The gate (spec #70) returns **GO on the point estimate**;
-formally closing it needs the reach-block **bootstrap-CI significance** (#9/#47 reopened for exactly
-this). Forward work then sits downstream in the product: applying the model to invasive scoring
+the reach-block **bootstrap CI is now computed** (+0.074, 95% CI [−0.023, +0.246], not significant at
+n=4 — the #9/#47 item is closed; formal closure needs more held-out reaches). Forward work then sits downstream in the product: applying the model to invasive scoring
 (Stage 2) and annual change (Stage 3), and the grounded RAG agent over the whole record (Quartzose).
 
 ## Latest (2026-07-20): the FM-vs-RF gate is **specified + its RF bar measured** — both merged
