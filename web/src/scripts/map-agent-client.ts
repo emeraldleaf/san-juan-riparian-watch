@@ -335,6 +335,25 @@ else if (container) {
 
   // The agent drives the overlays too: toggle a product's layers and sync its
   // legend checkbox, so "show me the invasive extent" flips the same switch.
+  // Fit the map to a product's data extent (lazy-fetched, cached). Driven only by an
+  // explicit "Zoom to" click in the answer — never automatically. Turning a layer on
+  // should not yank the camera; the user decides when to travel.
+  const productBounds: Record<string, maplibregl.LngLatBounds | null> = {};
+  async function fitToProduct(key: string) {
+    if (!(key in productBounds)) {
+      const b = new maplibregl.LngLatBounds();
+      for (const file of PRODUCTS[key]?.files || []) {
+        try {
+          const gj = await (await fetch(file)).json();
+          (gj.features || []).forEach((f: any) => eachCoord(f.geometry, (c) => b.extend(c as any)));
+        } catch { /* a missing file just contributes nothing */ }
+      }
+      productBounds[key] = b.isEmpty() ? null : b;
+    }
+    const bb = productBounds[key];
+    if (bb) map.fitBounds(bb, { padding: 60, maxZoom: 12.5, duration: 1200 });
+  }
+
   addEventListener('mapagent:layer', (e: any) => {
     const key = e.detail?.layer;
     const visible = e.detail?.visible !== false;
@@ -343,5 +362,11 @@ else if (container) {
     ids.forEach((id) => map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'));
     const cb = document.querySelector<HTMLInputElement>(`[data-product="${key}"]`);
     if (cb) cb.checked = visible;
+  });
+
+  // "Zoom to" from an answer: fly to a product's extent on demand.
+  addEventListener('mapagent:zoomto', (e: any) => {
+    const key = e.detail?.layer;
+    if (ready && key && PRODUCTS[key]) fitToProduct(key);
   });
 }

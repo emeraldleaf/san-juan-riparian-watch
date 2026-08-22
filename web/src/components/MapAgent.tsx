@@ -7,9 +7,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { turnstileToken } from '../scripts/turnstile';
 
-type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[]; pres?: boolean };
+type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[]; pres?: boolean;
+  // Layers this answer switched on — offered as explicit "Zoom to" buttons rather
+  // than moving the camera automatically. The user decides when to travel.
+  zoomTo?: { layer: string; label: string }[] };
 type Reach = { name: string; reaches: number };
 type Scene = { index: number; total: number; title: string; phenology?: boolean };
+
+// Human labels for the overlay ids the agent can switch on.
+const LAYER_LABEL: Record<string, string> = {
+  rf: 'the Random Forest riparian layer',
+  fm: 'the OlmoEarth riparian layer',
+  invasive: 'the invasive layer',
+  truth: 'the NMRipMap truth layer',
+};
 
 const FALLBACK: Reach[] = [
   { name: 'San Juan River', reaches: 0 },
@@ -109,12 +120,18 @@ export default function MapAgent() {
       if (context || highlight) dispatchEvent(new CustomEvent('mapagent:geom', { detail: { context, highlight } }));
       else dispatchEvent(new CustomEvent('mapagent:clear'));
       // The agent can toggle overlays (rf/fm/invasive) via map(action="layer", …).
+      // Turning one on does NOT move the camera; instead each switched-on layer
+      // becomes a "Zoom to" button under the answer.
+      const turnedOn: { layer: string; label: string }[] = [];
       (d.map_actions || []).forEach((a: any) => {
         if (a && a.action === 'layer' && a.layer) {
-          dispatchEvent(new CustomEvent('mapagent:layer', { detail: { layer: a.layer, visible: a.visible !== false } }));
+          const visible = a.visible !== false;
+          dispatchEvent(new CustomEvent('mapagent:layer', { detail: { layer: a.layer, visible } }));
+          if (visible) turnedOn.push({ layer: a.layer, label: LAYER_LABEL[a.layer] || a.layer });
         }
       });
-      setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps, cited: d.cited_sources }]);
+      setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps,
+        cited: d.cited_sources, zoomTo: turnedOn.length ? turnedOn : undefined }]);
     } catch {
       setMsgs((m) => [...m, { role: 'agent', text: 'The map agent is unreachable right now.' }]);
     } finally {
@@ -150,6 +167,18 @@ export default function MapAgent() {
             )}
             <div className="ma-text">{m.text}</div>
             {m.cited && m.cited.length > 0 && <div className="ma-cite">source: {m.cited.join(', ')}</div>}
+            {m.zoomTo && m.zoomTo.length > 0 && (
+              <div className="ma-zoomrow">
+                {m.zoomTo.map((z) => (
+                  <button
+                    key={z.layer}
+                    className="ma-zoom"
+                    type="button"
+                    onClick={() => dispatchEvent(new CustomEvent('mapagent:zoomto', { detail: { layer: z.layer } }))}
+                  >⤢ Zoom to {z.label}</button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {busy && <div className="ma-msg agent"><div className="ma-text ma-busy">resolving…</div></div>}
