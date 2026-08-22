@@ -73,14 +73,22 @@ strong{font-weight:600;} em{color:var(--ink);}
   padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600;line-height:1;}
 .back{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);text-decoration:none;}
 .back:hover{color:var(--ink);}
-@media (max-width:640px){ .topnav a:not(.cta){display:none;} .topnav{gap:12px;} }
-/* Small screens: keep BOTH CTAs; collapse the brand to its dot and compact the buttons. */
-@media (max-width:560px){
-  .brand .btxt{display:none;}
-  .topnav{gap:8px;}
-  .topnav a.cta{padding:7px 11px;font-size:12px;}
-  .topnav a.cta.ghost{padding:6px 10px;}
+/* Hamburger: hidden on desktop; on phones it holds the text links + the agent CTA,
+   so nothing becomes unreachable. "Ask the map" stays visible as the primary action. */
+.menu-btn{display:none;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);
+  border-radius:8px;padding:5px 10px;font-size:15px;cursor:pointer;line-height:1;}
+.mobile-menu{display:none;position:absolute;left:0;right:0;top:100%;background:var(--panel);
+  border-bottom:1px solid var(--line);box-shadow:var(--shadow-lg);padding:4px 24px 8px;}
+.mobile-menu a{display:block;padding:12px 0;font-size:15px;color:var(--ink);text-decoration:none;
+  border-top:1px solid var(--line);font-weight:550;}
+@media (max-width:640px){
+  .topnav a:not(.cta){display:none;}
+  .topnav a.cta.ghost{display:none;}
+  .menu-btn{display:inline-flex;}
+  .mobile-menu:not([hidden]){display:block;}
+  .topnav{gap:10px;}
 }
+@media (max-width:560px){ .brand .btxt{display:none;} .topnav a.cta{padding:7px 11px;font-size:12px;} }
 
 /* hero */
 .hero{padding:64px 0 8px;}

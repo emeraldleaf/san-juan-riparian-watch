@@ -1,17 +1,43 @@
 ---
 // Shared top navigation, used on every page so nav + theme control are the same
 // everywhere. The primary CTA ("Ask the map") is hidden on the page it points to.
-// The #tog button is wired + persisted by the shared script in Base.astro.
+// On small screens the text links and the secondary CTA move into a hamburger
+// menu, so nothing becomes unreachable on a phone. The #tog button is wired +
+// persisted by the shared script in Base.astro.
 interface Props { current?: string }
 const { current } = Astro.props;
 ---
-<div class="topbar"><div class="wrap">
-  <a class="brand" href="/"><span class="dot"></span><span class="btxt">San Juan Riparian Watch</span></a>
-  <nav class="topnav">
+<div class="topbar">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="dot"></span><span class="btxt">San Juan Riparian Watch</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="/method">Method</a>
+      <a href="/architecture">Architecture</a>
+      <a class="cta ghost" href="/#agent">Ask the agent</a>
+      {current !== 'map' && <a class="cta" href="/map">Ask the map <span class="arw" aria-hidden="true">→</span></a>}
+      <button class="menu-btn" id="menu-btn" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">☰</button>
+      <button class="tog" id="tog" aria-label="Toggle light or dark theme">◐</button>
+    </nav>
+  </div>
+  <div class="mobile-menu" id="mobile-menu" hidden>
     <a href="/method">Method</a>
     <a href="/architecture">Architecture</a>
-    <a class="cta ghost" href="/#agent">Ask the agent</a>
-    {current !== 'map' && <a class="cta" href="/map">Ask the map <span class="arw" aria-hidden="true">→</span></a>}
-    <button class="tog" id="tog" aria-label="Toggle light or dark theme">◐</button>
-  </nav>
-</div></div>
+    <a href="/#agent">Ask the agent</a>
+  </div>
+</div>
+<script>
+  // Hamburger open/close; closes on link tap, outside tap, or Escape.
+  const btn = document.getElementById('menu-btn');
+  const menu = document.getElementById('mobile-menu');
+  function setOpen(open: boolean) {
+    if (!btn || !menu) return;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  }
+  btn?.addEventListener('click', () => setOpen(!!menu?.hidden));
+  menu?.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('a')) setOpen(false); });
+  document.addEventListener('click', (e) => {
+    if (menu && !menu.hidden && !(e.target as HTMLElement).closest('.topbar')) setOpen(false);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+</script>
