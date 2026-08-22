@@ -153,6 +153,11 @@
 .ma-presctl button:hover { border-color: var(--accent); }
 .ma-presexit { font-size: 12px !important; color: var(--muted) !important; margin-left: 4px; }
 .ma-chip-present { border-color: var(--accent) !important; color: var(--accent-2) !important; font-weight: 600; }
+/* Place chips sit under the capability chips: same control, quieter, so the four
+   "what this agent does" prompts stay the primary read. */
+.ma-places { margin-top: 8px; align-items: center; }
+.ma-places-label { font-size: 11.5px; color: var(--muted); margin-right: 2px; }
+.ma-chip-quiet { color: var(--muted); font-size: 12px; padding: 5px 9px; }
 
 /* phenology month slider (shown during the 12-month scene) */
 .ma-monthrow { flex-basis: 100%; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
