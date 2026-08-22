@@ -6,6 +6,7 @@
 //    beat by beat and lets you pause, ask, and continue — all in the same thread.
 import { useEffect, useRef, useState } from 'react';
 import { turnstileToken } from '../scripts/turnstile';
+import { citeUrlFor, mdToHtml } from '../lib/agent-format';
 
 type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[]; pres?: boolean;
   // Layers this answer switched on — offered as explicit "Zoom to" buttons rather
@@ -185,8 +186,25 @@ export default function MapAgent() {
             {m.role === 'agent' && m.steps && m.steps.length > 0 && (
               <div className="ma-steps">{m.steps.map((s) => s.tool).join(' → ')}</div>
             )}
-            <div className="ma-text">{m.text}</div>
-            {m.cited && m.cited.length > 0 && <div className="ma-cite">source: {m.cited.join(', ')}</div>}
+            {m.role === 'agent' && !m.pres
+              ? <div className="ma-text md" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }} />
+              : <div className="ma-text">{m.text}</div>}
+            {m.cited && m.cited.length > 0 && (
+              <div className="ma-cite">
+                source:{' '}
+                {m.cited.map((c, j) => {
+                  const href = citeUrlFor(c);
+                  return (
+                    <span key={c}>
+                      {j > 0 && ', '}
+                      {href
+                        ? <a href={href} target="_blank" rel="noopener noreferrer">{c}</a>
+                        : c}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {m.zoomTo && m.zoomTo.length > 0 && (
               <div className="ma-zoomrow">
                 {m.zoomTo.map((z) => (
