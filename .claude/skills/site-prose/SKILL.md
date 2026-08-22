@@ -91,12 +91,16 @@ Numbers, units, and metric names stay exact. Translate the wrapping, never the m
 ## Before committing prose
 
 ```bash
-# dashes in user-facing text (code comments exempt)
-grep -n "—" web/src/pages/*.astro | grep -v "© 2026"
-# author-we
-grep -nE "\b[Ww]e\b|\b[Oo]ur\b" web/src/pages/*.astro
-# jargon spot-check
-grep -niE "out-of-distribution|in-sample|prevalence|morpholog|compositing recipe" web/src/pages/*.astro
+# ALL declared prose surfaces, and BOTH dash characters (em — and en –).
+# Code comments and the footer legal line are the only exempt hits.
+SURFACES="web/src/pages/*.astro web/src/components/Chat.tsx web/src/scripts/map-agent-client.ts"
+grep -n "[—–]" $SURFACES | grep -vE "© 2026|^\s*//|<!--"
+# author-we (inclusive tour-guide "we" in the PRESENTATION narration is the one exception)
+grep -nE "\b[Ww]e\b|\b[Oo]ur\b" $SURFACES
+# jargon spot-check (the translation table above)
+grep -niE "out-of-distribution|in-distribution|in-sample|prevalence|morpholog|compositing recipe|per-pixel|corridor-masked" $SURFACES
+# cross-page consistency: statements about OLMo availability must agree everywhere
+grep -rniE "olmo.{0,60}(serve|select|available)" web/src/pages/ web/src/components/Chat.tsx
 # then: the build and the drift gates
 cd web && npm run build
 ./dev.sh --check-encoding   # or run .claude/scripts/check-*.sh individually
