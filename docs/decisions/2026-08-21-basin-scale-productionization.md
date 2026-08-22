@@ -60,7 +60,11 @@ The spine of the whole system — one row per unit of work, the resumability con
 # Workers claim tile-years ATOMICALLY (concurrency-safe) and RESUME from the furthest-done stage,
 # so retries never repeat completed GPU work and two workers never grab the same row.
 STAGE = {cube:0, extent:1, invasive:2, written:3}
-while (t := manifest.claim_one(status="pending")):   # atomic UPDATE...RETURNING → status=running, worker=me
+# A tile is "done" only when nothing is left for it. While the Stage-2 gate is off, extent-complete
+# tiles are parked as `extent_done`, and re-claimed for invasive once the gate goes green — so gating
+# invasive off never permanently skips it.
+while (t := manifest.claim_one(status="pending", or_extent_done=STAGE2_LORO_GREEN)):  # atomic UPDATE...RETURNING → running, worker=me
+    cube = None
     try:
         cube = load_or_build_cube(t)                          if t.stage < STAGE.cube    else t.cube   # STAC + COG range-reads
         extent = olmoearth.predict_extent(cube)               if t.stage < STAGE.extent  else t.extent # GPU
@@ -68,11 +72,13 @@ while (t := manifest.claim_one(status="pending")):   # atomic UPDATE...RETURNING
         if STAGE2_LORO_GREEN and t.stage < STAGE.invasive:    # invasive ONLY after its LORO gate passes (see below)
             inv = invasive_model.predict(cube, extent)        # GPU; within extent
         write_geotiff(extent, inv, t.outputs)                 # invasive_uri omitted while the gate is not green
-        manifest.mark(t, status="done", gpu_seconds=..., cost=...)
+        # DONE only if invasive ran (or is out of scope); else park at extent_done to reprocess later
+        manifest.mark(t, status=("done" if STAGE2_LORO_GREEN else "extent_done"),
+                      stage=(STAGE.invasive if inv is not None else STAGE.extent), gpu_seconds=..., cost=...)
     except Exception:
         manifest.mark(t, status="failed")                     # re-runs alone; completed stages are skipped on retry
     finally:
-        del cube                                              # discard raw — storage stays GB, not TB
+        if cube is not None: del cube                         # discard raw (only if built) — storage stays GB, not TB
 # after all tiles for the year:
 mosaic → threshold → polygons + invasive share → PostGIS(silver/gold) → MVT tiles
 change = diff(year, year-1, landsat_baseline)        # Stage 3
