@@ -407,7 +407,7 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
               (m.streaming && !m.text) ? '…thinking' : (
                 <>
                   {m.standalone && (
-                    <div className="rewrite" title="A follow-up — resolved using the conversation so far">↳ {m.standalone}</div>
+                    <div className="rewrite" title="A follow-up, resolved using the conversation so far">↳ {m.standalone}</div>
                   )}
                   {/* Render markdown LIVE while streaming: m.html is set only at
                       finalize, so until then parse the partial each tick so bold,
