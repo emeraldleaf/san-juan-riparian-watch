@@ -71,10 +71,15 @@ def reach_block_bootstrap(
         The point estimate, percentile CI, and the share of resample means above zero.
 
     Raises:
-        ValueError: If fewer than two reach-level differences are supplied.
+        ValueError: If fewer than two reach-level differences are supplied, if
+            ``n_resamples`` is not positive, or if ``alpha`` is outside (0, 1).
     """
     if len(deltas) < 2:
         raise ValueError("reach-block bootstrap needs at least two reach deltas")
+    if n_resamples < 1:
+        raise ValueError(f"n_resamples must be positive, got {n_resamples}")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     rng = random.Random(seed)
     n = len(deltas)
     means = sorted(

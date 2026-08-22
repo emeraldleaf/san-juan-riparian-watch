@@ -158,7 +158,7 @@ comparison.
    `riparian/validation/reach_block_bootstrap.py`) gives macro-mean FM−RF **+0.074, 95% CI
    [−0.023, +0.246]**, P(mean > 0) = 0.70. The point estimate clears the +0.04 bar; the interval does
    **not** exclude zero, so at n = 4 reaches the contract's significance condition is **not met**. The
-   second contract path also fails outright (Kirtland regresses −0.033 > 0.01). Honest reading: the GO
+   second contract path also fails outright: Kirtland regresses by 0.033, exceeding the 0.01 allowance. Honest reading: the GO
    stays **provisional on the point estimate**; four reaches cannot establish significance, and the fix
    is more held-out reaches, not more resamples. The river-reach "ties" likewise remain *not
    distinguished*, not *proven equal*.

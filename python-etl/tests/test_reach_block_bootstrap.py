@@ -31,3 +31,13 @@ class TestReachBlockBootstrap:
     def test_rejects_fewer_than_two_reaches(self) -> None:
         with pytest.raises(ValueError, match="at least two"):
             reach_block_bootstrap([0.1])
+
+    @pytest.mark.parametrize("n_resamples", [0, -1, -100])
+    def test_rejects_nonpositive_resamples(self, n_resamples: int) -> None:
+        with pytest.raises(ValueError, match="n_resamples must be positive"):
+            reach_block_bootstrap([0.1, 0.2], n_resamples=n_resamples)
+
+    @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.05, 1.5])
+    def test_rejects_alpha_outside_unit_interval(self, alpha: float) -> None:
+        with pytest.raises(ValueError, match="alpha must be in"):
+            reach_block_bootstrap([0.1, 0.2], alpha=alpha)
