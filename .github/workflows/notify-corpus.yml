@@ -1,16 +1,20 @@
 name: Notify corpus of canon changes
 
-# The project's own docs are part of the RAG corpus, so an edited spec or a new
-# retraction must reach the agent's index — otherwise the agent keeps citing the
-# superseded version. That is the worst failure this project can have: a retraction
-# that reaches every surface EXCEPT the thing answering questions about it.
+# The project's own docs ARE the RAG corpus, so an edited spec or a new retraction must
+# reach the agent's index — otherwise the agent keeps citing the superseded version.
 #
-# Nobody remembers to re-ingest, so this pings the private harness whenever the canon
-# changes on main. Same principle as the drift gates: mechanize it, don't document it.
+# This sends a DELTA, not a "something changed" ping. The public repo is the only side
+# that can compute it (it has the git history), so it does, and the harness applies it:
+# see docintel/CORPUS_DELTA_CONTRACT.md for the payload schema.
 #
-# Needs a CORPUS_DISPATCH_TOKEN secret (a PAT with `repo` scope on the harness). If the
-# secret is absent the job SKIPS with a notice rather than failing — a missing token
-# should not redden an unrelated docs push.
+# Why a delta rather than a full re-ingest: a full run re-embeds ~58 documents (~30 min
+# on the box's CPU, occupying its single self-hosted runner and queueing deploys behind
+# it). A typical docs push touches one or two files. Re-embedding the other 56 to pick
+# those up is the kind of waste that eventually gets the automation turned off.
+#
+# Needs CORPUS_DISPATCH_TOKEN (a fine-grained PAT, Contents: read+write on the harness).
+# Absent, the job SKIPS with a notice rather than failing — a missing secret should not
+# redden an unrelated docs push.
 
 on:
   push:
@@ -20,7 +24,12 @@ on:
       - 'CLAUDE.md'
       - 'CONTEXT.md'
       - 'docintel/corpus/seed_sources.yaml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Force a FULL re-ingest instead of a delta'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,23 +42,62 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping the harness to re-ingest
+      - uses: actions/checkout@v5
+        with:
+          # A delta needs history: the default depth-1 checkout cannot diff two commits.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compute the delta
+        id: delta
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          FORCE_FULL: ${{ inputs.full }}
+        run: |
+          set -euo pipefail
+          # github.event.before IS the watermark — no state to store or drift. It is all
+          # zeros for a new branch or after a force-push, and absent on workflow_dispatch;
+          # in those cases we cannot know what changed, so ask for a full sync.
+          if [ "${FORCE_FULL:-false}" = "true" ] || [ -z "${BEFORE:-}" ] \
+             || [ "${BEFORE:-}" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "::notice::no usable base commit — requesting a FULL re-ingest"
+            exit 0
+          fi
+          # A=added M=modified D=deleted R=renamed. -M detects renames so a moved doc is
+          # a delete + an add rather than two unrelated edits.
+          git diff --name-status -M "$BEFORE" "$AFTER" -- \
+            docs CLAUDE.md CONTEXT.md docintel/corpus/seed_sources.yaml > /tmp/raw.diff || true
+          echo "--- raw diff ---"; cat /tmp/raw.diff
+          python3 .github/scripts/build_corpus_delta.py /tmp/raw.diff "$BEFORE" "$AFTER" > /tmp/delta.json
+          echo "mode=delta" >> "$GITHUB_OUTPUT"
+          echo "--- payload ---"; cat /tmp/delta.json
+
+      - name: Dispatch to the harness
         env:
           TOKEN: ${{ secrets.CORPUS_DISPATCH_TOKEN }}
+          MODE: ${{ steps.delta.outputs.mode }}
         run: |
           set -euo pipefail
           if [ -z "${TOKEN:-}" ]; then
-            echo "::notice::CORPUS_DISPATCH_TOKEN not set — skipping. The corpus will"\
-                 "not pick up this change until someone re-ingests manually."
+            echo "::notice::CORPUS_DISPATCH_TOKEN not set — skipping. The corpus will not"\
+                 "pick up this change until someone re-ingests manually."
             exit 0
+          fi
+          if [ "$MODE" = "full" ]; then
+            printf '{"event_type":"canon-changed","client_payload":{"mode":"full"}}' > /tmp/body.json
+          else
+            python3 -c 'import json,sys; d=json.load(open("/tmp/delta.json")); print(json.dumps({"event_type":"canon-changed","client_payload":d}))' > /tmp/body.json
           fi
           code=$(curl -sS -o /tmp/resp -w '%{http_code}' -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $TOKEN" \
             https://api.github.com/repos/emeraldleaf/riparian-rag-harness/dispatches \
-            -d '{"event_type":"canon-changed"}')
+            --data @/tmp/body.json)
           if [ "$code" = "204" ]; then
-            echo "Re-ingest requested."
+            echo "Corpus sync requested (mode=$MODE)."
           else
             echo "::error::dispatch failed (HTTP $code)"; cat /tmp/resp; exit 1
           fi

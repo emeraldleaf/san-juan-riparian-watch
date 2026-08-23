@@ -360,7 +360,8 @@ san-juan-riparian-watch/
 │   ├── src/pages/                     #   riparian.emeraldleaf.dev) — index.astro (scrollytelling) +
 │   ├── src/components/Chat.tsx        #   method/architecture/agent/privacy. Chat.tsx = the grounded
 │   └── src/scripts/story-client.ts    #   RAG agent as a React island; story-client.ts = the maps.
-├── docintel/                          # The agent's public CONTRACT (API_CONTRACT.md) + geo-mention
+├── docintel/                          # Public CONTRACTS: API_CONTRACT.md (the agent) and
+│                                     #   CORPUS_DELTA_CONTRACT.md (keeping the index in step) + geo-mention
 │                                      #   resolver. The RAG engine itself (Quartzose) is a SEPARATE,
 │                                      #   PRIVATE repo — this repo only speaks to it over /query.
 │
