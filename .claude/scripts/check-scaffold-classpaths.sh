@@ -32,7 +32,12 @@ fi
 
 # macOS ships bash 3.2 — no `mapfile`. Keep this portable; a gate that only runs on the author's
 # machine is not a gate.
-PATHS=$(grep -rhoE 'class_path:[[:space:]]*[A-Za-z_][A-Za-z0-9_.]*' "$SCAFFOLD" \
+# Scope to YAML: `class_path:` is an rslearn config key. Without --include this greps
+# the materialized reach DATASETS under experiments/ — tens of thousands of GeoTIFFs —
+# and effectively hangs (>7 min, never finished). That is why this gate sat outside CI:
+# it was unrunnable there, so it only ever ran when someone waited it out locally.
+PATHS=$(grep -rhoE --include='*.yaml' --include='*.yml' \
+        'class_path:[[:space:]]*[A-Za-z_][A-Za-z0-9_.]*' "$SCAFFOLD" \
     | sed -E 's/class_path:[[:space:]]*//' | sort -u)
 
 if [[ -z "$PATHS" ]]; then

@@ -21,6 +21,8 @@ skills, `docs/` + diagrams) × 3 enforcement tiers, kept from drifting by mechan
 - **Shared vocabulary:** `CONTEXT.md` (riparian science + method terms)
 - **Procedures:** `/feature-spec`, `/check-rules`, `/sync-status`, `/add-endpoint`,
   `/add-etl-step`, `/add-map-layer`, **`/paper-audit`** in `.claude/commands/`
+- **Skills:** `site-prose` (the public site's voice + jargon rules — load it before editing
+  any visitor-facing text, so tone and calibrated language don't drift per-session)
 - **`/paper-audit` — run it on any relevant paper.** Our contribution is a *novelty claim*
   ("nobody has produced a wall-to-wall, time-series, native-vs-invasive product"), and **one paper
   can falsify it.** We learned CO-RIP had already solved basin-wide extent by *reading*, not by any
@@ -43,6 +45,8 @@ so the ledger below stays honest.
 | Ruff (lint) — `python-etl` **and** `experiments` (the ungated zone, now gated) | **Automatic in CI** (`ci-python`), version **pinned** so a release can't retro-fail a branch |
 | CodeRabbit | **Automatic** on every PR — and it must be **green before merge** (below) |
 | `architecture-reviewer` agent | **Automatic in CI** (`architecture-review.yml`, self-owned, fails on must-fix) **once `ANTHROPIC_API_KEY` is set** — soft-passes until then; also on demand via `/check-rules` |
+| **Corpus freshness** — `notify-corpus.yml` → the harness's `reingest-corpus.yml` | **Automatic on push to `main`** touching `docs/**`, `CLAUDE.md`, `CONTEXT.md` or the seed list — **once `CORPUS_DISPATCH_TOKEN` is set**; skips with a notice until then. The project's own docs ARE the RAG corpus, so a stale index means the agent cites a superseded spec, or a claim we already retracted. |
+| **Corpus verification** — the harness's `verify-corpus.yml` | **On demand**, strictly read-only (collection stats + indexed sources). Run it BEFORE changing the index: five blind re-ingests against production were settled by one read-only look. |
 
 **Drift gates** (`./dev.sh --check-encoding`) catch *semantic* drift, which every other check is
 blind to. Every existing check enforced file **shape** — canon size, diagram pairing, stale refs
@@ -57,6 +61,11 @@ living on in a component docstring. All three actually happened.
 When you retire a value or withdraw a result, **add it to the registry**. The sweep's completion
 criterion is "`./dev.sh --check-encoding` passes", not "the docs someone remembered are updated".
 See `docs/code-review.md`.
+
+**The corpus is a surface too.** `docs/` is indexed for the RAG + map agents, so a retraction that
+updates every file but not the index leaves the agent still answering with the withdrawn claim —
+the one surface a reader is most likely to ask. That is why corpus re-ingest is *mechanized* (the
+row above) rather than a step someone remembers. Detail: `docs/corpus-automation.md`.
 
 **The method itself is a deliverable — `docs/method.md`.** Why these gates exist, with the dated
 failures each one actually caught, and what did *not* work (every documentation-only surface drifted;
