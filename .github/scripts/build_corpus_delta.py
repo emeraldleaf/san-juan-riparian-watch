@@ -26,6 +26,28 @@ _CORPUS_FILES = ("CLAUDE.md", "CONTEXT.md")
 _SEED = "docintel/corpus/seed_sources.yaml"
 
 
+def seeded_ids(repo_root: str = ".") -> set[str]:
+    """The corpus ids the seed list actually declares.
+
+    The corpus is defined by seed_sources.yaml, NOT by what happens to sit in docs/:
+    the canon was curated (21 of ~80 documents), so a new doc is not a corpus source
+    until it is seeded. Without this filter the delta names documents the index has
+    never held — the applier then finds no raw file for them and fails the run, which
+    is safe but is a red X for a design gap rather than a real problem.
+    """
+    seed = os.path.join(repo_root, "docintel", "corpus", "seed_sources.yaml")
+    ids: set[str] = set()
+    try:
+        with open(seed, encoding="utf-8") as fh:
+            for line in fh:
+                stripped = line.strip()
+                if stripped.startswith("- id:"):
+                    ids.add(stripped.split(":", 1)[1].strip())
+    except OSError:
+        return set()  # unreadable seed list -> caller escalates to a full sync
+    return ids
+
+
 def corpus_id(path: str) -> str | None:
     """Repo path -> the `source_file` the index stores, or None if not indexed.
 
@@ -82,6 +104,22 @@ def main() -> int:
                           "from": sha_from, "to": sha_to}))
         return 0
 
+    # Keep only ids the seed list declares. `fetch_corpus.py` names files by seed id,
+    # so an id absent here has no raw file and could never have been indexed.
+    seeded = seeded_ids()
+    if not seeded:
+        print(json.dumps({"mode": "full", "reason": "seed list unreadable",
+                          "from": sha_from, "to": sha_to}))
+        return 0
+    # The two forms differ and both matter: the seed list declares `project-STATUS`
+    # (no extension, it names the fetched FILE), while the index stores
+    # `project-STATUS.md` as source_file (verified against the live collection). Emit
+    # the indexed form — that is what a delete must target — but test membership on the
+    # bare stem. Comparing the two directly silently drops every document.
+    def keep(xs: list[str]) -> list[str]:
+        return [x for x in xs if x.rsplit(".", 1)[0] in seeded or x in seeded]
+    added, modified, deleted = keep(added), keep(modified), keep(deleted)
+
     payload = {
         "mode": "delta",
         "from": sha_from,
@@ -97,5 +135,39 @@ def main() -> int:
     return 0
 
 
+
+
+# --- self-test: `python3 build_corpus_delta.py --selftest` -------------------
+# Two failures this file already had, both silent: emitting docs that were never
+# corpus sources (the applier then fails with "nothing staged"), and comparing the
+# seed's bare id against the index's `.md` form (which drops EVERY document).
+def _selftest() -> int:
+    import tempfile
+    ok = True
+    seeded = seeded_ids()
+    if "project-STATUS" not in seeded:
+        print("FAIL: seed list not readable or project-STATUS missing"); return 1
+    with tempfile.NamedTemporaryFile("w", suffix=".diff", delete=False) as fh:
+        fh.write("M\tdocs/STATUS.md\nA\tdocs/decisions/not-seeded.md\nD\tdocs/RETRACTIONS.md\n")
+        path = fh.name
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        sys.argv = ["x", path, "a", "b"]
+        main()
+    out = json.loads(buf.getvalue())
+    if out["modified"] != ["project-STATUS.md"]:
+        print(f"FAIL: seeded doc dropped or wrong form: {out['modified']}"); ok = False
+    if any("not-seeded" in x for x in out["added"]):
+        print("FAIL: unseeded doc leaked into the delta"); ok = False
+    if out["deleted"] != ["project-RETRACTIONS.md"]:
+        print(f"FAIL: deletion lost: {out['deleted']}"); ok = False
+    print("selftest OK" if ok else "selftest FAILED")
+    return 0 if ok else 1
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
+        raise SystemExit(_selftest())
     raise SystemExit(main())

@@ -71,6 +71,10 @@ jobs:
           git diff --name-status -M "$BEFORE" "$AFTER" -- \
             docs CLAUDE.md CONTEXT.md docintel/corpus/seed_sources.yaml > /tmp/raw.diff || true
           echo "--- raw diff ---"; cat /tmp/raw.diff
+          # Guard the two silent failures this script has already had: emitting docs
+          # that were never corpus sources, and comparing the seed's bare id against the
+          # index's .md form (which drops every document).
+          python3 .github/scripts/build_corpus_delta.py --selftest
           python3 .github/scripts/build_corpus_delta.py /tmp/raw.diff "$BEFORE" "$AFTER" > /tmp/delta.json
           echo "mode=delta" >> "$GITHUB_OUTPUT"
           echo "--- payload ---"; cat /tmp/delta.json
