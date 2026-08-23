@@ -65,7 +65,7 @@ jobs:
           echo "All diagrams paired (or none present)."
 
   drift-gates:
-    name: Drift gates (tombstones · retractions · orphans · canonical results · scaffolds · layer co-location)
+    name: Drift gates (tombstones · retracted claims · doc orphans)   # NB: this name is a REQUIRED status check — renaming it blocks every merge
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
