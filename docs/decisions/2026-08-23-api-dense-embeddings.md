@@ -2,13 +2,28 @@
 
 **2026-08-23 · status: proposed**
 
+> ⚠️ **The evidence cited below was misread — corrected the same day.** This ADR was written
+> from the observation that a full re-ingest never finished, and attributed that to the local
+> embedding model being too slow. It was not. The box could not import a PDF library, so every
+> PDF was byte-decoded into a multi-megabyte pseudo-document, and the run was trying to embed
+> **~20,000 chunks of binary noise instead of ~1,400 chunks of text**. Faster embeddings would
+> have failed faster. With clean input the rebuild may well finish locally and this ADR may not
+> be needed at all. Decide it on cost, latency and quality — never on "the rebuild does not
+> terminate", which is no longer true.
+> Post-mortem: [when a missing library became a 65 MB document](../2026-08-23-corpus-extraction-failure.md).
+
 ## Context
 
-The corpus cannot currently be rebuilt. A full re-ingest embeds ~58 documents through
-**Snowflake Arctic Embed v2 running in Ollama** on an 8 GB box that is simultaneously
-serving Qdrant, Postgres, Redis, the backend, and an LLM. Observed 2026-08-23: the
-first batch reported `0/2 [02:18<?, ?it/s]` and the run did not finish in 30 minutes.
-Not an error — just slower than the box can sustain while serving.
+A full re-ingest embeds ~58 documents through **Snowflake Arctic Embed v2 running in Ollama**
+on an 8 GB box that is simultaneously serving Qdrant, Postgres, Redis, the backend, and an
+LLM. Observed 2026-08-23: the first batch reported `0/2 [02:18<?, ?it/s]` and the run did not
+finish in 30 minutes.
+
+That observation was real. **The inference drawn from it was wrong** — see the correction
+above. The run was not slow because the model could not keep up with a normal corpus; it was
+slow because the corpus it had been handed was 65 MB of undecoded PDF. Local embedding
+throughput on the *actual* corpus has never been measured, and must be before this ADR is
+accepted.
 
 That is a real constraint, not an annoyance. It means:
 
