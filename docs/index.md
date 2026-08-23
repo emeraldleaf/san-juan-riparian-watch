@@ -78,9 +78,9 @@ That is what this project is for — and their recommendation is, in effect, its
 ## Decision records
 
 - [Move dense embeddings to an API, keep sparse local](decisions/2026-08-23-api-dense-embeddings.md)
-  — the corpus cannot currently be rebuilt: a full re-ingest runs Arctic in Ollama on an 8 GB box
-  that is also serving everything else, and does not finish. That leaves `mode: full` in the delta
-  contract pointing at a dead end. Move the **dense** leg to Voyage (API, 1024-d, matching the
+  — ⚠️ **premise corrected the same day**: the rebuild did not stall because the local model was
+  too slow, but because a missing PDF library turned every PDF into a multi-megabyte
+  pseudo-document (see the post-mortem below). Decide this one on cost, latency and quality. Move the **dense** leg to Voyage (API, 1024-d, matching the
   collection); **sparse stays** `Qdrant/bm25`, which is lexical and cheap, so hybrid retrieval is
   structurally unchanged. Migration is a rebuild into a new collection, never a flag flip: same
   width is not the same vector space.
@@ -129,6 +129,16 @@ That is what this project is for — and their recommendation is, in effect, its
   SonarQube, 20 unit tests and a human review all passed; six ETL bugs that silently corrupted data
   without crashing). Ends with **the gaps**, which is the useful part: **the subsystem with the worst
   defect record is the one with the weakest gate.**
+
+- [**When a missing library became a 65 MB document**](2026-08-23-corpus-extraction-failure.md) —
+  the RAG index the agents answer from lost three quarters of its content, and **all three
+  explanations I offered were wrong** until I measured the artifact instead of reasoning about the
+  pipeline. A box that could not import a PDF library byte-decoded every PDF into a multi-megabyte
+  pseudo-document; one 75 KB paper became **21 MB**, and the index was left trying to embed ~20,000
+  chunks of binary noise. Nothing threw, because the output was plausible at every checkpoint. The
+  test that finally settled it was **repetition** — distinct garbage means decoded binary, repeated
+  garbage means a loop. Same shape as the reach-provenance gap one layer lower: **measure the
+  artifact, not the pipeline that produced it.**
 
 - [**The data-cube technique**](2026-07-18-reach-cube-materialization.md) — how a bare bounding box
   becomes a **phenologically-aligned Sentinel-2 time-series cube** per reach: STAC indexing + COG

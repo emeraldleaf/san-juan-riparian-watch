@@ -22,6 +22,11 @@ river-dominated subwatershed; the transfer result itself stands).
 The method's own finding applies to itself: *every rule that was merely documented
 eventually drifted; every rule that was mechanized held.* So re-ingest is mechanized.
 
+![How the corpus stays in sync](corpus-sync.svg)
+
+*The public repo computes what changed; the harness applies it. Neither side can do the
+other's half — that asymmetry is why this is a contract rather than a script.*
+
 ## The three workflows
 
 | workflow | repo | trigger | what it does |
