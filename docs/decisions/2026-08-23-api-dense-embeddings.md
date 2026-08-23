@@ -37,11 +37,14 @@ on an 8 GB box that is simultaneously serving Qdrant, Postgres, Redis, the backe
 LLM. Observed 2026-08-23: the first batch reported `0/2 [02:18<?, ?it/s]` and the run did not
 finish in 30 minutes.
 
-That observation was real. **The inference drawn from it was wrong** — see the correction
-above. The run was not slow because the model could not keep up with a normal corpus; it was
-slow because the corpus it had been handed was 65 MB of undecoded PDF. Local embedding
-throughput on the *actual* corpus has never been measured, and must be before this ADR is
-accepted.
+That observation was real, but **the inference first drawn from it was wrong** — the corpus in
+hand was 65 MB of undecoded PDF, not a normal corpus. Extraction has since been repaired, and the
+measurement was then taken properly (see the correction above): with **55 correctly extracted
+documents**, the box completed one embedding batch in ~30 s and was killed with no traceback at 45
+minutes, the same signature as the two earlier runs. Fixing the input changed the document count
+and nothing else.
+
+So the constraint is real and now measured.
 
 That is a real constraint, not an annoyance. It means:
 
