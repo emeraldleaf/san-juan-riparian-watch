@@ -76,6 +76,13 @@ That is what this project is for — and their recommendation is, in effect, its
 
 ## Decision records
 
+- [Move dense embeddings to an API, keep sparse local](decisions/2026-08-23-api-dense-embeddings.md)
+  — the corpus cannot currently be rebuilt: a full re-ingest runs Arctic in Ollama on an 8 GB box
+  that is also serving everything else, and does not finish. That leaves `mode: full` in the delta
+  contract pointing at a dead end. Move the **dense** leg to Voyage (API, 1024-d, matching the
+  collection); **sparse stays** `Qdrant/bm25`, which is lexical and cheap, so hybrid retrieval is
+  structurally unchanged. Migration is a rebuild into a new collection, never a flag flip: same
+  width is not the same vector space.
 - [Basin-scale productionization — wall-to-wall riparian + invasive, annually](decisions/2026-08-21-basin-scale-productionization.md)
   — how the four-reach experiment becomes a recurring basin product: classify the **hydrography buffer**
   (not the whole basin), tile it, drive a resumable `(tile, year)` manifest, stream imagery + two-stage
