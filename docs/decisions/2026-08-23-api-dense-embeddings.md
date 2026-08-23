@@ -2,32 +2,45 @@
 
 **2026-08-23 · status: proposed**
 
-> ⚠️ **Corrected twice on 2026-08-23. The original reasoning was wrong; the decision survives.**
+> ⚠️ **Corrected three times on 2026-08-23. The original argument is now dead; a different one survives.**
 >
-> This ADR was written from "a full re-ingest never finishes" and blamed the local embedder. The
-> first cause found was different: the box could not import a PDF library, so every PDF was
-> byte-decoded into a multi-megabyte pseudo-document and the run was embedding **~20,000 chunks of
-> binary noise instead of ~1,000 chunks of text**. Two further bugs hid HTML and mislabelled 21
-> markdown files. All are fixed.
+> **What this ADR first claimed:** a full re-ingest "does not finish" because the local
+> embedder cannot keep up. **That is false, and was false when written.** The box could not
+> import a PDF library, so every PDF was byte-decoded into a multi-megabyte pseudo-document
+> and the run was embedding ~20,000 chunks of binary noise. Two further bugs hid HTML and
+> mislabelled 21 markdown files. All are fixed.
 >
-> **Then it was measured properly, and the conclusion here holds after all.** With extraction
-> repaired the box reached **55 documents** (up from 21) and still could not embed them:
+> **The real cause of the failure was batch size, not throughput.** `--batch-size` counts
+> **documents**, not chunks, and one corpus document is 504k characters. At the default of 10
+> the box was OOM-killed with no traceback, three times, at 31/31/45 minutes.
 >
-> | attempt | documents | embeddings done | died at | error |
-> |---|---:|---:|---:|---|
-> | 1 | 21 | 1 batch / 30.1 s | 31 min | none |
-> | 2 | 21 | 1 batch / 30.1 s | 31 min | none |
-> | 3 (extraction fixed) | **55** | 1 batch / 29.5 s | **45 min** | none |
+> **Measured with that corrected:** at `--batch-size 1` the rebuild runs at **8.7 points/min**
+> with memory flat at ~3.08 GB, and completes a full corpus in **~1.7 hours**. It terminates.
+> So *"there is no working recovery path"* below is no longer true, and neither is
+> *"`mode: full` goes nowhere"*.
 >
-> One batch in ~30 s, then silence, then a death with no traceback — the signature of an OOM kill.
-> Three times, unchanged by fixing the input. **So the local embedder genuinely cannot rebuild this
-> corpus on this hardware, and that is now measured rather than assumed.**
+> **What still argues for this ADR:**
+> - **Memory, not speed.** Ollama pins **2.7 GB of a 7.7 GB box** to keep the embedder
+>   resident. Moving dense embedding off-box returns that, which matters more than the hours.
+> - A 1.7-hour rebuild is tolerable for a *rare* operation but painful for a frequent one.
 >
-> One caveat before accepting: a **proven** alternative already exists — `deploy/push-to-prod.sh
-> corpus` extracts locally and ships the processed JSONL, so the box never embeds a cold corpus from
-> scratch. That path built the 988-point index this collection used to hold. Weigh this ADR against
-> keeping that, not against the failing path.
+> **What argues against it, and is not stated below:**
+> - **It is all-or-nothing.** Query and document embeddings must occupy the same vector
+>   space, so this cannot be adopted for ingest while keeping Arctic for queries. It puts an
+>   external API in the **retrieval hot path**: today a slow Ollama degrades retrieval, but a
+>   down Voyage stops it.
+> - **Full rebuilds are rare by design.** The delta path (`sync_corpus.py`) syncs a normal
+>   docs push in minutes. Adding a hot-path dependency to speed up the recovery case is the
+>   wrong trade while the recovery case works.
+> - **Cost is not a factor either way.** The corpus is ~448k tokens per full rebuild and a
+>   query embeds 15-30. Decide this on operations, not price.
 >
+> **A cheaper fix addresses most of it.** `co-san-juan-dolores-planning-model-manual.pdf` is
+> 504k chars — 22% of the corpus alone — and is the single reason `--batch-size 1` is
+> mandatory. Splitting it at fetch time relaxes the constraint for everything else.
+>
+> **Status: hold.** Revisit when rebuilds stop being rare, when query latency from local
+> Arctic becomes the felt bottleneck, or when the box needs Ollama's 2.7 GB back.
 > Post-mortem: [when a missing library became a 65 MB document](../2026-08-23-corpus-extraction-failure.md).
 
 ## Context
@@ -37,24 +50,24 @@ on an 8 GB box that is simultaneously serving Qdrant, Postgres, Redis, the backe
 LLM. Observed 2026-08-23: the first batch reported `0/2 [02:18<?, ?it/s]` and the run did not
 finish in 30 minutes.
 
-That observation was real, but **the inference first drawn from it was wrong** — the corpus in
-hand was 65 MB of undecoded PDF, not a normal corpus. Extraction has since been repaired, and the
-measurement was then taken properly (see the correction above): with **55 correctly extracted
-documents**, the box completed one embedding batch in ~30 s and was killed with no traceback at 45
-minutes, the same signature as the two earlier runs. Fixing the input changed the document count
-and nothing else.
+That observation was real, but **every inference drawn from it was wrong.** The corpus in hand
+was 65 MB of undecoded PDF, and the deaths that followed were an OOM caused by batching whole
+documents — not by embedder throughput. With extraction repaired and `--batch-size 1`, the same
+box rebuilds the same corpus at 8.7 points/min without stress. See the correction above: the
+constraint this section describes does not exist.
 
-So the constraint is real and now measured.
+~~That is a real constraint, not an annoyance. It means:~~
 
-That is a real constraint, not an annoyance. It means:
+> **Struck 2026-08-23.** All three bullets rested on the rebuild not finishing. It finishes.
+> They are kept, struck, so the reasoning that was actually used stays visible.
 
-- **there is no working recovery path.** "Re-index everything" is the standard answer to
-  a corrupted or drifted index, and here it does not terminate;
-- **the delta design assumes a rebuild exists.** `CORPUS_DELTA_CONTRACT.md` escalates to
+- ~~**there is no working recovery path.** "Re-index everything" is the standard answer to
+  a corrupted or drifted index, and here it does not terminate;~~ — it terminates in ~1.7 h.
+- ~~**the delta design assumes a rebuild exists.** `CORPUS_DELTA_CONTRACT.md` escalates to
   `mode: full` whenever a delta would be incomplete — an escape hatch that currently
-  goes nowhere;
-- **incremental sync becomes load-bearing rather than an optimisation**, which is a
-  fragile place to be.
+  goes nowhere;~~ — `mode: full` works.
+- ~~**incremental sync becomes load-bearing rather than an optimisation**~~ — incremental
+  sync is an optimisation again, with a working full rebuild behind it.
 
 This project has already made this decision once, one component over: the reranker was a
 per-query local ONNX model that OOM'd the backend, and moving it to an API took the
@@ -100,9 +113,11 @@ So: never mutate the live collection into a mixed state.
 
 ## Consequences
 
-**Gained:** a rebuild path that terminates; one less local model on a box that cannot
-afford it; full re-index measured in minutes of API calls rather than hours of contended
-CPU; `mode: full` in the delta contract stops being a dead end.
+**Gained:** ~2.7 GB of RAM returned by evicting the resident local embedder — the strongest
+remaining benefit; a full re-index in minutes of API calls rather than ~1.7 hours.
+
+*(Struck: "a rebuild path that terminates" and "`mode: full` stops being a dead end". Both
+were true only while extraction was broken. The rebuild terminates today.)*
 
 **Cost:** every ingest *and every query* now needs the embedding API. Retrieval acquires
 a hard external dependency in its hot path — if Voyage is down, retrieval is down (today
