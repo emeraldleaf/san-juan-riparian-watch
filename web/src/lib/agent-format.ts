@@ -35,37 +35,38 @@ export const CITE_PAPERS: Record<string, string> = {
 // (specs / decisions / audits) are mapped here, since the backend sends only
 // source_file, not the path — anything not listed is a docs/ top-level file.
 // (Keep in sync with the repo's docs/ layout; a wrong/missing entry 404s.)
-const DOC_SUBDIR: Record<string, string> = {
-  '2026-07-03-stage1-riparian-delineation': 'specs/',
-  '2026-07-04-document-intelligence-rag': 'specs/',
-  '2026-07-04-stage3-annual-change': 'specs/',
-  '2026-07-11-stage2-invasives-tamarix': 'specs/',
-  '2026-07-12-gpu-finetune-execution-plan': 'specs/',
-  '2026-07-18-phase3-deeptime-change': 'specs/',
-  '2026-07-19-fm-vs-rf-deploy-decision': 'specs/',
-  '2026-08-01-stage2-invasives-beetle-gate': 'specs/',
-  '2026-07-03-delineation-over-hydrology-buffers': 'decisions/',
-  '2026-07-04-document-intelligence-subsystem': 'decisions/',
-  '2026-07-04-nextaurora-rules-applicability': 'decisions/',
-  '2026-07-11-confidence-weighted-label-crosswalk': 'decisions/',
-  '2026-07-11-model-and-inference-hosting': 'decisions/',
-  '2026-07-12-beetle-training-pool-ecoregion-matched': 'decisions/',
-  '2026-07-12-olmoearth-finetune-invasives-with-extent-control': 'decisions/',
-  '2026-07-11-corip-woodward-2018': 'audits/',
-  '2026-07-11-tamarisk-detection-established': 'audits/',
-  '2026-07-12-evangelista-2018-csu-nrel': 'audits/',
-  '2026-07-12-perkins-2025-canyonlands': 'audits/',
-  '2026-07-14-riparian-methods-prior-art': 'audits/',
-  '2026-07-16-DECISION-MEMO-olmoearth-gpu': 'audits/',
-  '2026-07-16-cross-tile-transfer-results': 'audits/',
-  '2026-07-16-finetune-transfer-results': 'audits/',
-  '2026-07-16-label-budget-sweep-results': 'audits/',
-  '2026-07-16-malpais-reach-generalization-note': 'audits/',
-  '2026-07-16-presto-arm-results': 'audits/',
-  '2026-07-16-presto-species-results': 'audits/',
-  '2026-07-16-riparian-fm-methods-review': 'audits/',
-  '2026-07-16-three-tile-transfer-results': 'audits/',
-  '2026-07-17-cropglobe-tong-2025': 'audits/',
+// Corpus id -> the document's path under docs/, generated from
+// docintel/corpus/seed_sources.yaml and VERIFIED against the repo tree. Exact rather
+// than reconstructed: the previous version rebuilt paths from a prefix + a
+// subdirectory guess, which silently produced dead links for every `audit-*` citation
+// (their corpus ids drop the date prefix their filenames carry) and would have done
+// the same for every spec and decision record added to the corpus.
+const DOC_PATHS: Record<string, string> = {
+  'audit-corip-woodward-2018': 'audits/2026-07-11-corip-woodward-2018.md',
+  'audit-evangelista-2018-csu-nrel': 'audits/2026-07-12-evangelista-2018-csu-nrel.md',
+  'audit-perkins-2025-canyonlands': 'audits/2026-07-12-perkins-2025-canyonlands.md',
+  'audit-tamarisk-detection-established': 'audits/2026-07-11-tamarisk-detection-established.md',
+  'project-2026-07-03-delineation-over-hydrology-buffers': 'decisions/2026-07-03-delineation-over-hydrology-buffers.md',
+  'project-2026-07-03-stage1-riparian-delineation': 'specs/2026-07-03-stage1-riparian-delineation.md',
+  'project-2026-07-04-stage3-annual-change': 'specs/2026-07-04-stage3-annual-change.md',
+  'project-2026-07-11-model-and-inference-hosting': 'decisions/2026-07-11-model-and-inference-hosting.md',
+  'project-2026-07-11-stage2-invasives-tamarix': 'specs/2026-07-11-stage2-invasives-tamarix.md',
+  'project-2026-07-18-methods-and-metrics': '2026-07-18-methods-and-metrics.md',
+  'project-2026-07-18-reach-cube-materialization': '2026-07-18-reach-cube-materialization.md',
+  'project-2026-07-19-fm-vs-rf-deploy-decision': 'specs/2026-07-19-fm-vs-rf-deploy-decision.md',
+  'project-2026-07-20-diverse-reach-transfer': '2026-07-20-diverse-reach-transfer.md',
+  'project-2026-08-01-fm-vs-rf-loro-result': '2026-08-01-fm-vs-rf-loro-result.md',
+  'project-2026-08-10-arroyo-map-extent-artifact': '2026-08-10-arroyo-map-extent-artifact.md',
+  'project-2026-08-18-map-agent-runtime': 'decisions/2026-08-18-map-agent-runtime.md',
+  'project-2026-08-21-basin-scale-productionization': 'decisions/2026-08-21-basin-scale-productionization.md',
+  'project-2026-08-21-invasive-fm-vs-rf-loro': 'specs/2026-08-21-invasive-fm-vs-rf-loro.md',
+  'project-2026-08-21-reach-provenance-gap': '2026-08-21-reach-provenance-gap.md',
+  'project-RETRACTIONS': 'RETRACTIONS.md',
+  'project-STATUS': 'STATUS.md',
+  'project-code-review': 'code-review.md',
+  'project-data-sources': 'data-sources.md',
+  'project-literature-review': 'literature-review.md',
+  'project-method': 'method.md',
 };
 const DOCS_BASE = 'https://github.com/emeraldleaf/san-juan-riparian-watch/blob/main/docs/';
 
@@ -73,14 +74,14 @@ export function citeUrlFor(src: string): string | null {
   if (!src) return null;
   const stem = src.replace(/\.(md|pdf|html?)$/, '');
   if (CITE_PAPERS[stem]) return CITE_PAPERS[stem];
-  if (stem.indexOf('findings-') === 0)
-    return DOCS_BASE + stem.replace(/^findings-/, '') + '.md';
-  if (stem.indexOf('project-') === 0) {
-    const name = stem.replace(/^project-/, '');
-    return DOCS_BASE + (DOC_SUBDIR[name] || '') + name + '.md';
-  }
+  const path = DOC_PATHS[stem];
+  if (path) return DOCS_BASE + path;
+  // method.md is fetched as published HTML, so its id doesn't match a filename.
+  if (stem === 'project-method-ai-assisted-research') return DOCS_BASE + 'method.md';
+  if (stem.indexOf('findings-') === 0) return DOCS_BASE + stem.slice('findings-'.length) + '.md';
   return null;
 }
+
 
 // Escape ALL HTML-significant chars incl. quotes — the result is assigned via
 // dangerouslySetInnerHTML, so an unescaped " in a model-supplied link URL could
