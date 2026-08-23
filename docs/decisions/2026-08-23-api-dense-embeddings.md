@@ -2,14 +2,32 @@
 
 **2026-08-23 · status: proposed**
 
-> ⚠️ **The evidence cited below was misread — corrected the same day.** This ADR was written
-> from the observation that a full re-ingest never finished, and attributed that to the local
-> embedding model being too slow. It was not. The box could not import a PDF library, so every
-> PDF was byte-decoded into a multi-megabyte pseudo-document, and the run was trying to embed
-> **~20,000 chunks of binary noise instead of ~1,400 chunks of text**. Faster embeddings would
-> have failed faster. With clean input the rebuild may well finish locally and this ADR may not
-> be needed at all. Decide it on cost, latency and quality — never on "the rebuild does not
-> terminate", which is no longer true.
+> ⚠️ **Corrected twice on 2026-08-23. The original reasoning was wrong; the decision survives.**
+>
+> This ADR was written from "a full re-ingest never finishes" and blamed the local embedder. The
+> first cause found was different: the box could not import a PDF library, so every PDF was
+> byte-decoded into a multi-megabyte pseudo-document and the run was embedding **~20,000 chunks of
+> binary noise instead of ~1,000 chunks of text**. Two further bugs hid HTML and mislabelled 21
+> markdown files. All are fixed.
+>
+> **Then it was measured properly, and the conclusion here holds after all.** With extraction
+> repaired the box reached **55 documents** (up from 21) and still could not embed them:
+>
+> | attempt | documents | embeddings done | died at | error |
+> |---|---:|---:|---:|---|
+> | 1 | 21 | 1 batch / 30.1 s | 31 min | none |
+> | 2 | 21 | 1 batch / 30.1 s | 31 min | none |
+> | 3 (extraction fixed) | **55** | 1 batch / 29.5 s | **45 min** | none |
+>
+> One batch in ~30 s, then silence, then a death with no traceback — the signature of an OOM kill.
+> Three times, unchanged by fixing the input. **So the local embedder genuinely cannot rebuild this
+> corpus on this hardware, and that is now measured rather than assumed.**
+>
+> One caveat before accepting: a **proven** alternative already exists — `deploy/push-to-prod.sh
+> corpus` extracts locally and ships the processed JSONL, so the box never embeds a cold corpus from
+> scratch. That path built the 988-point index this collection used to hold. Weigh this ADR against
+> keeping that, not against the failing path.
+>
 > Post-mortem: [when a missing library became a 65 MB document](../2026-08-23-corpus-extraction-failure.md).
 
 ## Context
