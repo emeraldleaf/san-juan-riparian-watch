@@ -133,9 +133,16 @@
 .ma-form button:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 820px) {
-  .ma-layout { grid-template-columns: 1fr; grid-template-rows: 44vh auto; height: auto; }
-  .ma-map { min-height: 300px; }
+  /* 44vh of map plus a full intro block pushed the first answer well below the fold.
+     Trim both: a shorter map, and a header that keeps the title and lede but stops
+     spending 32px of padding on them. */
+  .ma-layout { grid-template-columns: 1fr; grid-template-rows: 38vh auto; height: auto; }
+  .ma-map { min-height: 260px; }
   .ma-panel { border-left: none; border-top: 1px solid var(--line); }
+  .ma-head { padding: 12px 16px 8px; }
+  .ma-head h1 { margin: 4px 0 6px; font-size: 19px; }
+  .ma-lede { font-size: 12.5px; line-height: 1.45; }
+  .ma-log { padding: 12px 16px; }
   /* Keep the legend a small overlay on a short map: tighter, smaller, and never
      taller than half the map or wider than 62% of it. Scrolls if it must. */
   .ma-legend { left: 8px; top: 8px; padding: 7px 9px; font-size: 12px;
