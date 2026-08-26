@@ -68,8 +68,25 @@ export default function MapAgent() {
   useEffect(() => {
     const el = logRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    const id = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+
+    // Two layouts, two scrollers. On desktop .ma-panel has a bounded height so the
+    // log scrolls INSIDE itself. On mobile the grid row is `auto`, so the log has no
+    // height to overflow — it just grows and the PAGE scrolls. Pinning scrollTop
+    // there is a no-op, which is why a phone left the newest answer far below the
+    // map with nothing bringing it into view.
+    const pin = () => {
+      const scrollsItself = el.scrollHeight > el.clientHeight + 1;
+      if (scrollsItself) {
+        el.scrollTop = el.scrollHeight;
+      } else {
+        // The page is the scroller: bring the newest message to the viewport.
+        // block:'nearest' scrolls the minimum needed, so it never yanks the map
+        // off-screen when the answer was already visible.
+        el.lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    };
+    pin();
+    const id = requestAnimationFrame(pin);   // covers late layout (images, tables)
     return () => cancelAnimationFrame(id);
   }, [msgs, busy, pausedForAsk]);
 
