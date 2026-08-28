@@ -26,10 +26,8 @@ declare global {
 
 let scriptPromise: Promise<void> | null = null;
 
-// Why the most recent mint failed, for the caller's error message. Undefined means
-// no failure recorded. Not state anyone should branch on — it is for reporting.
-let lastFailure: string | undefined;
-export function lastTurnstileFailure(): string | undefined { return lastFailure; }
+/** A mint attempt: the token if one was produced, else why not. */
+export type MintResult = { token?: string; reason?: string };
 
 function loadScript(): Promise<void> {
   if (scriptPromise) return scriptPromise;
@@ -51,14 +49,13 @@ function loadScript(): Promise<void> {
  * when the gate is off / the widget can't produce one. Each call renders a
  * throwaway widget and removes it, so tokens are never reused across requests.
  */
-export async function turnstileToken(): Promise<string | undefined> {
-  if (!SITEKEY) return undefined; // gate off — no key configured
-  lastFailure = undefined;
+export async function turnstileToken(): Promise<MintResult> {
+  if (!SITEKEY) return {}; // gate off — no key configured
   try {
     await loadScript();
     const ts = window.turnstile;
-    if (!ts) { lastFailure = 'script-blocked'; return undefined; }
-    return await new Promise<string | undefined>((resolve) => {
+    if (!ts) return { reason: 'script-blocked' };
+    return await new Promise<MintResult>((resolve) => {
       // OFF-SCREEN, not display:none. An invisible Turnstile widget still has to
       // render to execute, and a display:none container is documented as unreliable
       // for that — it fails intermittently, which is exactly the symptom seen on
@@ -71,34 +68,43 @@ export async function turnstileToken(): Promise<string | undefined> {
       holder.setAttribute('aria-hidden', 'true');
       document.body.appendChild(holder);
       let id: string | undefined;
-      const finish = (token?: string) => {
+      const finish = (token?: string, reason?: string) => {
         clearTimeout(timer);
         try { if (id) ts.remove(id); } catch { /* already gone */ }
         holder.remove();
-        resolve(token);
+        resolve(token ? { token } : { reason: reason || 'no-token' });
       };
       // 12s, not 8s: Cloudflare can escalate an invisible widget to an interactive
       // challenge, which takes longer than a silent pass.
-      const timer = setTimeout(() => { lastFailure = 'timeout'; finish(undefined); }, 12000);
+      const timer = setTimeout(() => finish(undefined, 'timeout'), 12000);
       try {
         // An invisible widget auto-executes on render, so we don't call
         // execute() ourselves (doing so logs "already executing").
+        // NO `size: 'invisible'`. Cloudflare documents only normal / flexible /
+        // compact for size; invisible is a property of the SITEKEY's widget mode,
+        // set in the Cloudflare dashboard, not a render option. Passing an
+        // undocumented value is how this silently misbehaved.
+        //
+        // This makes the sitekey's configured mode load-bearing: it must be
+        // Invisible. If it is Managed or Non-Interactive the widget expects to be
+        // seen, and rendering it off-screen will never complete.
         id = ts.render(holder, {
           sitekey: SITEKEY,
-          size: 'invisible',
           callback: (token: string) => finish(token),
           // Cloudflare passes an error CODE here and the old version discarded it,
           // so a failed mint was indistinguishable from every other failed mint.
           // Keep the last one so callers can report WHY rather than guessing.
-          'error-callback': (code?: string) => { lastFailure = code || 'error'; finish(undefined); },
-          'timeout-callback': () => { lastFailure = 'challenge-timeout'; finish(undefined); },
+          'error-callback': (code?: string) => finish(undefined, code || 'error'),
+          'timeout-callback': () => finish(undefined, 'challenge-timeout'),
         });
       } catch {
-        finish(undefined);
+        // ts.render() can throw synchronously (bad sitekey, widget already
+        // rendered). Without a reason here the caller gets a 403 it cannot explain,
+        // which is the gap this whole file was changed to close.
+        finish(undefined, 'render-threw');
       }
     });
   } catch {
-    lastFailure = lastFailure || 'script-load-failed';
-    return undefined;
+    return { reason: 'script-load-failed' };
   }
 }
