@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { turnstileToken } from '../scripts/turnstile';
+import { turnstileToken, lastTurnstileFailure } from '../scripts/turnstile';
 
 // The grounded RAG agent, as a React island. It streams tokens from the full
 // Quartzose /query/stream pipeline, renders numbered source chips, and lets the
@@ -229,8 +229,9 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
       // happening, and hides the one thing that would fix it: reload the page.
       .catch((e: any) => {
         const denied = e?.status === 403;
+        const why = lastTurnstileFailure();
         finalize(fallbackAnswer(text) + (denied
-          ? '\n\n(the bot check did not complete, so that was a pre-written answer. Reload the page and ask again.)'
+          ? `\n\n(the bot check did not complete${why ? ` (${why})` : ''}, so that was a pre-written answer. Reload the page and ask again.)`
           : '\n\n(the live agent was unreachable just now, that was a pre-written answer.)'), [], []);
         if (!denied) setLive(false);
       })

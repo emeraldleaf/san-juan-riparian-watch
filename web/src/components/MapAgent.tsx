@@ -5,7 +5,7 @@
 //    map client owns the scenes (camera + layers); this panel shows the narration
 //    beat by beat and lets you pause, ask, and continue — all in the same thread.
 import { useEffect, useRef, useState } from 'react';
-import { turnstileToken } from '../scripts/turnstile';
+import { turnstileToken, lastTurnstileFailure } from '../scripts/turnstile';
 import { citeUrlFor, mdToHtml } from '../lib/agent-format';
 
 type Msg = { role: 'user' | 'agent'; text: string; steps?: { tool: string }[]; cited?: string[]; pres?: boolean;
@@ -172,8 +172,9 @@ export default function MapAgent() {
       setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps,
         cited: d.cited_sources, zoomTo: turnedOn.length ? turnedOn : undefined }]);
     } catch (e: any) {
+      const why = lastTurnstileFailure();
       setMsgs((m) => [...m, { role: 'agent', text: e?.status === 403
-        ? 'The bot check did not complete. Reload the page and ask again.'
+        ? `The bot check did not complete${why ? ` (${why})` : ''}. Reload the page and ask again.`
         : 'The map agent is unreachable right now.' }]);
     } finally {
       setBusy(false);
