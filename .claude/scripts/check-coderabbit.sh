@@ -106,10 +106,34 @@ else
     Push, or trigger it with '@coderabbitai review' — and do NOT trust a bare '✅ Review finished'."
 fi
 
-# 2. Unaddressed review findings block the merge, even with a green check.
-#    Top-level comments only (in_reply_to_id == null); a thread we replied in is engaged-with.
-FINDINGS=$(gh api "repos/{owner}/{repo}/pulls/$PR/comments" --paginate \
-    --jq '[.[] | select(.user.login|test("coderabbit";"i")) | select(.in_reply_to_id == null)] | length' 2>/dev/null || echo 0)
+# 2. UNADDRESSED review findings block the merge, even with a green check.
+#
+#    The comment here used to say "a thread we replied in is engaged-with" while the query
+#    counted every top-level comment regardless of replies OR resolution. Documentation and
+#    implementation disagreed, and the implementation won: on #130 three findings were fixed,
+#    all three threads auto-resolved (their line anchors outdated by the fix), and each carried
+#    a reply naming the commit that addressed it — and the gate still counted three.
+#
+#    Combined with check 3 below that made the PR unmergeable by any route. CodeRabbit posts
+#    COMMENTED on this repo, never APPROVED, so a findings-bearing PR could never satisfy
+#    "current:APPROVED" and could never get the count to zero either.
+#
+#    A gate that cannot be satisfied by doing the right thing does not enforce rigor, it
+#    trains people to bypass it. So: count only threads that are still OPEN and still
+#    UNANSWERED. Resolution is CodeRabbit's or GitHub's judgement that the code moved on; a
+#    reply is ours that it was handled. Either is engagement. Neither is silence.
+FINDINGS=$(gh api graphql -f query='
+  query($owner:String!,$name:String!,$pr:Int!) {
+    repository(owner:$owner,name:$name) { pullRequest(number:$pr) {
+      reviewThreads(first:100) { nodes {
+        isResolved isOutdated
+        comments(first:100){ nodes { author { login } } }
+      } } } } }'   -F owner="${OWNER:-$(gh repo view --json owner -q .owner.login)}"   -F name="${REPO:-$(gh repo view --json name -q .name)}"   -F pr="$PR" 2>/dev/null   | jq '[ .data.repository.pullRequest.reviewThreads.nodes[]
+          | select(.isResolved | not)
+          | select(.comments.nodes[0].author.login | test("coderabbit";"i"))
+          # a human reply anywhere in the thread means we engaged with it
+          | select([.comments.nodes[].author.login | test("coderabbit";"i")] | all)
+        ] | length' 2>/dev/null || echo 0)
 
 # 3. Did CodeRabbit review THIS head? A review on an older commit has not seen your fix.
 #    NOTE: `gh api --jq` does NOT accept jq's `--arg`; passing it makes gh error ("accepts 1
