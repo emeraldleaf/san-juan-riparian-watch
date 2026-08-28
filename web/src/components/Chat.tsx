@@ -174,11 +174,11 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctrl.abort(), 30000); };
     bump();
     try {
-      const token = await turnstileToken();
+      const mint = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
-      if (token) headers['X-Turnstile-Token'] = token;
+      if (mint.token) headers['X-Turnstile-Token'] = mint.token;
       const r = await fetch(url, { method: 'POST', headers, signal: ctrl.signal, body: JSON.stringify({ query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current }) });
-      if (!r.ok || !r.body) throw new Error('agent ' + r.status);
+      if (!r.ok || !r.body) throw Object.assign(new Error('agent ' + r.status), { status: r.status, mintReason: mint.reason });
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '', full = ''; const ctx: any[] = [];
       for (;;) {
         const out = await reader.read(); if (out.done) break;
@@ -207,11 +207,11 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const body = isQuery ? { query: q, session_id: sessionRef.current || undefined, use_cache: true, model_tier: tierRef.current } : { question: q, top_k: 8 };
     const t = withTimeout(60000);
     try {
-      const token = await turnstileToken();
+      const mint = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
-      if (token) headers['X-Turnstile-Token'] = token;
+      if (mint.token) headers['X-Turnstile-Token'] = mint.token;
       const r = await fetch(AGENT_URL, { method: 'POST', headers, signal: t.signal, body: JSON.stringify(body) });
-      if (!r.ok) throw new Error('agent ' + r.status);
+      if (!r.ok) throw Object.assign(new Error('agent ' + r.status), { status: r.status, mintReason: mint.reason });
       const res = await r.json();
       if (isQuery) {
         if (res.session_id) sessionRef.current = res.session_id;
@@ -238,7 +238,17 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     const onRewrite = (s: string) => { standalone = s; setMessages((m) => { const c = m.slice(); c[c.length - 1] = { ...c[c.length - 1], standalone: s }; return c; }); };
     const run = isQuery ? askLiveStream(text, onToken, onRewrite) : askLive(text).then((res: any) => ({ answer: res.answer, citations: res.citations, geoms: res.resolved_geometries }));
     run.then((res: any) => finalize(res.answer || '(no answer returned)', res.citations || [], res.geoms || []))
-      .catch(() => { finalize(fallbackAnswer(text) + '\n\n(the live agent was unreachable just now, that was a pre-written answer.)', [], []); setLive(false); })
+      // A 403 is the bot check failing to mint a token, not the agent being down.
+      // Saying "offline" there sends the reader to look for an outage that is not
+      // happening, and hides the one thing that would fix it: reload the page.
+      .catch((e: any) => {
+        const denied = e?.status === 403;
+        const why = e?.mintReason;
+        finalize(fallbackAnswer(text) + (denied
+          ? `\n\n(the bot check did not complete${why ? ` (${why})` : ''}, so that was a pre-written answer. Reload the page and ask again.)`
+          : '\n\n(the live agent was unreachable just now, that was a pre-written answer.)'), [], []);
+        if (!denied) setLive(false);
+      })
       .finally(() => setBusy(false));
   }, [busy, live, isQuery, askLive, askLiveStream, finalize]);
 

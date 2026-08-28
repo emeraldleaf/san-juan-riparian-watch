@@ -145,11 +145,12 @@ export default function MapAgent() {
     setMsgs((m) => [...m, { role: 'user', text: q }]);
     setBusy(true);
     try {
-      const token = await turnstileToken();
+      const mint = await turnstileToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
-      if (token) headers['X-Turnstile-Token'] = token;
+      if (mint.token) headers['X-Turnstile-Token'] = mint.token;
       const r = await fetch('/agent/map', { method: 'POST', headers, body: JSON.stringify(SESSION_ID ? { question: q, session_id: SESSION_ID } : { question: q }), signal: AbortSignal.timeout(30000) });
-      if (!r.ok) throw new Error(`agent responded ${r.status}`);  // e.g. 403 when the Turnstile token is missing/invalid
+      // 403 here means the bot check did not mint a token, NOT that the agent is down.
+      if (!r.ok) throw Object.assign(new Error(`agent responded ${r.status}`), { status: r.status, mintReason: mint.reason });
       const d = await r.json();
       const context = Object.values(d.display_geom || {}).filter(Boolean)[0];
       const riparian = Object.values(d.riparian_geom || {}).filter(Boolean)[0];
@@ -170,8 +171,11 @@ export default function MapAgent() {
       });
       setMsgs((m) => [...m, { role: 'agent', text: d.answer || '(no answer)', steps: d.steps,
         cited: d.cited_sources, zoomTo: turnedOn.length ? turnedOn : undefined }]);
-    } catch {
-      setMsgs((m) => [...m, { role: 'agent', text: 'The map agent is unreachable right now.' }]);
+    } catch (e: any) {
+      const why = e?.mintReason;
+      setMsgs((m) => [...m, { role: 'agent', text: e?.status === 403
+        ? `The bot check did not complete${why ? ` (${why})` : ''}. Reload the page and ask again.`
+        : 'The map agent is unreachable right now.' }]);
     } finally {
       setBusy(false);
     }
