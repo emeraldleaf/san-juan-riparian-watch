@@ -240,6 +240,14 @@
   .qa-head .live.on{color:var(--native);border-color:color-mix(in srgb,var(--native) 45%,var(--line));background:color-mix(in srgb,var(--native) 8%,transparent);}
   .qa-head .live .pip{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:5px;}
   .chat{padding:16px;max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:11px;}
+  /* On a phone a 400px scroller inside a scrolling page is two nested scrollers:
+     you swipe, the page moves, you hit the chat and it scrolls instead, and neither
+     goes where you meant. Let the chat grow and let the PAGE be the only scroller.
+     The JS that keeps your last question in view detects which element actually
+     scrolls, so both layouts stay correct. */
+  @media (max-width:640px){
+    .chat{max-height:none;overflow-y:visible;padding:14px;}
+  }
   .chat::-webkit-scrollbar{width:6px;} .chat::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px;}
   .msg{max-width:88%;padding:11px 14px;border-radius:var(--radius);font-size:14.5px;line-height:1.55;white-space:pre-wrap;}
   .msg.a{align-self:flex-start;background:var(--ground);border:1px solid var(--line);border-bottom-left-radius:5px;}
