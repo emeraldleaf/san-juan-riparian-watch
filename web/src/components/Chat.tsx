@@ -91,7 +91,21 @@ export default function Chat({ agentUrl = '/query' }: { agentUrl?: string }) {
     if (messages.length > prevLenRef.current) {
       const qs = el.querySelectorAll('.msg.u');
       const lastQ = qs[qs.length - 1] as HTMLElement | undefined;
-      if (lastQ) el.scrollTo({ top: el.scrollTop + lastQ.getBoundingClientRect().top - el.getBoundingClientRect().top - 8, behavior: 'smooth' });
+      if (lastQ) {
+        // Which element actually scrolls depends on the layout. On desktop .chat is
+        // capped at 400px and scrolls inside itself; on mobile that cap is removed
+        // (two nested scrollers fight each other on a phone) and the PAGE scrolls.
+        // Calling scrollTo on a non-scrolling element is a silent no-op, which is
+        // how the map agent ended up leaving new answers below the fold.
+        const scrollsItself = el.scrollHeight > el.clientHeight + 1;
+        if (scrollsItself) {
+          el.scrollTo({ top: el.scrollTop + lastQ.getBoundingClientRect().top - el.getBoundingClientRect().top - 8, behavior: 'smooth' });
+        } else {
+          // Same intent, page-level: put the question you just asked at the top so
+          // the answer streams in below it.
+          lastQ.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
     }
     prevLenRef.current = messages.length;
   }, [messages]);
