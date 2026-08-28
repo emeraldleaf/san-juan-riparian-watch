@@ -98,8 +98,17 @@ REVIEWED_HEAD=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
     --jq '.[] | select(.user.login|test("coderabbit";"i")) | .body' 2>/dev/null \
     | grep -oiE '\b[0-9a-f]{40}\b' | grep -Fxc "$HEAD" || true)
 
-if [[ "${REVIEWED_HEAD:-0}" -gt 0 ]]; then
-    echo "  ${GREEN}✓${NC} CodeRabbit's walkthrough names ${SHORT} — it read this exact head"
+# A walkthrough does not ALWAYS carry the SHA. On #132 CodeRabbit reviewed the head and
+# posted CHANGES_REQUESTED against it, yet mentioned no SHA anywhere in its comments, so
+# the grep above found nothing and the gate reported "has not reviewed" about a review
+# that had demonstrably happened. The reviews API records commit_id directly; that is
+# authoritative where the prose is merely conventional.
+REVIEW_ON_HEAD=$(gh api "repos/{owner}/{repo}/pulls/$PR/reviews" --paginate 2>/dev/null \
+    | jq -r --arg h "$HEAD" '[.[] | select(.user.login|test("coderabbit";"i"))
+                              | select(.commit_id == $h)] | length' 2>/dev/null || echo 0)
+
+if [[ "${REVIEWED_HEAD:-0}" -gt 0 || "${REVIEW_ON_HEAD:-0}" -gt 0 ]]; then
+    echo "  ${GREEN}✓${NC} CodeRabbit reviewed ${SHORT} — this exact head"
 else
     fail "CodeRabbit has not reviewed ${SHORT}.
     Its walkthrough does not name this commit, so it has not seen what you are about to merge.
@@ -122,18 +131,54 @@ fi
 #    trains people to bypass it. So: count only threads that are still OPEN and still
 #    UNANSWERED. Resolution is CodeRabbit's or GitHub's judgement that the code moved on; a
 #    reply is ours that it was handled. Either is engagement. Neither is silence.
-FINDINGS=$(gh api graphql -f query='
-  query($owner:String!,$name:String!,$pr:Int!) {
-    repository(owner:$owner,name:$name) { pullRequest(number:$pr) {
-      reviewThreads(first:100) { nodes {
-        isResolved isOutdated
-        comments(first:100){ nodes { author { login } } }
-      } } } } }'   -F owner="${OWNER:-$(gh repo view --json owner -q .owner.login)}"   -F name="${REPO:-$(gh repo view --json name -q .name)}"   -F pr="$PR" 2>/dev/null   | jq '[ .data.repository.pullRequest.reviewThreads.nodes[]
-          | select(.isResolved | not)
-          | select(.comments.nodes[0].author.login | test("coderabbit";"i"))
-          # a human reply anywhere in the thread means we engaged with it
-          | select([.comments.nodes[].author.login | test("coderabbit";"i")] | all)
-        ] | length' 2>/dev/null || echo 0)
+#    PAGINATED and FAIL-CLOSED. The first version read only the first 100 threads and
+#    used `|| echo 0`, so an API error, a jq error, or a 101st thread silently produced
+#    FINDINGS=0 — the zero-findings SUCCESS path. A merge gate that passes when it cannot
+#    see is worse than no gate: it reports safety it never established, which is the exact
+#    failure this whole script exists to catch.
+_gql_threads() {   # $1 = after-cursor or empty
+  local after=""
+  [[ -n "${1:-}" ]] && after=", after: \"$1\""
+  gh api graphql -f query="
+    { repository(owner: \"$OWNER\", name: \"$REPO_NAME\") {
+        pullRequest(number: $PR) {
+          reviewThreads(first: 100$after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              isResolved
+              comments(first: 100) {
+                pageInfo { hasNextPage }
+                nodes { author { login } }
+              } } } } } }"
+}
+
+OWNER=$(gh repo view --json owner -q .owner.login 2>/dev/null) || fail "cannot resolve repo owner"
+REPO_NAME=$(gh repo view --json name -q .name 2>/dev/null) || fail "cannot resolve repo name"
+
+FINDINGS=0
+CURSOR=""
+while :; do
+    PAGE=$(_gql_threads "$CURSOR") \
+        || fail "could not read review threads for #$PR (API error). Refusing to report a
+    finding count this script could not actually establish."
+    echo "$PAGE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1 \
+        || fail "unexpected GraphQL response shape for #$PR. Refusing to guess."
+
+    #  A thread blocks when it is OPEN, opened by CodeRabbit, and no human has replied.
+    #  If its comment list is itself truncated we count it: unsure means blocked, never
+    #  waved through.
+    N=$(echo "$PAGE" | jq '[ .data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved | not)
+        | select(.comments.nodes[0].author.login | test("coderabbit";"i"))
+        | select( (.comments.pageInfo.hasNextPage)
+                  or ([.comments.nodes[].author.login | test("coderabbit";"i")] | all) )
+      ] | length') || fail "could not evaluate review threads for #$PR"
+    FINDINGS=$(( FINDINGS + N ))
+
+    HAS_NEXT=$(echo "$PAGE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+    [[ "$HAS_NEXT" == "true" ]] || break
+    CURSOR=$(echo "$PAGE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
+done
 
 # 3. Did CodeRabbit review THIS head? A review on an older commit has not seen your fix.
 #    NOTE: `gh api --jq` does NOT accept jq's `--arg`; passing it makes gh error ("accepts 1
